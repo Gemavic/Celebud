@@ -110,6 +110,68 @@ function generateSlug(title: string): string {
     .substring(0, 100);
 }
 
+async function fetchFullArticleContent(url: string): Promise<string> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      },
+    });
+
+    if (!response.ok) return '';
+
+    const html = await response.text();
+
+    let content = '';
+
+    const articleSelectors = [
+      /<article[^>]*>([\s\S]*?)<\/article>/i,
+      /<div[^>]*class="[^"]*article-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*class="[^"]*post-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<main[^>]*>([\s\S]*?)<\/main>/i,
+    ];
+
+    for (const selector of articleSelectors) {
+      const match = html.match(selector);
+      if (match && match[1]) {
+        content = match[1];
+        break;
+      }
+    }
+
+    if (!content) {
+      const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+      if (bodyMatch) {
+        content = bodyMatch[1];
+      }
+    }
+
+    content = content
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+      .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+      .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+      .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '')
+      .replace(/<div[^>]*class="[^"]*comment[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+      .replace(/<div[^>]*class="[^"]*sidebar[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+      .replace(/<div[^>]*class="[^"]*ad[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+
+    const paragraphs = content.match(/<p[^>]*>[\s\S]*?<\/p>/gi) || [];
+    const cleanedParagraphs = paragraphs
+      .map(p => stripHtml(p))
+      .filter(p => p.length > 50)
+      .join('\n\n');
+
+    return cleanedParagraphs.substring(0, 15000);
+  } catch (error) {
+    console.error('Error fetching full article:', error);
+    return '';
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -173,7 +235,7 @@ Deno.serve(async (req: Request) => {
 
         for (const item of items.slice(0, 10)) {
           const slug = generateSlug(item.title);
-          
+
           const { data: existing } = await supabase
             .from('media_content')
             .select('id')
@@ -181,11 +243,20 @@ Deno.serve(async (req: Request) => {
             .maybeSingle();
 
           if (!existing) {
+            let fullContent = item.content;
+
+            if (item.link) {
+              const scrapedContent = await fetchFullArticleContent(item.link);
+              if (scrapedContent && scrapedContent.length > fullContent.length) {
+                fullContent = scrapedContent;
+              }
+            }
+
             const { error } = await supabase.from('media_content').insert({
               title: item.title,
               slug,
               description: item.description,
-              content: item.content,
+              content: fullContent,
               category_id: defaultCategory?.id,
               author_id: defaultAuthor?.id,
               media_type: 'article',
