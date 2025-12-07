@@ -103,14 +103,14 @@ export function HomePage() {
         </div>
 
         <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900">
+              <h2 className="text-2xl font-semibold text-gray-900">
                 {selectedCategory
-                  ? `${categories.find((c) => c.slug === selectedCategory)?.name} Content`
-                  : 'Latest Content'}
+                  ? `${categories.find((c) => c.slug === selectedCategory)?.name}`
+                  : 'Latest Stories'}
               </h2>
-              <p className="text-gray-600 mt-1">Discover the freshest stories and updates</p>
+              <p className="text-gray-500 text-sm mt-1">Fresh updates and trending news</p>
             </div>
           </div>
 

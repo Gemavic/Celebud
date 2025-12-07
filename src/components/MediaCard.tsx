@@ -30,7 +30,7 @@ export function MediaCard({ content }: MediaCardProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
         {content.is_trending && (
-          <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center space-x-1">
+          <div className="absolute top-3 left-3 bg-red-500 text-white px-2.5 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
             <span>🔥</span>
             <span>Trending</span>
           </div>
@@ -38,7 +38,7 @@ export function MediaCard({ content }: MediaCardProps) {
 
         {content.categories && (
           <span
-            className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold uppercase text-white backdrop-blur-sm"
+            className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-medium text-white backdrop-blur-sm"
             style={{ backgroundColor: `${content.categories.color}CC` }}
           >
             {content.categories.name}
@@ -52,11 +52,11 @@ export function MediaCard({ content }: MediaCardProps) {
       </div>
 
       <div className="p-5">
-        <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-rose-600 group-hover:to-purple-600 group-hover:bg-clip-text transition-all">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-red-600 transition-colors">
           {content.title}
         </h3>
 
-        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+        <p className="text-gray-600 text-sm mb-4 line-clamp-3 leading-relaxed">
           {content.description}
         </p>
 
@@ -67,9 +67,9 @@ export function MediaCard({ content }: MediaCardProps) {
                 <img
                   src={content.authors.avatar_url || ''}
                   alt={content.authors.name}
-                  className="w-8 h-8 rounded-full border-2 border-gray-200"
+                  className="w-7 h-7 rounded-full border border-gray-200"
                 />
-                <span className="text-sm text-gray-700 font-medium">
+                <span className="text-xs text-gray-600">
                   {content.authors.name}
                 </span>
               </>
@@ -77,21 +77,21 @@ export function MediaCard({ content }: MediaCardProps) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-          <div className="flex items-center space-x-4 text-gray-500 text-xs">
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+          <div className="flex items-center space-x-3 text-gray-500 text-xs">
             <div className="flex items-center space-x-1">
-              <Eye className="w-4 h-4" />
+              <Eye className="w-3.5 h-3.5" />
               <span>{(content.views_count / 1000).toFixed(1)}K</span>
             </div>
             <div className="flex items-center space-x-1">
-              <Clock className="w-4 h-4" />
+              <Clock className="w-3.5 h-3.5" />
               <span>{formatDistanceToNow(content.published_at)}</span>
             </div>
           </div>
 
-          <button className="text-sm font-semibold text-transparent bg-gradient-to-r from-rose-600 to-purple-600 bg-clip-text hover:from-rose-700 hover:to-purple-700 transition-all">
+          <span className="text-xs text-red-600 hover:text-red-700 transition-colors">
             {content.media_type === 'video' || content.media_type === 'audio' ? 'Play' : 'Read'} →
-          </button>
+          </span>
         </div>
       </div>
     </article>

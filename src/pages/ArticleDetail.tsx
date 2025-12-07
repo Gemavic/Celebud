@@ -102,48 +102,48 @@ export function ArticleDetail() {
 
           {article.categories && (
             <span
-              className="inline-block px-4 py-1.5 rounded-full text-sm font-bold uppercase text-white mb-4"
+              className="inline-block px-3 py-1 rounded-full text-xs font-medium text-white mb-4"
               style={{ backgroundColor: article.categories.color }}
             >
               {article.categories.name}
             </span>
           )}
 
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
+          <h1 className="text-3xl md:text-4xl font-semibold text-gray-900 mb-5 leading-snug">
             {article.title}
           </h1>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-10 pb-8 border-b-2 border-gray-100">
-            <div className="flex items-center space-x-4 mb-4 sm:mb-0">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 pb-6 border-b border-gray-200">
+            <div className="flex items-center space-x-3 mb-4 sm:mb-0">
               {article.authors && (
                 <>
                   <img
                     src={article.authors.avatar_url || ''}
                     alt={article.authors.name}
-                    className="w-14 h-14 rounded-full border-2 border-red-100 shadow-md"
+                    className="w-11 h-11 rounded-full border border-gray-200"
                   />
                   <div>
-                    <p className="font-bold text-gray-900 text-lg">{article.authors.name}</p>
-                    <p className="text-sm text-gray-600">{article.authors.role}</p>
+                    <p className="font-medium text-gray-900 text-sm">{article.authors.name}</p>
+                    <p className="text-xs text-gray-500">{article.authors.role}</p>
                   </div>
                 </>
               )}
             </div>
 
-            <div className="flex items-center space-x-6 text-gray-600 text-sm">
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-red-600" />
-                <span className="font-medium">{formatDistanceToNow(article.published_at)}</span>
+            <div className="flex items-center space-x-4 text-gray-500 text-xs">
+              <div className="flex items-center space-x-1">
+                <Clock className="w-3.5 h-3.5" />
+                <span>{formatDistanceToNow(article.published_at)}</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <Eye className="w-4 h-4 text-red-600" />
-                <span className="font-medium">{((article.views_count || 0) / 1000).toFixed(1)}K views</span>
+              <div className="flex items-center space-x-1">
+                <Eye className="w-3.5 h-3.5" />
+                <span>{((article.views_count || 0) / 1000).toFixed(1)}K views</span>
               </div>
             </div>
           </div>
 
           {article.thumbnail_url && (
-            <div className="mb-10 rounded-2xl overflow-hidden shadow-xl">
+            <div className="mb-8 rounded-xl overflow-hidden shadow-lg">
               <img
                 src={article.thumbnail_url}
                 alt={article.title}
@@ -152,97 +152,104 @@ export function ArticleDetail() {
             </div>
           )}
 
-          <article className="prose prose-lg max-w-none mb-12">
-            {article.content ? (
-              <div className="text-gray-800 text-lg leading-relaxed space-y-6">
-                {article.content.split('\n\n').map((paragraph, index) => (
-                  <p key={index} className="text-justify">
+          <div className="prose prose-lg max-w-none mb-12">
+            <div className="text-gray-700 text-base leading-relaxed space-y-5">
+              {(article.content || article.description)
+                .split('\n')
+                .filter(para => para.trim())
+                .map((paragraph, index) => (
+                  <p key={index} className="leading-loose">
                     {paragraph}
                   </p>
-                ))}
-              </div>
-            ) : (
-              <div className="text-gray-800 text-lg leading-relaxed space-y-6">
-                {article.description.split('\n\n').map((paragraph, index) => (
-                  <p key={index} className="text-justify">
-                    {paragraph}
-                  </p>
-                ))}
-              </div>
-            )}
+                ))
+              }
+
+            </div>
 
             {article.source_url && (
-              <div className="mt-10 p-6 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 shadow-sm">
-                <p className="text-sm font-semibold text-gray-700 mb-3">Source</p>
+              <div className="mt-8 p-5 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-xs font-medium text-gray-600 mb-2">Source</p>
                 <a
                   href={article.source_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-red-600 hover:text-red-700 font-medium break-all inline-flex items-center"
+                  className="text-red-600 hover:text-red-700 text-sm break-all inline-flex items-center"
                 >
                   Read the original article
-                  <span className="ml-2">→</span>
+                  <span className="ml-1">→</span>
                 </a>
               </div>
             )}
-          </article>
+          </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-8 border-y-2 border-gray-100 mb-12 bg-gray-50 px-6 rounded-xl">
-            <p className="text-gray-800 font-bold text-lg mb-4 sm:mb-0">Share this article</p>
-            <div className="flex items-center space-x-3">
-              <button
-                className="p-3 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-all hover:scale-110 shadow-md"
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-6 border-y border-gray-200 mb-12 bg-gray-50 px-5 rounded-lg">
+            <p className="text-gray-700 font-medium text-base mb-4 sm:mb-0">Share this article</p>
+            <div className="flex items-center space-x-2">
+              <a
+                href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2.5 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm"
                 aria-label="Share on Facebook"
               >
-                <Facebook className="w-5 h-5" />
-              </button>
-              <button
-                className="p-3 rounded-full bg-sky-500 text-white hover:bg-sky-600 transition-all hover:scale-110 shadow-md"
+                <Facebook className="w-4 h-4" />
+              </a>
+              <a
+                href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(article.title)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2.5 rounded-full bg-sky-500 text-white hover:bg-sky-600 transition-colors shadow-sm"
                 aria-label="Share on Twitter"
               >
-                <Twitter className="w-5 h-5" />
-              </button>
-              <button
-                className="p-3 rounded-full bg-blue-700 text-white hover:bg-blue-800 transition-all hover:scale-110 shadow-md"
+                <Twitter className="w-4 h-4" />
+              </a>
+              <a
+                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2.5 rounded-full bg-blue-700 text-white hover:bg-blue-800 transition-colors shadow-sm"
                 aria-label="Share on LinkedIn"
               >
-                <Linkedin className="w-5 h-5" />
-              </button>
+                <Linkedin className="w-4 h-4" />
+              </a>
               <button
-                className="p-3 rounded-full bg-gray-700 text-white hover:bg-gray-800 transition-all hover:scale-110 shadow-md"
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  alert('Link copied to clipboard!');
+                }}
+                className="p-2.5 rounded-full bg-gray-700 text-white hover:bg-gray-800 transition-colors shadow-sm"
                 aria-label="Copy link"
               >
-                <Share2 className="w-5 h-5" />
+                <Share2 className="w-4 h-4" />
               </button>
             </div>
           </div>
 
           {relatedArticles.length > 0 && (
-            <div className="mt-16">
-              <h2 className="text-3xl font-bold text-gray-900 mb-8 pb-4 border-b-2 border-gray-100">
-                You Might Also Like
+            <div className="mt-12">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6 pb-3 border-b border-gray-200">
+                Related Articles
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {relatedArticles.map((related) => (
                   <Link
                     key={related.id}
                     to={`/article/${related.id}`}
                     className="group block"
                   >
-                    <div className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2">
-                      <div className="relative overflow-hidden h-48">
+                    <div className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                      <div className="relative overflow-hidden h-40">
                         <img
                           src={related.thumbnail_url || ''}
                           alt={related.title}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </div>
-                      <div className="p-5">
-                        <h3 className="font-bold text-gray-900 text-lg mb-3 line-clamp-2 group-hover:text-red-600 transition-colors leading-tight">
+                      <div className="p-4">
+                        <h3 className="font-medium text-gray-900 text-sm mb-2 line-clamp-2 group-hover:text-red-600 transition-colors leading-snug">
                           {related.title}
                         </h3>
-                        <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed">
+                        <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
                           {related.description}
                         </p>
                       </div>

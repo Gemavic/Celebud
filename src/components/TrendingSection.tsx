@@ -14,13 +14,13 @@ export function TrendingSection({ trendingContent }: TrendingSectionProps) {
 
   return (
     <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
-      <div className="flex items-center space-x-3 mb-8">
-        <div className="bg-gradient-to-r from-rose-500 to-orange-500 p-3 rounded-xl">
-          <TrendingUp className="w-6 h-6 text-white" />
+      <div className="flex items-center space-x-3 mb-6">
+        <div className="bg-gradient-to-r from-rose-500 to-orange-500 p-2.5 rounded-lg">
+          <TrendingUp className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">Trending Now</h2>
-          <p className="text-gray-600">What everyone's watching right now</p>
+          <h2 className="text-2xl font-semibold text-gray-900">Trending Now</h2>
+          <p className="text-gray-500 text-sm">Popular stories today</p>
         </div>
       </div>
 
@@ -40,20 +40,20 @@ export function TrendingSection({ trendingContent }: TrendingSectionProps) {
 
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
 
-              <div className="absolute top-3 left-3 bg-gradient-to-r from-rose-500 to-orange-500 text-white w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shadow-lg">
+              <div className="absolute top-3 left-3 bg-gradient-to-r from-rose-500 to-orange-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm shadow-md">
                 {index + 1}
               </div>
 
               {content.media_type === 'video' && (
                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="bg-white/20 backdrop-blur-sm rounded-full p-4">
-                    <Play className="w-8 h-8 text-white fill-white" />
+                  <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                    <Play className="w-6 h-6 text-white fill-white" />
                   </div>
                 </div>
               )}
 
               <div className="absolute bottom-0 left-0 right-0 p-4">
-                <h3 className="text-white font-bold text-sm mb-2 line-clamp-2">
+                <h3 className="text-white font-semibold text-sm mb-2 line-clamp-2 leading-snug">
                   {content.title}
                 </h3>
                 <div className="flex items-center justify-between text-white/80 text-xs">
@@ -69,7 +69,7 @@ export function TrendingSection({ trendingContent }: TrendingSectionProps) {
             <div className="mt-2 px-1">
               {content.categories && (
                 <span
-                  className="inline-block px-2 py-1 rounded-full text-xs font-semibold text-white"
+                  className="inline-block px-2 py-0.5 rounded-full text-xs font-medium text-white"
                   style={{ backgroundColor: content.categories.color }}
                 >
                   {content.categories.name}

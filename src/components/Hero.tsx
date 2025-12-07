@@ -28,13 +28,13 @@ export function Hero({ featuredContent }: HeroProps) {
           />
 
           <div className="absolute top-6 left-6 z-20 flex items-center space-x-2">
-            <span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center space-x-1">
+            <span className="bg-red-500 text-white px-2.5 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
               <TrendingUp className="w-3 h-3" />
               <span>Featured</span>
             </span>
             {mainFeatured.categories && (
               <span
-                className="px-3 py-1 rounded-full text-xs font-bold uppercase text-white"
+                className="px-2.5 py-1 rounded-full text-xs font-medium text-white"
                 style={{ backgroundColor: mainFeatured.categories.color }}
               >
                 {mainFeatured.categories.name}
@@ -43,42 +43,42 @@ export function Hero({ featuredContent }: HeroProps) {
           </div>
 
           <div className="absolute bottom-0 left-0 right-0 p-8 z-20">
-            <h2 className="text-4xl font-bold text-white mb-4 leading-tight">
+            <h2 className="text-3xl font-semibold text-white mb-3 leading-tight">
               {mainFeatured.title}
             </h2>
-            <p className="text-gray-200 text-lg mb-6 line-clamp-2">
+            <p className="text-gray-200 text-base mb-5 line-clamp-2 leading-relaxed">
               {mainFeatured.description}
             </p>
 
-            <div className="flex items-center space-x-6 text-gray-300 text-sm mb-6">
+            <div className="flex items-center space-x-5 text-gray-300 text-sm mb-5">
               {mainFeatured.authors && (
                 <div className="flex items-center space-x-2">
                   <img
                     src={mainFeatured.authors.avatar_url || ''}
                     alt={mainFeatured.authors.name}
-                    className="w-8 h-8 rounded-full border-2 border-white"
+                    className="w-7 h-7 rounded-full border border-white"
                   />
-                  <span>{mainFeatured.authors.name}</span>
+                  <span className="text-sm">{mainFeatured.authors.name}</span>
                 </div>
               )}
               <div className="flex items-center space-x-1">
-                <Clock className="w-4 h-4" />
-                <span>{formatDistanceToNow(mainFeatured.published_at)}</span>
+                <Clock className="w-3.5 h-3.5" />
+                <span className="text-sm">{formatDistanceToNow(mainFeatured.published_at)}</span>
               </div>
               <div className="flex items-center space-x-1">
-                <Eye className="w-4 h-4" />
-                <span>{mainFeatured.views_count.toLocaleString()} views</span>
+                <Eye className="w-3.5 h-3.5" />
+                <span className="text-sm">{mainFeatured.views_count.toLocaleString()} views</span>
               </div>
             </div>
 
-            <button className="bg-white text-gray-900 px-8 py-3 rounded-full font-bold hover:bg-gray-100 transition-colors flex items-center space-x-2 shadow-lg">
+            <button className="bg-white text-gray-900 px-6 py-2.5 rounded-full font-medium hover:bg-gray-100 transition-colors flex items-center space-x-2 shadow-lg text-sm">
               {mainFeatured.media_type === 'video' || mainFeatured.media_type === 'audio' ? (
                 <>
-                  <Play className="w-5 h-5" />
+                  <Play className="w-4 h-4" />
                   <span>Play Now</span>
                 </>
               ) : (
-                <span>Read More</span>
+                <span>Read Article</span>
               )}
             </button>
           </div>
@@ -101,18 +101,18 @@ export function Hero({ featuredContent }: HeroProps) {
 
               {content.categories && (
                 <span
-                  className="absolute top-4 left-4 z-20 px-3 py-1 rounded-full text-xs font-bold uppercase text-white"
+                  className="absolute top-4 left-4 z-20 px-2.5 py-1 rounded-full text-xs font-medium text-white"
                   style={{ backgroundColor: content.categories.color }}
                 >
                   {content.categories.name}
                 </span>
               )}
 
-              <div className="absolute bottom-0 left-0 right-0 p-6 z-20">
-                <h3 className="text-xl font-bold text-white mb-2 line-clamp-2">
+              <div className="absolute bottom-0 left-0 right-0 p-5 z-20">
+                <h3 className="text-lg font-semibold text-white mb-2 line-clamp-2 leading-snug">
                   {content.title}
                 </h3>
-                <div className="flex items-center space-x-4 text-gray-300 text-xs">
+                <div className="flex items-center space-x-3 text-gray-300 text-xs">
                   <div className="flex items-center space-x-1">
                     <Eye className="w-3 h-3" />
                     <span>{(content.views_count / 1000).toFixed(1)}K</span>
