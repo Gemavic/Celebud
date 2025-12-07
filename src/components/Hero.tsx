@@ -1,4 +1,5 @@
 import { Play, Clock, Eye, TrendingUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { formatDistanceToNow } from '../utils/date';
 
@@ -17,7 +18,7 @@ export function Hero({ featuredContent }: HeroProps) {
   return (
     <section className="pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 relative group cursor-pointer overflow-hidden rounded-3xl shadow-2xl">
+        <Link to={`/article/${mainFeatured.id}`} className="lg:col-span-2 relative group cursor-pointer overflow-hidden rounded-3xl shadow-2xl block">
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10" />
 
           <img
@@ -81,13 +82,14 @@ export function Hero({ featuredContent }: HeroProps) {
               )}
             </button>
           </div>
-        </div>
+        </Link>
 
         <div className="space-y-6">
           {sideFeatured.map((content) => (
-            <div
+            <Link
               key={content.id}
-              className="relative group cursor-pointer overflow-hidden rounded-2xl shadow-xl h-[242px]"
+              to={`/article/${content.id}`}
+              className="relative group cursor-pointer overflow-hidden rounded-2xl shadow-xl h-[242px] block"
             >
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10" />
 
@@ -118,7 +120,7 @@ export function Hero({ featuredContent }: HeroProps) {
                   <span>{formatDistanceToNow(content.published_at)}</span>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

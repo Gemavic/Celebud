@@ -1,4 +1,5 @@
 import { TrendingUp, Play, Eye } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { formatDistanceToNow } from '../utils/date';
 
@@ -25,9 +26,10 @@ export function TrendingSection({ trendingContent }: TrendingSectionProps) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {trendingContent.map((content, index) => (
-          <div
+          <Link
             key={content.id}
-            className="group relative cursor-pointer"
+            to={`/article/${content.id}`}
+            className="group relative cursor-pointer block"
           >
             <div className="relative overflow-hidden rounded-2xl shadow-lg">
               <img
@@ -74,7 +76,7 @@ export function TrendingSection({ trendingContent }: TrendingSectionProps) {
                 </span>
               )}
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </section>

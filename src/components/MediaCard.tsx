@@ -1,4 +1,5 @@
 import { Play, Clock, Eye, Volume2, Mic2, FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { formatDistanceToNow } from '../utils/date';
 
@@ -17,7 +18,8 @@ export function MediaCard({ content }: MediaCardProps) {
   const MediaIcon = mediaTypeIcons[content.media_type as keyof typeof mediaTypeIcons] || FileText;
 
   return (
-    <article className="group cursor-pointer bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+    <Link to={`/article/${content.id}`} className="block">
+      <article className="group cursor-pointer bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
       <div className="relative overflow-hidden h-56">
         <img
           src={content.thumbnail_url || ''}
@@ -93,5 +95,6 @@ export function MediaCard({ content }: MediaCardProps) {
         </div>
       </div>
     </article>
+    </Link>
   );
 }
