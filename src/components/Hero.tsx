@@ -1,4 +1,4 @@
-import { Play, Clock, Eye, TrendingUp } from 'lucide-react';
+import { Clock, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { formatDistanceToNow } from '../utils/date';
@@ -42,45 +42,15 @@ export function Hero({ featuredContent }: HeroProps) {
             )}
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 p-8 z-20">
-            <h2 className="text-3xl font-semibold text-white mb-3 leading-tight">
+          <div className="absolute bottom-0 left-0 right-0 p-6 z-20">
+            <h2 className="text-2xl font-medium text-white mb-3 leading-tight line-clamp-2">
               {mainFeatured.title}
             </h2>
-            <p className="text-gray-200 text-base mb-5 line-clamp-2 leading-relaxed">
-              {mainFeatured.description}
-            </p>
 
-            <div className="flex items-center space-x-5 text-gray-300 text-sm mb-5">
-              {mainFeatured.authors && (
-                <div className="flex items-center space-x-2">
-                  <img
-                    src={mainFeatured.authors.avatar_url || ''}
-                    alt={mainFeatured.authors.name}
-                    className="w-7 h-7 rounded-full border border-white"
-                  />
-                  <span className="text-sm">{mainFeatured.authors.name}</span>
-                </div>
-              )}
-              <div className="flex items-center space-x-1">
-                <Clock className="w-3.5 h-3.5" />
-                <span className="text-sm">{formatDistanceToNow(mainFeatured.published_at)}</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <Eye className="w-3.5 h-3.5" />
-                <span className="text-sm">{mainFeatured.views_count.toLocaleString()} views</span>
-              </div>
+            <div className="flex items-center space-x-3 text-gray-300 text-xs">
+              <Clock className="w-3.5 h-3.5" />
+              <span>{formatDistanceToNow(mainFeatured.published_at)}</span>
             </div>
-
-            <button className="bg-white text-gray-900 px-6 py-2.5 rounded-full font-medium hover:bg-gray-100 transition-colors flex items-center space-x-2 shadow-lg text-sm">
-              {mainFeatured.media_type === 'video' || mainFeatured.media_type === 'audio' ? (
-                <>
-                  <Play className="w-4 h-4" />
-                  <span>Play Now</span>
-                </>
-              ) : (
-                <span>Read Article</span>
-              )}
-            </button>
           </div>
         </Link>
 
@@ -108,17 +78,10 @@ export function Hero({ featuredContent }: HeroProps) {
                 </span>
               )}
 
-              <div className="absolute bottom-0 left-0 right-0 p-5 z-20">
-                <h3 className="text-lg font-semibold text-white mb-2 line-clamp-2 leading-snug">
+              <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
+                <h3 className="text-base font-medium text-white line-clamp-2 leading-snug">
                   {content.title}
                 </h3>
-                <div className="flex items-center space-x-3 text-gray-300 text-xs">
-                  <div className="flex items-center space-x-1">
-                    <Eye className="w-3 h-3" />
-                    <span>{(content.views_count / 1000).toFixed(1)}K</span>
-                  </div>
-                  <span>{formatDistanceToNow(content.published_at)}</span>
-                </div>
               </div>
             </Link>
           ))}
