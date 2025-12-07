@@ -1,4 +1,4 @@
-import { Video, Music, Mic, Star, Briefcase, Film, Flame } from 'lucide-react';
+import { Video, Music, Mic, Star, Briefcase, Film, Flame, Landmark, Users, Heart } from 'lucide-react';
 import { Category } from '../lib/database.types';
 
 interface CategoryFilterProps {
@@ -14,6 +14,9 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   star: Star,
   briefcase: Briefcase,
   film: Film,
+  landmark: Landmark,
+  users: Users,
+  heart: Heart,
 };
 
 export function CategoryFilter({
