@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Category, MediaContentWithRelations } from '../lib/database.types';
 import { Header } from '../components/Header';
@@ -13,12 +14,20 @@ import { NewsletterSignup } from '../components/NewsletterSignup';
 import { Loader2 } from 'lucide-react';
 
 export function HomePage() {
+  const [searchParams] = useSearchParams();
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredContent, setFeaturedContent] = useState<MediaContentWithRelations[]>([]);
   const [trendingContent, setTrendingContent] = useState<MediaContentWithRelations[]>([]);
   const [allContent, setAllContent] = useState<MediaContentWithRelations[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const categoryParam = searchParams.get('category');
+    if (categoryParam) {
+      setSelectedCategory(categoryParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     loadData();
