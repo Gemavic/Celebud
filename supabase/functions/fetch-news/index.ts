@@ -30,21 +30,22 @@ function parseRSS(xmlText: string): RSSItem[] {
     let thumbnail = '';
     const mediaContent = itemXml.match(/<media:content[^>]*url="([^"]*)"/)?.[1];
     const mediaThumbnail = itemXml.match(/<media:thumbnail[^>]*url="([^"]*)"/)?.[1];
-    const enclosure = itemXml.match(/<enclosure[^>]*url="([^"]*)"/)?.[1];
+    const enclosure = itemXml.match(/<enclosure[^>]*url="([^"]*)"[^>]*type="image/)?.[1];
     const ogImage = itemXml.match(/<og:image>(.*?)<\/og:image>/)?.[1];
-    
-    thumbnail = mediaContent || mediaThumbnail || enclosure || ogImage || '';
-    
-    const content = itemXml.match(/<content:encoded><!\[CDATA\[(.*?)\]\]><\/content:encoded>/)?.[1] || description;
 
-    if (title && link) {
+    const content = itemXml.match(/<content:encoded><!\[CDATA\[(.*?)\]\]><\/content:encoded>/)?.[1] || description;
+    const imgInContent = content.match(/<img[^>]*src="([^"]*)"/)?.[1];
+
+    thumbnail = mediaContent || mediaThumbnail || enclosure || ogImage || imgInContent || '';
+
+    if (title && link && thumbnail) {
       items.push({
         title: title.trim(),
-        description: stripHtml(description).substring(0, 300),
+        description: stripHtml(description),
         link: link.trim(),
         pubDate,
-        thumbnail: thumbnail || 'https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=800',
-        content: stripHtml(content).substring(0, 1000),
+        thumbnail: thumbnail,
+        content: stripHtml(content),
       });
     }
   }
