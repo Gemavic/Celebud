@@ -52,16 +52,53 @@ function parseRSS(xmlText: string): RSSItem[] {
   return items;
 }
 
+function decodeHtmlEntities(text: string): string {
+  const entities: Record<string, string> = {
+    '&nbsp;': ' ',
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&#8216;': "'",
+    '&#8217;': "'",
+    '&#8220;': '"',
+    '&#8221;': '"',
+    '&#8211;': '-',
+    '&#8212;': '-',
+    '&#8230;': '...',
+    '&apos;': "'",
+    '&ldquo;': '"',
+    '&rdquo;': '"',
+    '&lsquo;': "'",
+    '&rsquo;': "'",
+    '&mdash;': '-',
+    '&ndash;': '-',
+    '&hellip;': '...',
+  };
+
+  let decoded = text;
+  for (const [entity, char] of Object.entries(entities)) {
+    decoded = decoded.replace(new RegExp(entity, 'g'), char);
+  }
+
+  decoded = decoded.replace(/&#(\d+);/g, (_, code) => {
+    return String.fromCharCode(parseInt(code, 10));
+  });
+
+  decoded = decoded.replace(/&#x([0-9a-fA-F]+);/g, (_, code) => {
+    return String.fromCharCode(parseInt(code, 16));
+  });
+
+  return decoded;
+}
+
 function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .trim();
+  return decodeHtmlEntities(
+    html
+      .replace(/<[^>]*>/g, '')
+      .trim()
+  );
 }
 
 function generateSlug(title: string): string {
