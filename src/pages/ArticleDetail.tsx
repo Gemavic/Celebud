@@ -152,8 +152,32 @@ export function ArticleDetail() {
             </div>
           )}
 
+          {article.external_url && (
+            <div className="mb-8 p-6 bg-gradient-to-r from-red-50 to-orange-50 rounded-xl border-2 border-red-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 mb-1">Full Article Available</p>
+                  <p className="text-xs text-gray-600">Click below to read the complete story from the source</p>
+                </div>
+                <a
+                  href={article.external_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-semibold text-sm shadow-md hover:shadow-lg transform hover:scale-105 whitespace-nowrap ml-4"
+                >
+                  Read Full Article →
+                </a>
+              </div>
+            </div>
+          )}
+
           <div className="prose prose-lg max-w-none mb-12">
             <div className="text-gray-700 text-base leading-relaxed space-y-5">
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded-r-lg">
+                <p className="text-sm text-blue-900 font-medium">Article Preview</p>
+                <p className="text-xs text-blue-700 mt-1">This is an excerpt. Click "Read Full Article" above to see the complete story.</p>
+              </div>
+
               {(article.content || article.description)
                 .split('\n')
                 .filter(para => para.trim())
@@ -163,23 +187,7 @@ export function ArticleDetail() {
                   </p>
                 ))
               }
-
             </div>
-
-            {article.source_url && (
-              <div className="mt-8 p-5 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-xs font-medium text-gray-600 mb-2">Source</p>
-                <a
-                  href={article.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-red-600 hover:text-red-700 text-sm break-all inline-flex items-center"
-                >
-                  Read the original article
-                  <span className="ml-1">→</span>
-                </a>
-              </div>
-            )}
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-6 border-y border-gray-200 mb-12 bg-gray-50 px-5 rounded-lg">
