@@ -159,13 +159,35 @@ async function fetchFullArticleContent(url: string): Promise<string> {
       .replace(/<div[^>]*class="[^"]*sidebar[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
       .replace(/<div[^>]*class="[^"]*ad[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
 
-    const paragraphs = content.match(/<p[^>]*>[\s\S]*?<\/p>/gi) || [];
-    const cleanedParagraphs = paragraphs
-      .map(p => stripHtml(p))
-      .filter(p => p.length > 50)
-      .join('\n\n');
+    const images: string[] = [];
+    const imageMatches = content.matchAll(/<img[^>]*src="([^"]*)"[^>]*>/gi);
+    for (const match of imageMatches) {
+      const imgSrc = match[1];
+      if (imgSrc && !imgSrc.includes('data:image') && !imgSrc.includes('placeholder') && !imgSrc.includes('avatar') && !imgSrc.includes('icon')) {
+        let fullUrl = imgSrc;
+        if (imgSrc.startsWith('/')) {
+          const urlObj = new URL(url);
+          fullUrl = `${urlObj.protocol}//${urlObj.host}${imgSrc}`;
+        }
+        images.push(fullUrl);
+      }
+    }
 
-    return cleanedParagraphs.substring(0, 15000);
+    const paragraphs = content.match(/<p[^>]*>[\s\S]*?<\/p>/gi) || [];
+    const textParts: string[] = [];
+
+    for (let i = 0; i < paragraphs.length; i++) {
+      const cleaned = stripHtml(paragraphs[i]);
+      if (cleaned.length > 50) {
+        textParts.push(cleaned);
+
+        if (images.length > 0 && i > 0 && i % 3 === 0 && images[Math.floor(i / 3) - 1]) {
+          textParts.push(`[IMAGE:${images[Math.floor(i / 3) - 1]}]`);
+        }
+      }
+    }
+
+    return textParts.join('\n\n');
   } catch (error) {
     console.error('Error fetching full article:', error);
     return '';

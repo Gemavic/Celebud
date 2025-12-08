@@ -109,7 +109,7 @@ export function ArticleDetail() {
             </span>
           )}
 
-          <h1 className="text-3xl md:text-4xl font-semibold text-gray-900 mb-5 leading-snug">
+          <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-5 leading-snug">
             {article.title}
           </h1>
 
@@ -157,11 +157,28 @@ export function ArticleDetail() {
               {(article.content || article.description)
                 .split('\n')
                 .filter(para => para.trim())
-                .map((paragraph, index) => (
-                  <p key={index} className="leading-loose text-justify">
-                    {paragraph}
-                  </p>
-                ))
+                .map((paragraph, index) => {
+                  if (paragraph.startsWith('[IMAGE:') && paragraph.endsWith(']')) {
+                    const imageUrl = paragraph.slice(7, -1);
+                    return (
+                      <div key={index} className="my-6 rounded-lg overflow-hidden">
+                        <img
+                          src={imageUrl}
+                          alt="Article content"
+                          className="w-full h-auto object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+                  return (
+                    <p key={index} className="leading-loose text-justify">
+                      {paragraph}
+                    </p>
+                  );
+                })
               }
             </div>
 
