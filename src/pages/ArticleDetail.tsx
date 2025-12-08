@@ -90,7 +90,7 @@ export function ArticleDetail() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
       <Header />
 
-      <article className="pt-32 pb-16">
+      <article className="pt-40 pb-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <Link
             to="/"
@@ -102,14 +102,14 @@ export function ArticleDetail() {
 
           {article.categories && (
             <span
-              className="inline-block px-3 py-1 rounded-full text-xs font-medium text-white mb-4"
+              className="inline-block px-4 py-1.5 rounded-full text-sm font-semibold text-white mb-6 shadow-md"
               style={{ backgroundColor: article.categories.color }}
             >
               {article.categories.name}
             </span>
           )}
 
-          <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-5 leading-snug">
+          <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-5 leading-tight">
             {article.title}
           </h1>
 

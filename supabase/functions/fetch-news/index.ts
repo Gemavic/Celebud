@@ -40,7 +40,7 @@ function parseRSS(xmlText: string): RSSItem[] {
 
     if (title && link && thumbnail) {
       items.push({
-        title: title.trim(),
+        title: stripHtml(title.trim()),
         description: stripHtml(description),
         link: link.trim(),
         pubDate,
