@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { Header } from '../components/Header';
+import CommentsSection from '../components/CommentsSection';
 import { formatDistanceToNow } from '../utils/date';
 import { ArrowLeft, Eye, Clock, Share2, Facebook, Twitter, Linkedin } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
@@ -275,6 +276,8 @@ export function ArticleDetail() {
               </div>
             </div>
           )}
+
+          <CommentsSection contentId={article.id} />
         </div>
       </article>
     </div>

@@ -1,17 +1,37 @@
-import { Search, Menu, X, Star } from 'lucide-react';
+import { Search, Menu, X, Star, User, LogOut, PenSquare } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { SocialLinks } from './SocialLinks';
+import { useAuth } from '../contexts/AuthContext';
+import AuthModal from './AuthModal';
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const location = useLocation();
+  const { user, profile, signOut } = useAuth();
 
   const scrollToTop = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (location.pathname === '/') {
       e.preventDefault();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      setShowUserMenu(false);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  const openAuthModal = (mode: 'signin' | 'signup') => {
+    setAuthMode(mode);
+    setIsAuthModalOpen(true);
   };
 
   return (
@@ -77,6 +97,56 @@ export function Header() {
             />
           </div>
 
+          <div className="hidden md:flex items-center ml-4 space-x-2">
+            {user ? (
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <User className="w-4 h-4" />
+                  <span className="text-sm font-medium">{profile?.username || 'User'}</span>
+                </button>
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-10">
+                    {profile?.is_admin && (
+                      <Link
+                        to="/editorial"
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100"
+                      >
+                        <PenSquare className="w-4 h-4 mr-2" />
+                        Write Article
+                      </Link>
+                    )}
+                    <button
+                      onClick={handleSignOut}
+                      className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100"
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={() => openAuthModal('signin')}
+                  className="px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm font-medium"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => openAuthModal('signup')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  Sign Up
+                </button>
+              </>
+            )}
+          </div>
+
           <button
             className="lg:hidden p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -129,6 +199,12 @@ export function Header() {
           </nav>
         </div>
       )}
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        mode={authMode}
+      />
     </header>
   );
 }
