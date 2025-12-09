@@ -118,7 +118,7 @@ export function HomePage() {
       <Header />
       <LiveNewsIndicator onNewsUpdated={loadData} />
 
-      <main className="pt-44">
+      <main className="pt-44" role="main">
         <Hero featuredContent={featuredContent} />
 
         <CategoryFilter
@@ -133,7 +133,7 @@ export function HomePage() {
           <AdBanner placement="header" />
         </div>
 
-        <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
+        <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16" aria-label="Latest articles">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-2xl font-semibold text-gray-900">

@@ -5,6 +5,7 @@ import { MediaContentWithRelations } from '../lib/database.types';
 import { Header } from '../components/Header';
 import CommentsSection from '../components/CommentsSection';
 import { formatDistanceToNow } from '../utils/date';
+import { updateMetaTags, generateArticleStructuredData, removeArticleStructuredData } from '../utils/seo';
 import { ArrowLeft, Eye, Clock, Share2, Facebook, Twitter, Linkedin } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 
@@ -18,6 +19,9 @@ export function ArticleDetail() {
     if (id) {
       loadArticle(id);
     }
+    return () => {
+      removeArticleStructuredData();
+    };
   }, [id]);
 
   async function loadArticle(articleId: string) {
@@ -32,6 +36,28 @@ export function ArticleDetail() {
 
       if (data) {
         setArticle(data as MediaContentWithRelations);
+
+        updateMetaTags({
+          title: `${data.title} - CelebUD`,
+          description: data.description || data.title,
+          keywords: `${data.categories?.name || 'celebrity news'}, entertainment, celebrity, news`,
+          image: data.thumbnail_url || undefined,
+          url: `/article/${articleId}`,
+          type: 'article',
+          author: data.authors?.name || 'CelebUD',
+          publishedTime: data.published_at,
+          modifiedTime: data.updated_at,
+        });
+
+        generateArticleStructuredData({
+          title: data.title,
+          description: data.description || data.title,
+          image: data.thumbnail_url || undefined,
+          author: data.authors?.name || 'CelebUD',
+          publishedDate: data.published_at,
+          modifiedDate: data.updated_at,
+          url: `${window.location.origin}/article/${articleId}`,
+        });
 
         await supabase
           .from('media_content')
@@ -91,7 +117,7 @@ export function ArticleDetail() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
       <Header />
 
-      <article className="pt-40 pb-16">
+      <article className="pt-40 pb-16" itemScope itemType="https://schema.org/NewsArticle">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <Link
             to="/"
@@ -110,7 +136,7 @@ export function ArticleDetail() {
             </span>
           )}
 
-          <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-5 leading-tight">
+          <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-5 leading-tight" itemProp="headline">
             {article.title}
           </h1>
 
@@ -122,9 +148,10 @@ export function ArticleDetail() {
                     src={article.authors.avatar_url || ''}
                     alt={article.authors.name}
                     className="w-11 h-11 rounded-full border border-gray-200"
+                    itemProp="image"
                   />
-                  <div>
-                    <p className="font-medium text-gray-900 text-sm">{article.authors.name}</p>
+                  <div itemProp="author" itemScope itemType="https://schema.org/Person">
+                    <p className="font-medium text-gray-900 text-sm" itemProp="name">{article.authors.name}</p>
                     <p className="text-xs text-gray-500">{article.authors.role}</p>
                   </div>
                 </>
@@ -134,7 +161,9 @@ export function ArticleDetail() {
             <div className="flex items-center space-x-4 text-gray-500 text-xs">
               <div className="flex items-center space-x-1">
                 <Clock className="w-3.5 h-3.5" />
-                <span>{formatDistanceToNow(article.published_at)}</span>
+                <time itemProp="datePublished" dateTime={article.published_at}>
+                  {formatDistanceToNow(article.published_at)}
+                </time>
               </div>
               <div className="flex items-center space-x-1">
                 <Eye className="w-3.5 h-3.5" />
@@ -149,11 +178,12 @@ export function ArticleDetail() {
                 src={article.thumbnail_url}
                 alt={article.title}
                 className="w-full h-auto object-cover"
+                itemProp="image"
               />
             </div>
           )}
 
-          <div className="prose prose-lg max-w-none mb-12">
+          <div className="prose prose-lg max-w-none mb-12" itemProp="articleBody">
             <div className="text-gray-700 text-base leading-relaxed space-y-5">
               {(article.content || article.description)
                 .split('\n')
