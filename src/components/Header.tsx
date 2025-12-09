@@ -1,6 +1,6 @@
 import { Search, Menu, X, Star, User, LogOut, PenSquare } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { SocialLinks } from './SocialLinks';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
@@ -10,7 +10,9 @@ export function Header() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
 
   const scrollToTop = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -32,6 +34,14 @@ export function Header() {
   const openAuthModal = (mode: 'signin' | 'signup') => {
     setAuthMode(mode);
     setIsAuthModalOpen(true);
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`);
+      setIsMenuOpen(false);
+    }
   };
 
   return (
@@ -88,14 +98,16 @@ export function Header() {
             </Link>
           </nav>
 
-          <div className="hidden md:flex items-center bg-gray-100 rounded-lg px-4 py-2 ml-4">
+          <form onSubmit={handleSearch} className="hidden md:flex items-center bg-gray-100 rounded-lg px-4 py-2 ml-4">
             <Search className="w-4 h-4 text-gray-500 mr-2" />
             <input
               type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search news..."
               className="bg-transparent outline-none text-sm text-gray-700 placeholder-gray-500 w-48"
             />
-          </div>
+          </form>
 
           <div className="hidden md:flex items-center ml-4 space-x-2">
             {user ? (
@@ -187,14 +199,16 @@ export function Header() {
               VIDEOS
             </Link>
             <div className="pt-4">
-              <div className="flex items-center bg-white rounded-lg px-4 py-2">
+              <form onSubmit={handleSearch} className="flex items-center bg-white rounded-lg px-4 py-2">
                 <Search className="w-4 h-4 text-gray-500 mr-2" />
                 <input
                   type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search news..."
                   className="bg-transparent outline-none text-sm text-gray-700 placeholder-gray-500 w-full"
                 />
-              </div>
+              </form>
             </div>
           </nav>
         </div>

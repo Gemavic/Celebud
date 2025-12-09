@@ -19,13 +19,25 @@ export function HomePage() {
   const [featuredContent, setFeaturedContent] = useState<MediaContentWithRelations[]>([]);
   const [trendingContent, setTrendingContent] = useState<MediaContentWithRelations[]>([]);
   const [allContent, setAllContent] = useState<MediaContentWithRelations[]>([]);
+  const [searchResults, setSearchResults] = useState<MediaContentWithRelations[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const categoryParam = searchParams.get('category');
+    const searchParam = searchParams.get('search');
+
     if (categoryParam) {
       setSelectedCategory(categoryParam);
+      setSearchQuery(null);
+    } else if (searchParam) {
+      setSearchQuery(searchParam);
+      setSelectedCategory(null);
+      performSearch(searchParam);
+    } else {
+      setSelectedCategory(null);
+      setSearchQuery(null);
     }
   }, [searchParams]);
 
@@ -67,7 +79,26 @@ export function HomePage() {
     }
   }
 
-  const filteredContent = selectedCategory
+  async function performSearch(query: string) {
+    try {
+      const { data, error } = await supabase
+        .from('media_content')
+        .select('*, categories(*), authors(*)')
+        .or(`title.ilike.%${query}%,description.ilike.%${query}%,content.ilike.%${query}%`)
+        .order('published_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setSearchResults(data as MediaContentWithRelations[]);
+    } catch (error) {
+      console.error('Error performing search:', error);
+      setSearchResults([]);
+    }
+  }
+
+  const displayContent = searchQuery
+    ? searchResults
+    : selectedCategory
     ? allContent.filter((content) => content.categories?.slug === selectedCategory)
     : allContent;
 
@@ -106,23 +137,33 @@ export function HomePage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-2xl font-semibold text-gray-900">
-                {selectedCategory
+                {searchQuery
+                  ? `Search Results for "${searchQuery}"`
+                  : selectedCategory
                   ? `${categories.find((c) => c.slug === selectedCategory)?.name}`
                   : 'Latest Stories'}
               </h2>
-              <p className="text-gray-500 text-sm mt-1">Fresh updates and trending news</p>
+              <p className="text-gray-500 text-sm mt-1">
+                {searchQuery
+                  ? `Found ${displayContent.length} ${displayContent.length === 1 ? 'result' : 'results'}`
+                  : 'Fresh updates and trending news'}
+              </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredContent.map((content) => (
+            {displayContent.map((content) => (
               <MediaCard key={content.id} content={content} />
             ))}
           </div>
 
-          {filteredContent.length === 0 && (
+          {displayContent.length === 0 && (
             <div className="text-center py-16">
-              <p className="text-gray-500 text-lg">No content found in this category.</p>
+              <p className="text-gray-500 text-lg">
+                {searchQuery
+                  ? `No results found for "${searchQuery}". Try different keywords.`
+                  : 'No content found in this category.'}
+              </p>
             </div>
           )}
         </section>
