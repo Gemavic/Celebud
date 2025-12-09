@@ -22,11 +22,12 @@ interface CommentsSectionProps {
 }
 
 export default function CommentsSection({ contentId }: CommentsSectionProps) {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
     loadComments();
@@ -88,8 +89,6 @@ export default function CommentsSection({ contentId }: CommentsSectionProps) {
   }
 
   async function handleDelete(commentId: string) {
-    if (!confirm('Are you sure you want to delete this comment?')) return;
-
     try {
       const { error } = await supabase
         .from('comments')
@@ -98,6 +97,7 @@ export default function CommentsSection({ contentId }: CommentsSectionProps) {
 
       if (error) throw error;
       await loadComments();
+      setDeleteConfirm(null);
     } catch (err) {
       console.error('Error deleting comment:', err);
     }
@@ -161,12 +161,29 @@ export default function CommentsSection({ contentId }: CommentsSectionProps) {
                   </span>
                 </div>
                 {user && user.id === comment.user_id && (
-                  <button
-                    onClick={() => handleDelete(comment.id)}
-                    className="text-red-500 hover:text-red-700 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  deleteConfirm === comment.id ? (
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleDelete(comment.id)}
+                        className="text-xs px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirm(null)}
+                        className="text-xs px-2 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setDeleteConfirm(comment.id)}
+                      className="text-red-500 hover:text-red-700 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )
                 )}
               </div>
               <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>

@@ -57,12 +57,13 @@ export default function EditorialPage() {
     setSuccess(false);
     setLoading(true);
 
+    if (!formData.title.trim() || !formData.content.trim()) {
+      setError('Title and content are required');
+      setLoading(false);
+      return;
+    }
+
     try {
-      if (!formData.title.trim() || !formData.content.trim()) {
-        setError('Title and content are required');
-        setLoading(false);
-        return;
-      }
 
       const slug = formData.title
         .toLowerCase()

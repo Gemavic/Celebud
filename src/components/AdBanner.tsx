@@ -41,43 +41,51 @@ export function AdBanner({ placement, className = '' }: AdBannerProps) {
   }
 
   async function trackImpression(adId: string) {
-    const { data: currentAd } = await supabase
-      .from('advertisements')
-      .select('impression_count')
-      .eq('id', adId)
-      .single();
+    try {
+      const { data: currentAd } = await supabase
+        .from('advertisements')
+        .select('impression_count')
+        .eq('id', adId)
+        .maybeSingle();
 
-    if (currentAd) {
-      await supabase.from('advertisements').update({
-        impression_count: (currentAd.impression_count || 0) + 1,
-      }).eq('id', adId);
+      if (currentAd) {
+        await supabase.from('advertisements').update({
+          impression_count: (currentAd.impression_count || 0) + 1,
+        }).eq('id', adId);
 
-      await supabase.from('ad_impressions').insert({
-        ad_id: adId,
-        clicked: false,
-        user_agent: navigator.userAgent,
-      });
+        await supabase.from('ad_impressions').insert({
+          ad_id: adId,
+          clicked: false,
+          user_agent: navigator.userAgent,
+        });
+      }
+    } catch (error) {
+      console.error('Error tracking impression:', error);
     }
   }
 
   async function handleClick() {
     if (ad) {
-      const { data: currentAd } = await supabase
-        .from('advertisements')
-        .select('click_count')
-        .eq('id', ad.id)
-        .single();
+      try {
+        const { data: currentAd } = await supabase
+          .from('advertisements')
+          .select('click_count')
+          .eq('id', ad.id)
+          .maybeSingle();
 
-      if (currentAd) {
-        await supabase.from('advertisements').update({
-          click_count: (currentAd.click_count || 0) + 1,
-        }).eq('id', ad.id);
+        if (currentAd) {
+          await supabase.from('advertisements').update({
+            click_count: (currentAd.click_count || 0) + 1,
+          }).eq('id', ad.id);
 
-        await supabase.from('ad_impressions').insert({
-          ad_id: ad.id,
-          clicked: true,
-          user_agent: navigator.userAgent,
-        });
+          await supabase.from('ad_impressions').insert({
+            ad_id: ad.id,
+            clicked: true,
+            user_agent: navigator.userAgent,
+          });
+        }
+      } catch (error) {
+        console.error('Error tracking click:', error);
       }
     }
   }

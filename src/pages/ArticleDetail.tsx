@@ -231,8 +231,15 @@ export function ArticleDetail() {
               </a>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                  alert('Link copied to clipboard!');
+                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(window.location.href).then(() => {
+                      alert('Link copied to clipboard!');
+                    }).catch(() => {
+                      alert('Failed to copy link');
+                    });
+                  } else {
+                    alert('Clipboard not supported in this browser');
+                  }
                 }}
                 className="p-2.5 rounded-full bg-gray-700 text-white hover:bg-gray-800 transition-colors shadow-sm"
                 aria-label="Copy link"

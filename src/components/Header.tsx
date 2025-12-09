@@ -159,7 +159,7 @@ export function Header() {
       {isMenuOpen && (
         <div className="lg:hidden bg-red-600">
           <nav className="px-4 py-4 space-y-1">
-            <Link to="/" onClick={() => { scrollToTop; setIsMenuOpen(false); }} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">
+            <Link to="/" onClick={(e) => { scrollToTop(e); setIsMenuOpen(false); }} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">
               HOME
             </Link>
             <Link to="/?category=news" onClick={() => setIsMenuOpen(false)} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">

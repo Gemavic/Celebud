@@ -7,7 +7,7 @@ interface MediaCardProps {
   content: MediaContentWithRelations;
 }
 
-const mediaTypeIcons = {
+const mediaTypeIcons: Record<string, typeof FileText> = {
   video: Play,
   audio: Volume2,
   interview: Mic2,
@@ -15,7 +15,9 @@ const mediaTypeIcons = {
 };
 
 export function MediaCard({ content }: MediaCardProps) {
-  const MediaIcon = mediaTypeIcons[content.media_type as keyof typeof mediaTypeIcons] || FileText;
+  const MediaIcon = content.media_type && content.media_type in mediaTypeIcons
+    ? mediaTypeIcons[content.media_type]
+    : FileText;
 
   return (
     <Link to={`/article/${content.id}`} className="block">

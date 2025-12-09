@@ -287,9 +287,9 @@ Deno.serve(async (req: Request) => {
               source_id: source.id,
               source_published_at: item.pubDate,
               published_at: new Date().toISOString(),
-              is_featured: Math.random() > 0.8,
-              is_trending: Math.random() > 0.7,
-              views_count: Math.floor(Math.random() * 50000) + 10000,
+              is_featured: false,
+              is_trending: false,
+              views_count: 0,
             });
 
             if (!error) {

@@ -8,12 +8,12 @@ interface HeroProps {
 }
 
 export function Hero({ featuredContent }: HeroProps) {
-  const mainFeatured = featuredContent[0];
-  const sideFeatured = featuredContent.slice(1, 3);
-
-  if (!mainFeatured) {
+  if (!featuredContent || featuredContent.length === 0) {
     return null;
   }
+
+  const mainFeatured = featuredContent[0];
+  const sideFeatured = featuredContent.length > 1 ? featuredContent.slice(1, 3) : [];
 
   return (
     <section className="pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
@@ -55,7 +55,7 @@ export function Hero({ featuredContent }: HeroProps) {
         </Link>
 
         <div className="space-y-6">
-          {sideFeatured.map((content) => (
+          {sideFeatured.length > 0 && sideFeatured.map((content) => (
             <Link
               key={content.id}
               to={`/article/${content.id}`}

@@ -12,11 +12,18 @@ export async function fetchLatestNews() {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch news');
+      throw new Error(`Failed to fetch news: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
-    return data;
+    const text = await response.text();
+
+    try {
+      const data = JSON.parse(text);
+      return data;
+    } catch (parseError) {
+      console.error('Failed to parse JSON response:', text);
+      throw new Error('Invalid JSON response from server');
+    }
   } catch (error) {
     console.error('Error fetching news:', error);
     throw error;
