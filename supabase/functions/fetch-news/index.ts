@@ -255,6 +255,22 @@ Deno.serve(async (req: Request) => {
         const defaultCategorySlug = categoryMap?.default || 'entertainment';
         const defaultCategory = categories?.find((c: any) => c.slug === defaultCategorySlug);
 
+        // Function to assign author based on category
+        const getAuthorByCategory = (categorySlug: string) => {
+          switch (categorySlug) {
+            case 'politics':
+            case 'interview':
+            case 'business':
+              return authors?.find((a: any) => a.name === 'Gbenga Ayandare') || defaultAuthor;
+            case 'entertainment':
+            case 'lifestyle':
+              return authors?.find((a: any) => a.name === 'Victoria Odunola') || defaultAuthor;
+            default:
+              // news, celebrity, and other categories
+              return authors?.find((a: any) => a.name === 'Matthew Ayandare') || defaultAuthor;
+          }
+        };
+
         for (const item of items.slice(0, 10)) {
           const slug = generateSlug(item.title);
 
@@ -274,13 +290,16 @@ Deno.serve(async (req: Request) => {
               }
             }
 
+            // Get appropriate author based on category
+            const assignedAuthor = getAuthorByCategory(defaultCategorySlug);
+
             const { error } = await supabase.from('media_content').insert({
               title: item.title,
               slug,
               description: item.description,
               content: fullContent,
               category_id: defaultCategory?.id,
-              author_id: defaultAuthor?.id,
+              author_id: assignedAuthor?.id,
               media_type: 'article',
               thumbnail_url: item.thumbnail,
               external_url: item.link,
