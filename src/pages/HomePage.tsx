@@ -8,6 +8,7 @@ import { CategoryFilter } from '../components/CategoryFilter';
 import { MediaCard } from '../components/MediaCard';
 import { TrendingSection } from '../components/TrendingSection';
 import { LiveNewsIndicator } from '../components/LiveNewsIndicator';
+import { EditorialSection } from '../components/EditorialSection';
 import { AdBanner } from '../components/AdBanner';
 import { SubscriptionPlans } from '../components/SubscriptionPlans';
 import { NewsletterSignup } from '../components/NewsletterSignup';
@@ -128,6 +129,8 @@ export function HomePage() {
         />
 
         <TrendingSection trendingContent={trendingContent} />
+
+        <EditorialSection />
 
         <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-12">
           <AdBanner placement="header" />

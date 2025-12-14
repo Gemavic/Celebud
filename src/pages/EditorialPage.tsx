@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Save, ArrowLeft } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Save, ArrowLeft, Settings, TrendingUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { Header } from '../components/Header';
+import { EditorialDashboard } from '../components/EditorialDashboard';
+import { EditorialSection } from '../components/EditorialSection';
 import { supabase } from '../lib/supabase';
 
 interface Category {
@@ -13,6 +16,7 @@ interface Category {
 export default function EditorialPage() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const [activeTab, setActiveTab] = useState<'featured' | 'create' | 'dashboard'>('featured');
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState('');
@@ -28,10 +32,22 @@ export default function EditorialPage() {
     is_trending: false,
   });
 
+  const [createFormData, setCreateFormData] = useState({
+    title: '',
+    description: '',
+    content: '',
+    category_id: '',
+    thumbnail_url: '',
+    is_featured: false,
+    is_trending: false,
+  });
+
   useEffect(() => {
-    if (!user || !profile?.is_admin) {
-      navigate('/');
-      return;
+    // Allow all users to view the editorial page, but limit creation to admins
+    if (activeTab === 'create' || activeTab === 'dashboard') {
+      if (!user || !profile?.is_admin) {
+        setActiveTab('featured');
+      }
     }
 
     loadCategories();
@@ -57,7 +73,7 @@ export default function EditorialPage() {
     setSuccess(false);
     setLoading(true);
 
-    if (!formData.title.trim() || !formData.content.trim()) {
+    if (!createFormData.title.trim() || !createFormData.content.trim()) {
       setError('Title and content are required');
       setLoading(false);
       return;
@@ -65,7 +81,7 @@ export default function EditorialPage() {
 
     try {
 
-      const slug = formData.title
+      const slug = createFormData.title
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
@@ -73,23 +89,23 @@ export default function EditorialPage() {
       const { error: insertError } = await supabase
         .from('media_content')
         .insert({
-          title: formData.title,
+          title: createFormData.title,
           slug,
-          description: formData.description,
-          content: formData.content,
-          category_id: formData.category_id || null,
-          thumbnail_url: formData.thumbnail_url || null,
+          description: createFormData.description,
+          content: createFormData.content,
+          category_id: createFormData.category_id || null,
+          thumbnail_url: createFormData.thumbnail_url || null,
           author_id: user?.id,
           media_type: 'article',
-          is_featured: formData.is_featured,
-          is_trending: formData.is_trending,
+          is_featured: createFormData.is_featured,
+          is_trending: createFormData.is_trending,
           published_at: new Date().toISOString(),
         });
 
       if (insertError) throw insertError;
 
       setSuccess(true);
-      setFormData({
+      setCreateFormData({
         title: '',
         description: '',
         content: '',
@@ -109,34 +125,97 @@ export default function EditorialPage() {
     }
   }
 
-  if (!user || !profile?.is_admin) {
-    return null;
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 pt-40 pb-20">
-      <div className="max-w-4xl mx-auto px-4">
-        <button
-          onClick={() => navigate('/')}
-          className="flex items-center text-gray-600 hover:text-gray-900 mb-6"
-        >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Home
-        </button>
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      
+      <main className="pt-44 pb-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Page Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900">Editorial</h1>
+              <p className="text-gray-600 mt-2">Featured content, hot topics, and community discussions</p>
+            </div>
+            
+            <Link
+              to="/"
+              className="flex items-center text-gray-600 hover:text-gray-900 font-medium"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Back to Home
+            </Link>
+          </div>
 
-        <div className="bg-white rounded-xl shadow-lg p-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Write New Article</h1>
-          <p className="text-gray-600 mb-8">Create and publish editorial content</p>
+          {/* Tab Navigation */}
+          <div className="flex space-x-1 mb-8 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setActiveTab('featured')}
+              className={`flex-1 py-3 px-6 rounded-md font-medium transition-all ${
+                activeTab === 'featured'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <TrendingUp className="w-5 h-5" />
+                <span>Featured Content</span>
+              </div>
+            </button>
+            
+            {user && profile?.is_admin && (
+              <>
+                <button
+                  onClick={() => setActiveTab('create')}
+                  className={`flex-1 py-3 px-6 rounded-md font-medium transition-all ${
+                    activeTab === 'create'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    <Save className="w-5 h-5" />
+                    <span>Create Article</span>
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className={`flex-1 py-3 px-6 rounded-md font-medium transition-all ${
+                    activeTab === 'dashboard'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    <Settings className="w-5 h-5" />
+                    <span>Manage Features</span>
+                  </div>
+                </button>
+              </>
+            )}
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Tab Content */}
+          {activeTab === 'featured' && (
+            <div>
+              <EditorialSection />
+            </div>
+          )}
+
+          {activeTab === 'create' && user && profile?.is_admin && (
+            <div className="bg-white rounded-xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Article</h2>
+              
+              <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Title *
               </label>
               <input
                 type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                value={createFormData.title}
+                onChange={(e) => setCreateFormData({ ...createFormData, title: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter article title"
                 required
@@ -148,8 +227,8 @@ export default function EditorialPage() {
                 Category
               </label>
               <select
-                value={formData.category_id}
-                onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                value={createFormData.category_id}
+                onChange={(e) => setCreateFormData({ ...createFormData, category_id: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Select a category</option>
@@ -166,8 +245,8 @@ export default function EditorialPage() {
                 Description
               </label>
               <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                value={createFormData.description}
+                onChange={(e) => setCreateFormData({ ...createFormData, description: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={3}
                 placeholder="Brief description or excerpt"
@@ -179,8 +258,8 @@ export default function EditorialPage() {
                 Content *
               </label>
               <textarea
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                value={createFormData.content}
+                onChange={(e) => setCreateFormData({ ...createFormData, content: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                 rows={15}
                 placeholder="Write your article content here..."
@@ -194,8 +273,8 @@ export default function EditorialPage() {
               </label>
               <input
                 type="url"
-                value={formData.thumbnail_url}
-                onChange={(e) => setFormData({ ...formData, thumbnail_url: e.target.value })}
+                value={createFormData.thumbnail_url}
+                onChange={(e) => setCreateFormData({ ...createFormData, thumbnail_url: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="https://example.com/image.jpg"
               />
@@ -205,8 +284,8 @@ export default function EditorialPage() {
               <label className="flex items-center">
                 <input
                   type="checkbox"
-                  checked={formData.is_featured}
-                  onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
+                  checked={createFormData.is_featured}
+                  onChange={(e) => setCreateFormData({ ...createFormData, is_featured: e.target.checked })}
                   className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <span className="ml-2 text-sm font-medium text-gray-700">Featured Article</span>
@@ -215,8 +294,8 @@ export default function EditorialPage() {
               <label className="flex items-center">
                 <input
                   type="checkbox"
-                  checked={formData.is_trending}
-                  onChange={(e) => setFormData({ ...formData, is_trending: e.target.checked })}
+                  checked={createFormData.is_trending}
+                  onChange={(e) => setCreateFormData({ ...createFormData, is_trending: e.target.checked })}
                   className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <span className="ml-2 text-sm font-medium text-gray-700">Trending Article</span>
@@ -238,7 +317,7 @@ export default function EditorialPage() {
             <div className="flex justify-end space-x-4">
               <button
                 type="button"
-                onClick={() => navigate('/')}
+                onClick={() => setActiveTab('featured')}
                 className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancel
@@ -253,8 +332,14 @@ export default function EditorialPage() {
               </button>
             </div>
           </form>
+            </div>
+          )}
+          
+          {activeTab === 'dashboard' && user && profile?.is_admin && (
+            <EditorialDashboard />
+          )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
