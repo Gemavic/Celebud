@@ -261,12 +261,13 @@ Deno.serve(async (req: Request) => {
             case 'politics':
             case 'interview':
             case 'business':
+            case 'immigration':
               return authors?.find((a: any) => a.name === 'Gbenga Ayandare') || defaultAuthor;
             case 'entertainment':
             case 'lifestyle':
               return authors?.find((a: any) => a.name === 'Victoria Odunola') || defaultAuthor;
             default:
-              // news, celebrity, and other categories
+              // news, celebrity, society and other categories
               return authors?.find((a: any) => a.name === 'Matthew Ayandare') || defaultAuthor;
           }
         };
