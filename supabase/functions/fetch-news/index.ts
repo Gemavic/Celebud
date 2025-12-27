@@ -28,13 +28,13 @@ function parseRSS(xmlText: string): RSSItem[] {
     const pubDate = itemXml.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || new Date().toISOString();
     
     let thumbnail = '';
-    const mediaContent = itemXml.match(/<media:content[^>]*url="([^"]*)"/)?.[1];
-    const mediaThumbnail = itemXml.match(/<media:thumbnail[^>]*url="([^"]*)"/)?.[1];
-    const enclosure = itemXml.match(/<enclosure[^>]*url="([^"]*)"[^>]*type="image/)?.[1];
+    const mediaContent = itemXml.match(/<media:content[^>]*url=\"([^\"]*)\"/)?.[1];
+    const mediaThumbnail = itemXml.match(/<media:thumbnail[^>]*url=\"([^\"]*)\"/)?.[1];
+    const enclosure = itemXml.match(/<enclosure[^>]*url=\"([^\"]*)\"[^>]*type=\"image/)?.[1];
     const ogImage = itemXml.match(/<og:image>(.*?)<\/og:image>/)?.[1];
 
     const content = itemXml.match(/<content:encoded><!\[CDATA\[(.*?)\]\]><\/content:encoded>/)?.[1] || description;
-    const imgInContent = content.match(/<img[^>]*src="([^"]*)"/)?.[1];
+    const imgInContent = content.match(/<img[^>]*src=\"([^\"]*)\"/)?.[1];
 
     thumbnail = mediaContent || mediaThumbnail || enclosure || ogImage || imgInContent || '';
 
@@ -59,18 +59,18 @@ function decodeHtmlEntities(text: string): string {
     '&amp;': '&',
     '&lt;': '<',
     '&gt;': '>',
-    '&quot;': '"',
+    '&quot;': '\"',
     '&#39;': "'",
     '&#8216;': "'",
     '&#8217;': "'",
-    '&#8220;': '"',
-    '&#8221;': '"',
+    '&#8220;': '\"',
+    '&#8221;': '\"',
     '&#8211;': '-',
     '&#8212;': '-',
     '&#8230;': '...',
     '&apos;': "'",
-    '&ldquo;': '"',
-    '&rdquo;': '"',
+    '&ldquo;': '\"',
+    '&rdquo;': '\"',
     '&lsquo;': "'",
     '&rsquo;': "'",
     '&mdash;': '-',
@@ -126,10 +126,10 @@ async function fetchFullArticleContent(url: string): Promise<string> {
 
     const articleSelectors = [
       /<article[^>]*>([\s\S]*?)<\/article>/i,
-      /<div[^>]*class="[^"]*article-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*class="[^"]*post-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*class=\"[^\"]*article-content[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*class=\"[^\"]*post-content[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*class=\"[^\"]*entry-content[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*class=\"[^\"]*content[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
       /<main[^>]*>([\s\S]*?)<\/main>/i,
     ];
 
@@ -155,12 +155,12 @@ async function fetchFullArticleContent(url: string): Promise<string> {
       .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
       .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
       .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '')
-      .replace(/<div[^>]*class="[^"]*comment[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class="[^"]*sidebar[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class="[^"]*ad[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+      .replace(/<div[^>]*class=\"[^\"]*comment[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
+      .replace(/<div[^>]*class=\"[^\"]*sidebar[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
+      .replace(/<div[^>]*class=\"[^\"]*ad[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '');
 
     const images: string[] = [];
-    const imageMatches = content.matchAll(/<img[^>]*src="([^"]*)"[^>]*>/gi);
+    const imageMatches = content.matchAll(/<img[^>]*src=\"([^\"]*)\"[^>]*>/gi);
     for (const match of imageMatches) {
       const imgSrc = match[1];
       if (imgSrc && !imgSrc.includes('data:image') && !imgSrc.includes('placeholder') && !imgSrc.includes('avatar') && !imgSrc.includes('icon')) {
@@ -255,21 +255,8 @@ Deno.serve(async (req: Request) => {
         const defaultCategorySlug = categoryMap?.default || 'entertainment';
         const defaultCategory = categories?.find((c: any) => c.slug === defaultCategorySlug);
 
-        // Function to assign author based on category
         const getAuthorByCategory = (categorySlug: string) => {
-          switch (categorySlug) {
-            case 'politics':
-            case 'interview':
-            case 'business':
-            case 'immigration':
-              return authors?.find((a: any) => a.name === 'Gbenga Ayandare') || defaultAuthor;
-            case 'entertainment':
-            case 'lifestyle':
-              return authors?.find((a: any) => a.name === 'Victoria Odunola') || defaultAuthor;
-            default:
-              // news, celebrity, society and other categories
-              return authors?.find((a: any) => a.name === 'Matthew Ayandare') || defaultAuthor;
-          }
+          return defaultAuthor;
         };
 
         for (const item of items.slice(0, 10)) {
@@ -291,7 +278,6 @@ Deno.serve(async (req: Request) => {
               }
             }
 
-            // Get appropriate author based on category
             const assignedAuthor = getAuthorByCategory(defaultCategorySlug);
 
             const { error } = await supabase.from('media_content').insert({
