@@ -24,16 +24,16 @@
     - Reassign all existing content to appropriate authors based on category
     
   ## Notes
-    - Uses the photo `/g.m2.jpeg` for Matthew Ayandare
+    - Uses the photo `/g.m3.jpeg` for Matthew Ayandare
     - Professional profile photos for other authors
     - Updates all existing content assignments
 */
 
 -- Update Michael Chen to Matthew Ayandare
-UPDATE authors 
-SET 
+UPDATE authors
+SET
   name = 'Matthew Ayandare',
-  avatar_url = '/g.m2.jpeg',
+  avatar_url = '/g.m3.jpeg',
   bio = 'Senior journalist and news reporter covering breaking news, celebrity updates, and general interest stories with accuracy and engaging storytelling.'
 WHERE name = 'Michael Chen';
 
@@ -54,10 +54,10 @@ SET
 WHERE name = 'David Kim';
 
 -- Ensure Sarah Johnson is also updated to Matthew Ayandare (in case it wasn't done before)
-UPDATE authors 
-SET 
+UPDATE authors
+SET
   name = 'Matthew Ayandare',
-  avatar_url = '/g.m2.jpeg',
+  avatar_url = '/g.m3.jpeg',
   bio = 'Senior journalist and news reporter covering breaking news, celebrity updates, and general interest stories with accuracy and engaging storytelling.'
 WHERE name = 'Sarah Johnson';
 
