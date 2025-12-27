@@ -90,39 +90,5 @@ export function AdBanner({ placement, className = '' }: AdBannerProps) {
     }
   }
 
-  if (!ad) return null;
-
-  const isHorizontal = placement === 'header' || placement === 'footer';
-
-  return (
-    <div className={`bg-gray-50 rounded-lg overflow-hidden border border-gray-200 ${className}`}>
-      <div className="text-xs text-gray-400 px-3 py-1 bg-gray-100 border-b border-gray-200">
-        Sponsored
-      </div>
-      <a
-        href={ad.link_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={handleClick}
-        className="block group"
-      >
-        <div className={`relative ${isHorizontal ? 'h-24' : 'h-64'}`}>
-          <img
-            src={ad.image_url}
-            alt={ad.title}
-            className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
-            <div className="text-white">
-              <p className="font-semibold text-sm mb-1">{ad.title}</p>
-              <div className="flex items-center space-x-1 text-xs opacity-75">
-                <span>{ad.advertiser_name}</span>
-                <ExternalLink className="w-3 h-3" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </a>
-    </div>
-  );
+  return null;
 }

@@ -212,21 +212,6 @@ export function ArticleDetail() {
                 })
               }
             </div>
-
-            {article.external_url && (
-              <div className="mt-10 p-5 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-xs font-medium text-gray-600 mb-2">Original Source</p>
-                <a
-                  href={article.external_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-red-600 hover:text-red-700 text-sm break-all inline-flex items-center"
-                >
-                  View original article at source
-                  <span className="ml-1">→</span>
-                </a>
-              </div>
-            )}
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-6 border-y border-gray-200 mb-12 bg-gray-50 px-5 rounded-lg">
