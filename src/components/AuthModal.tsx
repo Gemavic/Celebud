@@ -19,19 +19,67 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
 
   if (!isOpen) return null;
 
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password: string): boolean => {
+    return password.length >= 8;
+  };
+
+  const validateUsername = (username: string): boolean => {
+    return username.trim().length >= 3 && username.trim().length <= 30;
+  };
+
+  const getFriendlyErrorMessage = (error: any): string => {
+    const message = error.message || '';
+
+    if (message.includes('User already registered')) {
+      return 'An account with this email already exists. Please sign in instead.';
+    }
+    if (message.includes('Invalid login credentials')) {
+      return 'Incorrect email or password. Please try again.';
+    }
+    if (message.includes('Email not confirmed')) {
+      return 'Please check your email and confirm your account.';
+    }
+    if (message.includes('duplicate key') && message.includes('username')) {
+      return 'This username is already taken. Please choose another.';
+    }
+    if (message.includes('Password should be at least')) {
+      return 'Password must be at least 8 characters long.';
+    }
+
+    return 'Something went wrong. Please try again.';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!validateEmail(email)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!validatePassword(password)) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
+
+    if (mode === 'signup') {
+      if (!validateUsername(username)) {
+        setError('Username must be between 3 and 30 characters.');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
       if (mode === 'signup') {
-        if (!username.trim()) {
-          setError('Username is required');
-          setLoading(false);
-          return;
-        }
-        await signUp(email, password, username);
+        await signUp(email, password, username.trim());
       } else {
         await signIn(email, password);
       }
@@ -40,7 +88,7 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
       setPassword('');
       setUsername('');
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(getFriendlyErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -76,6 +124,7 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Choose a username (3-30 characters)"
                 required
               />
             </div>
@@ -90,6 +139,7 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="your@email.com"
               required
             />
           </div>
@@ -103,8 +153,9 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder={mode === 'signup' ? 'At least 8 characters' : 'Enter your password'}
               required
-              minLength={6}
+              minLength={8}
             />
           </div>
 

@@ -63,38 +63,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
+      if (error) {
+        console.error('Error loading profile:', error);
+        setProfile(null);
+      } else {
+        setProfile(data);
       }
-
-      setProfile(data);
     } catch (error) {
       console.error('Error loading profile:', error);
+      setProfile(null);
     } finally {
       setLoading(false);
     }
   }
 
   async function signUp(email: string, password: string, username: string) {
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
-    });
-
-    if (authError) throw authError;
-
-    if (authData.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
+      options: {
+        data: {
           username,
           display_name: username,
-          is_admin: false,
-        });
+        },
+      },
+    });
 
-      if (profileError) throw profileError;
-    }
+    if (error) throw error;
   }
 
   async function signIn(email: string, password: string) {
