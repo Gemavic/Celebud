@@ -148,6 +148,42 @@ function stripHtml(html: string): string {
   );
 }
 
+function categorizeArticle(title: string, description: string): string {
+  const text = `${title} ${description}`.toLowerCase();
+
+  const categoryKeywords: Record<string, string[]> = {
+    'immigration': ['immigration', 'visa', 'immigrant', 'citizenship', 'refugee', 'border', 'deportation', 'asylum', 'green card', 'permanent resident'],
+    'politics': ['election', 'government', 'congress', 'senate', 'president', 'minister', 'political', 'parliament', 'vote', 'campaign', 'policy', 'legislation'],
+    'business': ['business', 'company', 'corporate', 'economy', 'market', 'stock', 'trade', 'industry', 'commerce', 'startup', 'ceo', 'investor'],
+    'finance': ['finance', 'investment', 'banking', 'financial', 'money', 'currency', 'cryptocurrency', 'bitcoin', 'stock market', 'trading', 'portfolio'],
+    'technology': ['technology', 'tech', 'software', 'hardware', 'ai', 'artificial intelligence', 'app', 'digital', 'innovation', 'gadget', 'smartphone', 'computer'],
+    'entertainment': ['entertainment', 'movie', 'film', 'music', 'celebrity', 'actor', 'actress', 'hollywood', 'netflix', 'streaming', 'concert', 'album'],
+    'celebrity': ['celebrity', 'star', 'famous', 'kardashian', 'kanye', 'beyonce', 'taylor swift', 'drake', 'rihanna', 'bieber'],
+    'lifestyle': ['lifestyle', 'fashion', 'beauty', 'wellness', 'health', 'fitness', 'food', 'recipe', 'home', 'decor', 'style'],
+    'education': ['education', 'school', 'university', 'college', 'student', 'teacher', 'learning', 'academic', 'scholarship', 'degree'],
+    'travel': ['travel', 'tourism', 'vacation', 'trip', 'destination', 'hotel', 'flight', 'adventure', 'tour', 'tourist'],
+    'society': ['society', 'social', 'community', 'culture', 'religion', 'protest', 'movement', 'justice', 'equality', 'rights']
+  };
+
+  let bestMatch = 'news';
+  let maxScore = 0;
+
+  for (const [category, keywords] of Object.entries(categoryKeywords)) {
+    let score = 0;
+    for (const keyword of keywords) {
+      if (text.includes(keyword)) {
+        score += keyword.split(' ').length;
+      }
+    }
+    if (score > maxScore) {
+      maxScore = score;
+      bestMatch = category;
+    }
+  }
+
+  return bestMatch;
+}
+
 function generateSlug(title: string): string {
   return title
     .toLowerCase()
@@ -300,12 +336,7 @@ Deno.serve(async (req: Request) => {
 
         const defaultAuthor = authors?.[0];
         const categoryMap = source.category_mapping as Record<string, string>;
-        const defaultCategorySlug = categoryMap?.default || 'entertainment';
-        const defaultCategory = categories?.find((c: any) => c.slug === defaultCategorySlug);
-
-        const getAuthorByCategory = (categorySlug: string) => {
-          return defaultAuthor;
-        };
+        const sourceCategorySlug = categoryMap?.default || 'news';
 
         for (const item of items.slice(0, 10)) {
           const slug = generateSlug(item.title);
@@ -326,15 +357,17 @@ Deno.serve(async (req: Request) => {
               }
             }
 
-            const assignedAuthor = getAuthorByCategory(defaultCategorySlug);
+            const detectedCategorySlug = categorizeArticle(item.title, item.description);
+            const finalCategorySlug = detectedCategorySlug !== 'news' ? detectedCategorySlug : sourceCategorySlug;
+            const articleCategory = categories?.find((c: any) => c.slug === finalCategorySlug);
 
             const { error } = await supabase.from('media_content').insert({
               title: item.title,
               slug,
               description: item.description,
               content: fullContent,
-              category_id: defaultCategory?.id,
-              author_id: assignedAuthor?.id,
+              category_id: articleCategory?.id,
+              author_id: defaultAuthor?.id,
               media_type: 'article',
               thumbnail_url: item.thumbnail,
               external_url: item.link,
@@ -344,6 +377,7 @@ Deno.serve(async (req: Request) => {
               is_featured: false,
               is_trending: false,
               views_count: 0,
+              comments_count: 0,
             });
 
             if (!error) {

@@ -44,6 +44,7 @@ export interface Database {
           is_featured: boolean;
           is_trending: boolean;
           views_count: number;
+          comments_count: number;
           published_at: string;
           created_at: string;
           updated_at: string;

@@ -20,11 +20,13 @@ interface Comment {
 
 interface CommentsSectionProps {
   contentId: string;
+  initialCount?: number;
 }
 
-export default function CommentsSection({ contentId }: CommentsSectionProps) {
+export default function CommentsSection({ contentId, initialCount = 0 }: CommentsSectionProps) {
   const { user } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
+  const [commentsCount, setCommentsCount] = useState(initialCount);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -50,6 +52,16 @@ export default function CommentsSection({ contentId }: CommentsSectionProps) {
 
       if (error) throw error;
       setComments(data || []);
+
+      const { data: contentData } = await supabase
+        .from('media_content')
+        .select('comments_count')
+        .eq('id', contentId)
+        .maybeSingle();
+
+      if (contentData) {
+        setCommentsCount(contentData.comments_count || 0);
+      }
     } catch (err) {
       console.error('Error loading comments:', err);
     }
@@ -111,7 +123,7 @@ export default function CommentsSection({ contentId }: CommentsSectionProps) {
       <div className="flex items-center mb-6">
         <MessageCircle className="w-6 h-6 text-blue-600 mr-2" />
         <h3 className="text-2xl font-bold text-gray-900">
-          Comments ({comments.length})
+          Comments ({commentsCount})
         </h3>
       </div>
 

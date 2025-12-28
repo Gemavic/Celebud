@@ -299,7 +299,7 @@ export function ArticleDetail() {
             </div>
           )}
 
-          <CommentsSection contentId={article.id} />
+          <CommentsSection contentId={article.id} initialCount={article.comments_count || 0} />
         </div>
       </article>
     </div>
