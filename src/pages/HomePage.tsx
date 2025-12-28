@@ -9,7 +9,6 @@ import { MediaCard } from '../components/MediaCard';
 import { TrendingSection } from '../components/TrendingSection';
 import { LiveNewsIndicator } from '../components/LiveNewsIndicator';
 import { EditorialSection } from '../components/EditorialSection';
-import { AdBanner } from '../components/AdBanner';
 import { SubscriptionPlans } from '../components/SubscriptionPlans';
 import { NewsletterSignup } from '../components/NewsletterSignup';
 import { Loader2 } from 'lucide-react';
@@ -132,10 +131,6 @@ export function HomePage() {
 
         <EditorialSection />
 
-        <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-12">
-          <AdBanner placement="header" />
-        </div>
-
         <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16" aria-label="Latest articles">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -176,10 +171,6 @@ export function HomePage() {
         </div>
 
         <SubscriptionPlans />
-
-        <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
-          <AdBanner placement="footer" />
-        </div>
       </main>
 
       <footer className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white py-12 px-4 sm:px-6 lg:px-8">
