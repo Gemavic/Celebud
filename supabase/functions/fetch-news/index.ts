@@ -15,6 +15,45 @@ interface RSSItem {
   content?: string;
 }
 
+function isValidArticleImage(imageUrl: string): boolean {
+  const lowerUrl = imageUrl.toLowerCase();
+
+  const excludeKeywords = [
+    'logo', 'icon', 'avatar', 'channel', 'header', 'footer',
+    'banner', 'badge', 'button', 'social', 'share', 'favicon',
+    'sprite', 'ui', 'nav', 'menu', 'sidebar', 'widget',
+    'ad', 'advertisement', 'sponsor', 'promo',
+    '/wp-content/themes/', '/assets/images/logo', '/static/logo',
+    'gravatar', 'profile-pic', 'user-image', 'author-',
+    'blank.', 'placeholder.', 'default.', 'dummy.',
+    'spacer.', 'pixel.', 'trans.', 'invisible.'
+  ];
+
+  for (const keyword of excludeKeywords) {
+    if (lowerUrl.includes(keyword)) {
+      return false;
+    }
+  }
+
+  const minSizePattern = /(\d+)x(\d+)/;
+  const sizeMatch = imageUrl.match(minSizePattern);
+  if (sizeMatch) {
+    const width = parseInt(sizeMatch[1]);
+    const height = parseInt(sizeMatch[2]);
+    if (width < 200 || height < 200) {
+      return false;
+    }
+  }
+
+  const validExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+  const hasValidExtension = validExtensions.some(ext => lowerUrl.includes(ext));
+  if (!hasValidExtension && !lowerUrl.includes('image')) {
+    return false;
+  }
+
+  return true;
+}
+
 function parseRSS(xmlText: string): RSSItem[] {
   const items: RSSItem[] = [];
   
@@ -28,15 +67,22 @@ function parseRSS(xmlText: string): RSSItem[] {
     const pubDate = itemXml.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || new Date().toISOString();
     
     let thumbnail = '';
-    const mediaContent = itemXml.match(/<media:content[^>]*url=\"([^\"]*)\"/)?.[1];
-    const mediaThumbnail = itemXml.match(/<media:thumbnail[^>]*url=\"([^\"]*)\"/)?.[1];
+    const mediaContent = itemXml.match(/<media:content[^>]*url=\"([^\"]*)\"/)?.[ 1];
+    const mediaThumbnail = itemXml.match(/<media:thumbnail[^>]*url=\"([^\"]*)\"/)?.[ 1];
     const enclosure = itemXml.match(/<enclosure[^>]*url=\"([^\"]*)\"[^>]*type=\"image/)?.[1];
     const ogImage = itemXml.match(/<og:image>(.*?)<\/og:image>/)?.[1];
 
     const content = itemXml.match(/<content:encoded><!\[CDATA\[(.*?)\]\]><\/content:encoded>/)?.[1] || description;
-    const imgInContent = content.match(/<img[^>]*src=\"([^\"]*)\"/)?.[1];
+    const imgInContent = content.match(/<img[^>]*src=\"([^\"]*)\"/)?.[ 1];
 
-    thumbnail = mediaContent || mediaThumbnail || enclosure || ogImage || imgInContent || '';
+    const potentialThumbnails = [mediaContent, mediaThumbnail, enclosure, ogImage, imgInContent].filter(Boolean);
+
+    for (const img of potentialThumbnails) {
+      if (img && isValidArticleImage(img)) {
+        thumbnail = img;
+        break;
+      }
+    }
 
     if (title && link && thumbnail) {
       items.push({
@@ -163,13 +209,15 @@ async function fetchFullArticleContent(url: string): Promise<string> {
     const imageMatches = content.matchAll(/<img[^>]*src=\"([^\"]*)\"[^>]*>/gi);
     for (const match of imageMatches) {
       const imgSrc = match[1];
-      if (imgSrc && !imgSrc.includes('data:image') && !imgSrc.includes('placeholder') && !imgSrc.includes('avatar') && !imgSrc.includes('icon')) {
+      if (imgSrc && !imgSrc.includes('data:image')) {
         let fullUrl = imgSrc;
         if (imgSrc.startsWith('/')) {
           const urlObj = new URL(url);
           fullUrl = `${urlObj.protocol}//${urlObj.host}${imgSrc}`;
         }
-        images.push(fullUrl);
+        if (isValidArticleImage(fullUrl)) {
+          images.push(fullUrl);
+        }
       }
     }
 
