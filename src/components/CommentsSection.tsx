@@ -3,6 +3,7 @@ import { MessageCircle, Send, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { formatDistanceToNow } from '../utils/date';
+import AuthModal from './AuthModal';
 
 interface Comment {
   id: string;
@@ -28,6 +29,8 @@ export default function CommentsSection({ contentId }: CommentsSectionProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
 
   useEffect(() => {
     loadComments();
@@ -139,7 +142,27 @@ export default function CommentsSection({ contentId }: CommentsSectionProps) {
         </form>
       ) : (
         <div className="bg-gray-50 p-6 rounded-lg mb-8 text-center">
-          <p className="text-gray-600">Please sign in to leave a comment</p>
+          <p className="text-gray-600 mb-4">Please sign in to leave a comment</p>
+          <div className="flex items-center justify-center space-x-3">
+            <button
+              onClick={() => {
+                setAuthMode('signin');
+                setIsAuthModalOpen(true);
+              }}
+              className="px-6 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-medium"
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => {
+                setAuthMode('signup');
+                setIsAuthModalOpen(true);
+              }}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              Sign Up
+            </button>
+          </div>
         </div>
       )}
 
@@ -191,6 +214,12 @@ export default function CommentsSection({ contentId }: CommentsSectionProps) {
           ))
         )}
       </div>
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        mode={authMode}
+      />
     </div>
   );
 }

@@ -210,6 +210,57 @@ export function Header() {
                 />
               </form>
             </div>
+
+            <div className="pt-4 space-y-2">
+              {user ? (
+                <>
+                  <div className="bg-white rounded-lg px-4 py-3">
+                    <p className="text-gray-900 font-semibold">{profile?.username || 'User'}</p>
+                  </div>
+                  {profile?.is_admin && (
+                    <Link
+                      to="/editorial"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center bg-white text-gray-900 hover:bg-gray-100 font-bold py-3 px-4 rounded-lg"
+                    >
+                      <PenSquare className="w-4 h-4 mr-2" />
+                      Write Article
+                    </Link>
+                  )}
+                  <button
+                    onClick={() => {
+                      handleSignOut();
+                      setIsMenuOpen(false);
+                    }}
+                    className="flex items-center w-full bg-white text-gray-900 hover:bg-gray-100 font-bold py-3 px-4 rounded-lg"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      openAuthModal('signin');
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full bg-white text-blue-600 hover:bg-gray-100 font-bold py-3 px-4 rounded-lg text-sm"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    onClick={() => {
+                      openAuthModal('signup');
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full bg-blue-600 text-white hover:bg-blue-700 font-bold py-3 px-4 rounded-lg text-sm"
+                  >
+                    Sign Up
+                  </button>
+                </>
+              )}
+            </div>
           </nav>
         </div>
       )}
