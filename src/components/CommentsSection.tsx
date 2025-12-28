@@ -36,6 +36,26 @@ export default function CommentsSection({ contentId, initialCount = 0 }: Comment
 
   useEffect(() => {
     loadComments();
+
+    const channel = supabase
+      .channel(`comments-${contentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'comments',
+          filter: `content_id=eq.${contentId}`,
+        },
+        () => {
+          loadComments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [contentId]);
 
   async function loadComments() {
