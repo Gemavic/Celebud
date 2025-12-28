@@ -18,10 +18,41 @@ export function ArticleDetail() {
   useEffect(() => {
     if (id) {
       loadArticle(id);
+
+      const channel = supabase
+        .channel(`article-${id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'media_content',
+            filter: `id=eq.${id}`,
+          },
+          (payload) => {
+            if (payload.new) {
+              setArticle((prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  views_count: (payload.new as any).views_count || prev.views_count,
+                  comments_count: (payload.new as any).comments_count || prev.comments_count,
+                };
+              });
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+        removeArticleStructuredData();
+      };
+    } else {
+      return () => {
+        removeArticleStructuredData();
+      };
     }
-    return () => {
-      removeArticleStructuredData();
-    };
   }, [id]);
 
   async function loadArticle(articleId: string) {
@@ -35,7 +66,13 @@ export function ArticleDetail() {
       if (error) throw error;
 
       if (data) {
-        setArticle(data as MediaContentWithRelations);
+        const newViewCount = (data.views_count || 0) + 1;
+        const updatedArticle = {
+          ...data,
+          views_count: newViewCount
+        } as MediaContentWithRelations;
+
+        setArticle(updatedArticle);
 
         updateMetaTags({
           title: `${data.title} - CelebUD`,
@@ -61,7 +98,7 @@ export function ArticleDetail() {
 
         await supabase
           .from('media_content')
-          .update({ views_count: (data.views_count || 0) + 1 })
+          .update({ views_count: newViewCount })
           .eq('id', articleId);
 
         if (data.category_id) {
