@@ -39,7 +39,7 @@ export default function CommentsSection({ contentId }: CommentsSectionProps) {
   async function loadComments() {
     try {
       const { data, error } = await supabase
-        .from('user_comments')
+        .from('comments')
         .select(`
           *,
           profiles:user_id (username, display_name)
@@ -73,7 +73,7 @@ export default function CommentsSection({ contentId }: CommentsSectionProps) {
 
     try {
       const { error: insertError } = await supabase
-        .from('user_comments')
+        .from('comments')
         .insert({
           content_id: contentId,
           user_id: user.id,
@@ -94,7 +94,7 @@ export default function CommentsSection({ contentId }: CommentsSectionProps) {
   async function handleDelete(commentId: string) {
     try {
       const { error } = await supabase
-        .from('user_comments')
+        .from('comments')
         .delete()
         .eq('id', commentId);
 
