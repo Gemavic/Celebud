@@ -60,18 +60,33 @@ export default function CommentsSection({ contentId, initialCount = 0 }: Comment
 
   async function loadComments() {
     try {
-      const { data, error } = await supabase
+      const { data: commentsData, error: commentsError } = await supabase
         .from('comments')
-        .select(`
-          *,
-          profiles:user_id (username, display_name)
-        `)
+        .select('*')
         .eq('content_id', contentId)
         .is('parent_id', null)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setComments(data || []);
+      if (commentsError) throw commentsError;
+
+      if (commentsData && commentsData.length > 0) {
+        const userIds = [...new Set(commentsData.map(c => c.user_id))];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, username, display_name')
+          .in('id', userIds);
+
+        const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
+
+        const enrichedComments = commentsData.map(comment => ({
+          ...comment,
+          profiles: profilesMap.get(comment.user_id) || { username: null, display_name: null }
+        }));
+
+        setComments(enrichedComments);
+      } else {
+        setComments([]);
+      }
 
       const { data: contentData } = await supabase
         .from('media_content')
