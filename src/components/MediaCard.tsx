@@ -1,4 +1,4 @@
-import { Play, Clock, Eye, Volume2, Mic2, FileText } from 'lucide-react';
+import { Play, Clock, Eye, Volume2, Mic2, FileText, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { formatDistanceToNow } from '../utils/date';
@@ -83,7 +83,11 @@ export function MediaCard({ content }: MediaCardProps) {
           <div className="flex items-center space-x-3 text-gray-500 text-xs">
             <div className="flex items-center space-x-1">
               <Eye className="w-3.5 h-3.5" />
-              <span>{(content.views_count / 1000).toFixed(1)}K</span>
+              <span>{((content.views_count || 0) / 1000).toFixed(1)}K</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>{content.comments_count || 0}</span>
             </div>
             <div className="flex items-center space-x-1">
               <Clock className="w-3.5 h-3.5" />

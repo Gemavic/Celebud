@@ -66,13 +66,7 @@ export function ArticleDetail() {
       if (error) throw error;
 
       if (data) {
-        const newViewCount = (data.views_count || 0) + 1;
-        const updatedArticle = {
-          ...data,
-          views_count: newViewCount
-        } as MediaContentWithRelations;
-
-        setArticle(updatedArticle);
+        setArticle(data as MediaContentWithRelations);
 
         updateMetaTags({
           title: `${data.title} - CelebUD`,
@@ -96,10 +90,7 @@ export function ArticleDetail() {
           url: `${window.location.origin}/article/${articleId}`,
         });
 
-        await supabase
-          .from('media_content')
-          .update({ views_count: newViewCount })
-          .eq('id', articleId);
+        await supabase.rpc('increment_article_views', { article_id: articleId });
 
         if (data.category_id) {
           const { data: related } = await supabase
