@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Check, Star, Zap, Crown } from 'lucide-react';
+import { Check, Star, Zap, Crown, Loader2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SubscriptionTier {
   id: string;
@@ -16,6 +17,8 @@ interface SubscriptionTier {
 export function SubscriptionPlans() {
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
+  const [loading, setLoading] = useState<string | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     loadTiers();
@@ -33,6 +36,57 @@ export function SubscriptionPlans() {
         ...tier,
         features: Array.isArray(tier.features) ? tier.features : [],
       })) as SubscriptionTier[]);
+    }
+  }
+
+  async function handleSubscribe(tierId: string, tierName: string) {
+    if (!user) {
+      alert('Please sign in to subscribe');
+      return;
+    }
+
+    if (tierName === 'Free') {
+      return;
+    }
+
+    setLoading(tierId);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        alert('Please sign in to subscribe');
+        return;
+      }
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tierId,
+          billingPeriod,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      alert('Failed to start checkout. Please try again.');
+    } finally {
+      setLoading(null);
     }
   }
 
@@ -130,13 +184,24 @@ export function SubscriptionPlans() {
                 </ul>
 
                 <button
-                  className={`w-full py-3 px-6 rounded-lg font-bold transition-all ${
+                  onClick={() => handleSubscribe(tier.id, tier.name)}
+                  disabled={loading === tier.id || tier.name === 'Free'}
+                  className={`w-full py-3 px-6 rounded-lg font-bold transition-all flex items-center justify-center ${
                     tier.name === 'Free'
-                      ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      ? 'bg-gray-200 text-gray-700 cursor-not-allowed'
+                      : loading === tier.id
+                      ? 'bg-gray-400 text-white cursor-wait'
                       : `bg-gradient-to-r ${colorClass} text-white hover:opacity-90 shadow-lg`
                   }`}
                 >
-                  {tier.name === 'Free' ? 'Current Plan' : 'Upgrade Now'}
+                  {loading === tier.id ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    tier.name === 'Free' ? 'Current Plan' : 'Upgrade Now'
+                  )}
                 </button>
               </div>
             </div>
