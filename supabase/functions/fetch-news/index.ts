@@ -84,13 +84,13 @@ function parseRSS(xmlText: string): RSSItem[] {
       }
     }
 
-    if (title && link && thumbnail) {
+    if (title && link) {
       items.push({
         title: stripHtml(title.trim()),
         description: stripHtml(description),
         link: link.trim(),
         pubDate,
-        thumbnail: thumbnail,
+        thumbnail: thumbnail || 'https://images.pexels.com/photos/1148820/pexels-photo-1148820.jpeg',
         content: stripHtml(content),
       });
     }

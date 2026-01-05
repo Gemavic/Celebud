@@ -1,18 +1,37 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { HomePage } from './pages/HomePage';
-import { ArticleDetail } from './pages/ArticleDetail';
-import EditorialPage from './pages/EditorialPage';
+import { Loader2 } from 'lucide-react';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+const HomePage = lazy(() => import('./pages/HomePage').then(module => ({ default: module.HomePage })));
+const ArticleDetail = lazy(() => import('./pages/ArticleDetail').then(module => ({ default: module.ArticleDetail })));
+const EditorialPage = lazy(() => import('./pages/EditorialPage'));
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="text-center">
+        <Loader2 className="w-12 h-12 animate-spin text-red-600 mx-auto mb-4" />
+        <p className="text-gray-600 font-medium">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/article/:id" element={<ArticleDetail />} />
-        <Route path="/editorial" element={<EditorialPage />} />
-        <Route path="/editorial/*" element={<EditorialPage />} />
-      </Routes>
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <Suspense fallback={<LoadingFallback />}>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/article/:id" element={<ArticleDetail />} />
+            <Route path="/editorial" element={<EditorialPage />} />
+            <Route path="/editorial/*" element={<EditorialPage />} />
+          </Routes>
+        </Suspense>
+      </Router>
+    </ErrorBoundary>
   );
 }
 

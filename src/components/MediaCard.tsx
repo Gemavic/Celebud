@@ -26,6 +26,7 @@ export function MediaCard({ content }: MediaCardProps) {
         <img
           src={content.thumbnail_url || ''}
           alt={content.title}
+          loading="lazy"
           className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
         />
 
@@ -69,6 +70,7 @@ export function MediaCard({ content }: MediaCardProps) {
                 <img
                   src={content.authors.avatar_url || ''}
                   alt={content.authors.name}
+                  loading="lazy"
                   className="w-7 h-7 rounded-full border border-gray-200"
                 />
                 <span className="text-xs text-gray-600">

@@ -24,6 +24,7 @@ export function Hero({ featuredContent }: HeroProps) {
           <img
             src={mainFeatured.thumbnail_url || ''}
             alt={mainFeatured.title}
+            loading="eager"
             className="w-full h-[500px] object-cover transform group-hover:scale-105 transition-transform duration-700"
           />
 
@@ -66,6 +67,7 @@ export function Hero({ featuredContent }: HeroProps) {
               <img
                 src={content.thumbnail_url || ''}
                 alt={content.title}
+                loading="lazy"
                 className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
               />
 

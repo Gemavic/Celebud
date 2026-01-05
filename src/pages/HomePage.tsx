@@ -11,10 +11,11 @@ import { LiveNewsIndicator } from '../components/LiveNewsIndicator';
 import { EditorialSection } from '../components/EditorialSection';
 import { SubscriptionPlans } from '../components/SubscriptionPlans';
 import { NewsletterSignup } from '../components/NewsletterSignup';
+import { Pagination } from '../components/Pagination';
 import { Loader2 } from 'lucide-react';
 
-export function HomePage() {
-  const [searchParams] = useSearchParams();
+function HomePage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredContent, setFeaturedContent] = useState<MediaContentWithRelations[]>([]);
   const [trendingContent, setTrendingContent] = useState<MediaContentWithRelations[]>([]);
@@ -23,6 +24,8 @@ export function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const articlesPerPage = 12;
 
   useEffect(() => {
     const categoryParam = searchParams.get('category');
@@ -96,11 +99,21 @@ export function HomePage() {
     }
   }
 
-  const displayContent = searchQuery
+  const filteredContent = searchQuery
     ? searchResults
     : selectedCategory
     ? allContent.filter((content) => content.categories?.slug === selectedCategory)
     : allContent;
+
+  const totalPages = Math.ceil(filteredContent.length / articlesPerPage);
+  const startIndex = (currentPage - 1) * articlesPerPage;
+  const endIndex = startIndex + articlesPerPage;
+  const displayContent = filteredContent.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   if (loading) {
     return (
@@ -163,6 +176,14 @@ export function HomePage() {
                   : 'No content found in this category.'}
               </p>
             </div>
+          )}
+
+          {filteredContent.length > articlesPerPage && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
           )}
         </section>
 
@@ -255,3 +276,5 @@ export function HomePage() {
     </div>
   );
 }
+
+export { HomePage };
