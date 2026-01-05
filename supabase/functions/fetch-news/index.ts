@@ -306,11 +306,32 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const sourcesByCountry = {
+      'Nigeria': sources.filter((s: any) => s.country === 'Nigeria'),
+      'Canada': sources.filter((s: any) => s.country === 'Canada'),
+      'USA': sources.filter((s: any) => s.country === 'USA'),
+      'Global': sources.filter((s: any) => s.country === 'Global' || !s.country),
+    };
+
+    const totalArticlesTarget = 100;
+    const articlesPerCountry = {
+      'Nigeria': Math.floor(totalArticlesTarget * 0.50),
+      'Canada': Math.floor(totalArticlesTarget * 0.20),
+      'USA': Math.floor(totalArticlesTarget * 0.10),
+      'Global': Math.floor(totalArticlesTarget * 0.30),
+    };
+
     let totalFetched = 0;
     let totalAdded = 0;
     const results = [];
 
-    for (const source of sources) {
+    for (const [country, countrySources] of Object.entries(sourcesByCountry)) {
+      if (countrySources.length === 0) continue;
+
+      const targetArticles = articlesPerCountry[country as keyof typeof articlesPerCountry];
+      const articlesPerSource = Math.ceil(targetArticles / countrySources.length);
+
+      for (const source of countrySources) {
       const logEntry = {
         source_id: source.id,
         fetch_started_at: new Date().toISOString(),
@@ -338,7 +359,7 @@ Deno.serve(async (req: Request) => {
         const categoryMap = source.category_mapping as Record<string, string>;
         const sourceCategorySlug = categoryMap?.default || 'news';
 
-        for (const item of items.slice(0, 10)) {
+        for (const item of items.slice(0, articlesPerSource)) {
           const slug = generateSlug(item.title);
 
           const { data: existing } = await supabase
@@ -402,6 +423,7 @@ Deno.serve(async (req: Request) => {
 
         results.push({
           source: source.name,
+          country: country,
           fetched: items.length,
           added: addedCount,
         });
@@ -416,15 +438,18 @@ Deno.serve(async (req: Request) => {
 
         results.push({
           source: source.name,
+          country: country,
           error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
+    }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Processed ${sources.length} sources`,
+        message: `Processed ${sources.length} sources with weighted distribution`,
+        distribution: articlesPerCountry,
         totalFetched,
         totalAdded,
         results,
