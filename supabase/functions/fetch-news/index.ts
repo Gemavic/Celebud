@@ -6,6 +6,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
+const nigerianFallbackImages = [
+  'https://images.unsplash.com/photo-1589624532540-14d0e1f53e6e?w=1200&q=80',
+  'https://images.unsplash.com/photo-1564759224907-65b0c6a6eccd?w=1200&q=80',
+  'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=1200&q=80',
+  'https://images.unsplash.com/photo-1605648916319-cf082f7524a1?w=1200&q=80',
+  'https://images.unsplash.com/photo-1515488764276-beab7607c1e6?w=1200&q=80',
+  'https://images.unsplash.com/photo-1610967423339-22686456bd43?w=1200&q=80',
+  'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=1200&q=80',
+  'https://images.unsplash.com/photo-1578471287714-ca7510e4c630?w=1200&q=80',
+];
+
+const defaultFallbackImage = 'https://images.pexels.com/photos/1148820/pexels-photo-1148820.jpeg';
+
+function getNigerianFallbackImage(): string {
+  return nigerianFallbackImages[Math.floor(Math.random() * nigerianFallbackImages.length)];
+}
+
 interface RSSItem {
   title: string;
   description: string;
@@ -90,7 +107,7 @@ function parseRSS(xmlText: string): RSSItem[] {
         description: stripHtml(description),
         link: link.trim(),
         pubDate,
-        thumbnail: thumbnail || 'https://images.pexels.com/photos/1148820/pexels-photo-1148820.jpeg',
+        thumbnail: thumbnail || '',
         content: stripHtml(content),
       });
     }
@@ -444,6 +461,11 @@ Deno.serve(async (req: Request) => {
             const finalCategorySlug = detectedCategorySlug !== 'news' ? detectedCategorySlug : sourceCategorySlug;
             const articleCategory = categories?.find((c: any) => c.slug === finalCategorySlug);
 
+            let finalThumbnail = item.thumbnail;
+            if (!finalThumbnail || finalThumbnail === '') {
+              finalThumbnail = country === 'Nigeria' ? getNigerianFallbackImage() : defaultFallbackImage;
+            }
+
             const { error } = await supabase.from('media_content').insert({
               title: item.title,
               slug,
@@ -452,7 +474,7 @@ Deno.serve(async (req: Request) => {
               category_id: articleCategory?.id,
               author_id: defaultAuthor?.id,
               media_type: 'article',
-              thumbnail_url: item.thumbnail,
+              thumbnail_url: finalThumbnail,
               external_url: item.link,
               source_id: source.id,
               source_published_at: item.pubDate,
