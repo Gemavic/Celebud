@@ -6,21 +6,84 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-const nigerianFallbackImages = [
-  'https://images.unsplash.com/photo-1589624532540-14d0e1f53e6e?w=1200&q=80',
-  'https://images.unsplash.com/photo-1564759224907-65b0c6a6eccd?w=1200&q=80',
-  'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=1200&q=80',
-  'https://images.unsplash.com/photo-1605648916319-cf082f7524a1?w=1200&q=80',
-  'https://images.unsplash.com/photo-1515488764276-beab7607c1e6?w=1200&q=80',
-  'https://images.unsplash.com/photo-1610967423339-22686456bd43?w=1200&q=80',
-  'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=1200&q=80',
-  'https://images.unsplash.com/photo-1578471287714-ca7510e4c630?w=1200&q=80',
-];
+const categoryFallbackImages: Record<string, string[]> = {
+  'immigration': [
+    'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1200&q=80',
+    'https://images.unsplash.com/photo-1488085061387-422e29b40080?w=1200&q=80',
+    'https://images.unsplash.com/photo-1569098644584-210bcd375b59?w=1200&q=80',
+    'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=1200&q=80',
+  ],
+  'politics': [
+    'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=1200&q=80',
+    'https://images.unsplash.com/photo-1551135049-8a33b5883817?w=1200&q=80',
+    'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1200&q=80',
+    'https://images.unsplash.com/photo-1555374018-13a8994ab246?w=1200&q=80',
+  ],
+  'business': [
+    'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&q=80',
+    'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80',
+    'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1200&q=80',
+    'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80',
+  ],
+  'finance': [
+    'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=1200&q=80',
+    'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80',
+    'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=1200&q=80',
+    'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80',
+  ],
+  'technology': [
+    'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=80',
+    'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=1200&q=80',
+    'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=1200&q=80',
+    'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=80',
+  ],
+  'entertainment': [
+    'https://images.unsplash.com/photo-1574267432644-f610f5ac2b0f?w=1200&q=80',
+    'https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=1200&q=80',
+    'https://images.unsplash.com/photo-1514306191717-452ec28c7814?w=1200&q=80',
+    'https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=1200&q=80',
+  ],
+  'celebrity': [
+    'https://images.unsplash.com/photo-1499364615650-ec38552f4f34?w=1200&q=80',
+    'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1200&q=80',
+    'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1200&q=80',
+    'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?w=1200&q=80',
+  ],
+  'lifestyle': [
+    'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=1200&q=80',
+    'https://images.unsplash.com/photo-1511690743698-d9d85f2fbf38?w=1200&q=80',
+    'https://images.unsplash.com/photo-1556740749-887f6717d7e4?w=1200&q=80',
+    'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=1200&q=80',
+  ],
+  'education': [
+    'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&q=80',
+    'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1200&q=80',
+    'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=1200&q=80',
+    'https://images.unsplash.com/photo-1519406596751-0a3ccc4937fe?w=1200&q=80',
+  ],
+  'travel': [
+    'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&q=80',
+    'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1200&q=80',
+    'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=1200&q=80',
+    'https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?w=1200&q=80',
+  ],
+  'society': [
+    'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1200&q=80',
+    'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=1200&q=80',
+    'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=1200&q=80',
+    'https://images.unsplash.com/photo-1528605105345-5344ea20e269?w=1200&q=80',
+  ],
+  'news': [
+    'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&q=80',
+    'https://images.unsplash.com/photo-1586339949916-3e9457bef6d3?w=1200&q=80',
+    'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200&q=80',
+    'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=1200&q=80',
+  ],
+};
 
-const defaultFallbackImage = 'https://images.pexels.com/photos/1148820/pexels-photo-1148820.jpeg';
-
-function getNigerianFallbackImage(): string {
-  return nigerianFallbackImages[Math.floor(Math.random() * nigerianFallbackImages.length)];
+function getCategoryFallbackImage(category: string): string {
+  const images = categoryFallbackImages[category] || categoryFallbackImages['news'];
+  return images[Math.floor(Math.random() * images.length)];
 }
 
 interface RSSItem {
@@ -463,7 +526,7 @@ Deno.serve(async (req: Request) => {
 
             let finalThumbnail = item.thumbnail;
             if (!finalThumbnail || finalThumbnail === '') {
-              finalThumbnail = country === 'Nigeria' ? getNigerianFallbackImage() : defaultFallbackImage;
+              finalThumbnail = getCategoryFallbackImage(finalCategorySlug);
             }
 
             const { error } = await supabase.from('media_content').insert({
