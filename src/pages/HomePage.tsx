@@ -68,7 +68,7 @@ function HomePage() {
           .from('media_content')
           .select('*, categories(*), authors(*)')
           .order('published_at', { ascending: false })
-          .limit(20),
+          .limit(12),
       ]);
 
       if (categoriesRes.data) setCategories(categoriesRes.data);
@@ -87,12 +87,26 @@ function HomePage() {
       const { data, error } = await supabase
         .from('media_content')
         .select('*, categories(*), authors(*)')
-        .or(`title.ilike.%${query}%,description.ilike.%${query}%,content.ilike.%${query}%`)
+        .textSearch('fts', query, {
+          type: 'websearch',
+          config: 'english'
+        })
         .order('published_at', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
-      setSearchResults(data as MediaContentWithRelations[]);
+      if (error) {
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('media_content')
+          .select('*, categories(*), authors(*)')
+          .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+          .order('published_at', { ascending: false })
+          .limit(50);
+
+        if (fallbackError) throw fallbackError;
+        setSearchResults(fallbackData as MediaContentWithRelations[]);
+      } else {
+        setSearchResults(data as MediaContentWithRelations[]);
+      }
     } catch (error) {
       console.error('Error performing search:', error);
       setSearchResults([]);
