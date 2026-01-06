@@ -346,7 +346,15 @@ async function fetchFullArticleContent(url: string): Promise<string> {
       .replace(/<div[^>]*class=\"[^\"]*social[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
       .replace(/<div[^>]*class=\"[^\"]*share[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
       .replace(/<div[^>]*class=\"[^\"]*newsletter[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*id=\"[^\"]*comment[s]?[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '');
+      .replace(/<div[^>]*class=\"[^\"]*related[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
+      .replace(/<div[^>]*class=\"[^\"]*author[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
+      .replace(/<div[^>]*class=\"[^\"]*byline[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
+      .replace(/<div[^>]*class=\"[^\"]*credit[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
+      .replace(/<div[^>]*class=\"[^\"]*caption[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
+      .replace(/<figcaption[^>]*>[\s\S]*?<\/figcaption>/gi, '')
+      .replace(/<div[^>]*id=\"[^\"]*comment[s]?[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
+      .replace(/<section[^>]*class=\"[^\"]*related[^\"]*\"[^>]*>[\s\S]*?<\/section>/gi, '')
+      .replace(/<section[^>]*class=\"[^\"]*author[^\"]*\"[^>]*>[\s\S]*?<\/section>/gi, '');
 
     const images: string[] = [];
     const imageMatches = content.matchAll(/<img[^>]*src=[\"']([^\"']*)[\"'][^>]*>/gi);
@@ -390,7 +398,26 @@ async function fetchFullArticleContent(url: string): Promise<string> {
 
       const minLength = element.type === 'h' ? 5 : element.type === 'li' ? 10 : 40;
 
-      if (cleaned.length >= minLength && !cleaned.match(/^(share|tweet|comment|subscribe|follow|read more)/i)) {
+      const excludePatterns = [
+        /^(share|tweet|comment|subscribe|follow|read more|latest|related)/i,
+        /view\s+(image|photo|picture)\s+in\s+fullscreen/i,
+        /photograph(er)?:/i,
+        /image\s+credit:/i,
+        /photo\s+(by|credit|courtesy)/i,
+        /getty\s+images/i,
+        /^(published|updated|posted)\s+(on|at|:)/i,
+        /^by\s+\w+\s+\w+/i,
+        /^related\s+(stories|articles|posts)/i,
+        /^(sign\s+up|log\s+in|register)/i,
+        /^(facebook|twitter|instagram|linkedin|whatsapp)/i,
+        /^share\s+(this|on|via)/i,
+        /^source:/i,
+        /^\d+\s+(week|day|hour|minute)s?\s+ago$/i,
+      ];
+
+      const shouldExclude = excludePatterns.some(pattern => pattern.test(cleaned));
+
+      if (cleaned.length >= minLength && !shouldExclude) {
         textParts.push(cleaned);
 
         if (images.length > imageInsertCount && textParts.length > 2 && textParts.length % 4 === 0) {
