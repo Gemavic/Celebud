@@ -38,6 +38,13 @@ export function MediaCard({ content }: MediaCardProps) {
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
+        {content.is_trending && (
+          <div className="absolute top-3 left-3 bg-red-500 text-white px-2.5 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
+            <span>🔥</span>
+            <span>Trending</span>
+          </div>
+        )}
+
         {content.categories && (
           <span
             className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-medium text-white backdrop-blur-sm"

@@ -3,8 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Category, MediaContentWithRelations } from '../lib/database.types';
 import { Header } from '../components/Header';
+import { Hero } from '../components/Hero';
 import { CategoryFilter } from '../components/CategoryFilter';
 import { MediaCard } from '../components/MediaCard';
+import { TrendingSection } from '../components/TrendingSection';
 import { LiveNewsIndicator } from '../components/LiveNewsIndicator';
 import { EditorialSection } from '../components/EditorialSection';
 import { SubscriptionPlans } from '../components/SubscriptionPlans';
@@ -15,6 +17,8 @@ import { Loader2 } from 'lucide-react';
 function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [featuredContent, setFeaturedContent] = useState<MediaContentWithRelations[]>([]);
+  const [trendingContent, setTrendingContent] = useState<MediaContentWithRelations[]>([]);
   const [allContent, setAllContent] = useState<MediaContentWithRelations[]>([]);
   const [searchResults, setSearchResults] = useState<MediaContentWithRelations[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -46,8 +50,22 @@ function HomePage() {
 
   async function loadData() {
     try {
-      const [categoriesRes, allContentRes] = await Promise.all([
+      await supabase.rpc('update_trending_featured_flags');
+
+      const [categoriesRes, featuredRes, trendingRes, allContentRes] = await Promise.all([
         supabase.from('categories').select('*').order('name'),
+        supabase
+          .from('media_content')
+          .select('*, categories(*), authors(*)')
+          .eq('is_featured', true)
+          .order('views_count', { ascending: false })
+          .limit(3),
+        supabase
+          .from('media_content')
+          .select('*, categories(*), authors(*)')
+          .eq('is_trending', true)
+          .order('views_count', { ascending: false })
+          .limit(6),
         supabase
           .from('media_content')
           .select('*, categories(*), authors(*)')
@@ -56,6 +74,8 @@ function HomePage() {
       ]);
 
       if (categoriesRes.data) setCategories(categoriesRes.data);
+      if (featuredRes.data) setFeaturedContent(featuredRes.data as MediaContentWithRelations[]);
+      if (trendingRes.data) setTrendingContent(trendingRes.data as MediaContentWithRelations[]);
       if (allContentRes.data) {
         const uniqueContent = allContentRes.data.filter(
           (content, index, self) =>
@@ -133,12 +153,16 @@ function HomePage() {
       <Header />
       <LiveNewsIndicator onNewsUpdated={loadData} />
 
-      <main className="pt-24" role="main">
+      <main className="pt-44" role="main">
+        <Hero featuredContent={featuredContent} />
+
         <CategoryFilter
           categories={categories}
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
         />
+
+        <TrendingSection trendingContent={trendingContent} />
 
         <EditorialSection />
 
