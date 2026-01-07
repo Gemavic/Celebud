@@ -12,6 +12,7 @@ import { EditorialSection } from '../components/EditorialSection';
 import { SubscriptionPlans } from '../components/SubscriptionPlans';
 import { NewsletterSignup } from '../components/NewsletterSignup';
 import { Pagination } from '../components/Pagination';
+import { AdBanner } from '../components/AdBanner';
 import { Loader2 } from 'lucide-react';
 
 function HomePage() {
@@ -156,6 +157,10 @@ function HomePage() {
       <main className="pt-44" role="main">
         <Hero featuredContent={featuredContent} />
 
+        <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-12">
+          <AdBanner placement="header" className="max-w-4xl mx-auto" />
+        </div>
+
         <CategoryFilter
           categories={categories}
           selectedCategory={selectedCategory}
@@ -163,6 +168,10 @@ function HomePage() {
         />
 
         <TrendingSection trendingContent={trendingContent} />
+
+        <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-12">
+          <AdBanner placement="sidebar" className="max-w-md mx-auto" />
+        </div>
 
         <EditorialSection />
 

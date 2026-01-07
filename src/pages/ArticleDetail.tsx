@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { Header } from '../components/Header';
 import CommentsSection from '../components/CommentsSection';
+import { AdBanner } from '../components/AdBanner';
 import { formatDistanceToNow } from '../utils/date';
 import { updateMetaTags, generateArticleStructuredData, removeArticleStructuredData } from '../utils/seo';
 import { ArrowLeft, Eye, Clock, Share2, Facebook, Twitter, Linkedin } from 'lucide-react';
@@ -326,6 +327,10 @@ export function ArticleDetail() {
               </div>
             </div>
           )}
+
+          <div className="my-12">
+            <AdBanner placement="article" />
+          </div>
 
           <CommentsSection contentId={article.id} initialCount={article.comments_count || 0} />
         </div>
