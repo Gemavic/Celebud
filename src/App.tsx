@@ -6,6 +6,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 const HomePage = lazy(() => import('./pages/HomePage').then(module => ({ default: module.HomePage })));
 const ArticleDetail = lazy(() => import('./pages/ArticleDetail').then(module => ({ default: module.ArticleDetail })));
 const EditorialPage = lazy(() => import('./pages/EditorialPage'));
+const AdRevenueReport = lazy(() => import('./components/AdRevenueReport').then(module => ({ default: module.AdRevenueReport })));
 
 function LoadingFallback() {
   return (
@@ -28,6 +29,7 @@ function App() {
             <Route path="/article/:id" element={<ArticleDetail />} />
             <Route path="/editorial" element={<EditorialPage />} />
             <Route path="/editorial/*" element={<EditorialPage />} />
+            <Route path="/admin/ad-revenue" element={<AdRevenueReport />} />
           </Routes>
         </Suspense>
       </Router>
