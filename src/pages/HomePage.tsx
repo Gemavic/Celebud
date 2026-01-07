@@ -68,7 +68,7 @@ function HomePage() {
           .from('media_content')
           .select('*, categories(*), authors(*)')
           .order('published_at', { ascending: false })
-          .limit(12),
+          .limit(100),
       ]);
 
       if (categoriesRes.data) setCategories(categoriesRes.data);

@@ -19,14 +19,20 @@ export function MediaCard({ content }: MediaCardProps) {
     ? mediaTypeIcons[content.media_type]
     : FileText;
 
+  const fallbackImage = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&q=80';
+
   return (
     <Link to={`/article/${content.id}`} className="block">
       <article className="group cursor-pointer bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
-      <div className="relative overflow-hidden h-56">
+      <div className="relative overflow-hidden h-56 bg-gray-200">
         <img
-          src={content.thumbnail_url || ''}
+          src={content.thumbnail_url || fallbackImage}
           alt={content.title}
           loading="lazy"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.src = fallbackImage;
+          }}
           className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
         />
 

@@ -12,6 +12,8 @@ export function TrendingSection({ trendingContent }: TrendingSectionProps) {
     return null;
   }
 
+  const fallbackImage = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&q=80';
+
   return (
     <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
       <div className="flex items-center space-x-3 mb-6">
@@ -33,8 +35,13 @@ export function TrendingSection({ trendingContent }: TrendingSectionProps) {
           >
             <div className="relative overflow-hidden rounded-2xl shadow-lg">
               <img
-                src={content.thumbnail_url || ''}
+                src={content.thumbnail_url || fallbackImage}
                 alt={content.title}
+                loading="lazy"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = fallbackImage;
+                }}
                 className="w-full h-64 object-cover transform group-hover:scale-110 transition-transform duration-500"
               />
 

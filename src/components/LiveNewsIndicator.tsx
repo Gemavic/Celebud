@@ -9,7 +9,7 @@ interface LiveNewsIndicatorProps {
 export function LiveNewsIndicator({ onNewsUpdated }: LiveNewsIndicatorProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
