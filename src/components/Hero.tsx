@@ -14,6 +14,7 @@ export function Hero({ featuredContent }: HeroProps) {
 
   const mainFeatured = featuredContent[0];
   const sideFeatured = featuredContent.length > 1 ? featuredContent.slice(1, 3) : [];
+  const fallbackImage = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&q=80';
 
   return (
     <section className="pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
@@ -22,9 +23,13 @@ export function Hero({ featuredContent }: HeroProps) {
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10" />
 
           <img
-            src={mainFeatured.thumbnail_url || ''}
+            src={mainFeatured.thumbnail_url || fallbackImage}
             alt={mainFeatured.title}
             loading="eager"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = fallbackImage;
+            }}
             className="w-full h-[500px] object-cover transform group-hover:scale-105 transition-transform duration-700"
           />
 
@@ -65,9 +70,13 @@ export function Hero({ featuredContent }: HeroProps) {
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10" />
 
               <img
-                src={content.thumbnail_url || ''}
+                src={content.thumbnail_url || fallbackImage}
                 alt={content.title}
                 loading="lazy"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = fallbackImage;
+                }}
                 className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
               />
 
