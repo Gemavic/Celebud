@@ -5,6 +5,7 @@ import './index.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Sentry from '@sentry/react';
+import { registerServiceWorker } from './utils/serviceWorker';
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN || '',
@@ -26,6 +27,16 @@ const queryClient = new QueryClient({
       gcTime: 10 * 60 * 1000,
       retry: 1,
       refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      networkMode: 'online',
+    },
+    mutations: {
+      retry: 2,
+      networkMode: 'online',
+      onError: (error) => {
+        console.error('Mutation error:', error);
+        Sentry.captureException(error);
+      },
     },
   },
 });
@@ -39,3 +50,5 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>
 );
+
+registerServiceWorker();
