@@ -1,0 +1,10 @@
+name = "celebud-cdn"
+main = "cloudflare-workers.js"
+compatibility_date = "2024-01-01"
+
+[env.production]
+route = { pattern = "*celebud.com/*", zone_name = "celebud.com" }
+
+# Uncomment and configure once you have your domain set up
+# [env.production.vars]
+# ENVIRONMENT = "production"
