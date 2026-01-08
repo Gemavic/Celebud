@@ -1,0 +1,42 @@
+# Security and Performance Headers for CDN
+
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  X-XSS-Protection: 1; mode=block
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+
+# Static Assets - Cache for 1 year
+/*.js
+  Cache-Control: public, max-age=31536000, immutable
+/*.css
+  Cache-Control: public, max-age=31536000, immutable
+/*.woff2
+  Cache-Control: public, max-age=31536000, immutable
+/*.woff
+  Cache-Control: public, max-age=31536000, immutable
+
+# Images - Cache for 30 days
+/*.jpg
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+/*.jpeg
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+/*.png
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+/*.webp
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+/*.svg
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+/*.gif
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+
+# HTML - Cache for 5 minutes with stale-while-revalidate
+/*.html
+  Cache-Control: public, max-age=300, stale-while-revalidate=86400
+/
+  Cache-Control: public, max-age=300, stale-while-revalidate=86400
+
+# Service Worker
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
