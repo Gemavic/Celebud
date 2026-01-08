@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
+    "@sentry/react": "^10.32.1",
     "@supabase/supabase-js": "^2.57.4",
+    "@tanstack/react-query": "^5.90.16",
     "lucide-react": "^0.344.0",
     "node-fetch": "^2.7.0",
     "pg": "^8.16.3",

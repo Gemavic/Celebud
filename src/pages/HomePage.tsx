@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { Category, MediaContentWithRelations } from '../lib/database.types';
 import { Header } from '../components/Header';
 import { Hero } from '../components/Hero';
 import { CategoryFilter } from '../components/CategoryFilter';
@@ -14,131 +12,82 @@ import { NewsletterSignup } from '../components/NewsletterSignup';
 import { Pagination } from '../components/Pagination';
 import { AdBanner } from '../components/AdBanner';
 import { Loader2 } from 'lucide-react';
+import { useFeaturedArticles, useTrendingArticles, useArticles } from '../hooks/useArticles';
+import { useCategories, useSearchArticles } from '../hooks/useCategories';
 
 function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [featuredContent, setFeaturedContent] = useState<MediaContentWithRelations[]>([]);
-  const [trendingContent, setTrendingContent] = useState<MediaContentWithRelations[]>([]);
-  const [allContent, setAllContent] = useState<MediaContentWithRelations[]>([]);
-  const [searchResults, setSearchResults] = useState<MediaContentWithRelations[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
+
+  const categoryParam = searchParams.get('category');
+  const searchParam = searchParams.get('search');
+  const pageParam = parseInt(searchParams.get('page') || '1', 10);
+
+  const currentPage = pageParam > 0 ? pageParam : 1;
   const articlesPerPage = 12;
 
-  useEffect(() => {
-    const categoryParam = searchParams.get('category');
-    const searchParam = searchParams.get('search');
+  const { data: categories = [], isLoading: categoriesLoading } = useCategories();
+  const { data: featuredContent = [], isLoading: featuredLoading } = useFeaturedArticles(3);
+  const { data: trendingContent = [], isLoading: trendingLoading } = useTrendingArticles(6);
 
-    if (categoryParam) {
-      setSelectedCategory(categoryParam);
-      setSearchQuery(null);
-    } else if (searchParam) {
-      setSearchQuery(searchParam);
-      setSelectedCategory(null);
-      performSearch(searchParam);
-    } else {
-      setSelectedCategory(null);
-      setSearchQuery(null);
+  const {
+    data: articlesData,
+    isLoading: articlesLoading,
+  } = useArticles({
+    category: categoryParam || undefined,
+    page: currentPage,
+    pageSize: articlesPerPage,
+  });
+
+  const { data: searchResults = [], isLoading: searchLoading } = useSearchArticles(searchParam || '');
+
+  const loading = categoriesLoading || featuredLoading || trendingLoading || articlesLoading;
+
+  const displayContent = useMemo(() => {
+    if (searchParam) {
+      return searchResults;
     }
-  }, [searchParams]);
+    return articlesData?.articles || [];
+  }, [searchParam, searchResults, articlesData]);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const totalCount = useMemo(() => {
+    if (searchParam) {
+      return searchResults.length;
+    }
+    return articlesData?.totalCount || 0;
+  }, [searchParam, searchResults, articlesData]);
 
-  async function loadData() {
-    try {
-      await supabase.rpc('update_trending_featured_flags');
+  const totalPages = useMemo(
+    () => Math.ceil(totalCount / articlesPerPage),
+    [totalCount, articlesPerPage]
+  );
 
-      const [categoriesRes, featuredRes, trendingRes, allContentRes] = await Promise.all([
-        supabase.from('categories').select('*').order('name'),
-        supabase
-          .from('media_content')
-          .select('*, categories(*), authors(*)')
-          .eq('is_featured', true)
-          .order('views_count', { ascending: false })
-          .limit(3),
-        supabase
-          .from('media_content')
-          .select('*, categories(*), authors(*)')
-          .eq('is_trending', true)
-          .order('views_count', { ascending: false })
-          .limit(6),
-        supabase
-          .from('media_content')
-          .select('*, categories(*), authors(*)')
-          .order('published_at', { ascending: false })
-          .limit(100),
-      ]);
+  const handlePageChange = useCallback(
+    (page: number) => {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('page', page.toString());
+      setSearchParams(newParams);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    [searchParams, setSearchParams]
+  );
 
-      if (categoriesRes.data) setCategories(categoriesRes.data);
-      if (featuredRes.data) setFeaturedContent(featuredRes.data as MediaContentWithRelations[]);
-      if (trendingRes.data) setTrendingContent(trendingRes.data as MediaContentWithRelations[]);
-      if (allContentRes.data) {
-        const uniqueContent = allContentRes.data.filter(
-          (content, index, self) =>
-            index === self.findIndex((c) => c.id === content.id)
-        );
-        setAllContent(uniqueContent as MediaContentWithRelations[]);
+  const handleCategorySelect = useCallback(
+    (category: string | null) => {
+      const newParams = new URLSearchParams();
+      if (category) {
+        newParams.set('category', category);
       }
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+      setSearchParams(newParams);
+    },
+    [setSearchParams]
+  );
 
-  async function performSearch(query: string) {
-    try {
-      const { data, error } = await supabase
-        .from('media_content')
-        .select('*, categories(*), authors(*)')
-        .textSearch('fts', query, {
-          type: 'websearch',
-          config: 'english'
-        })
-        .order('published_at', { ascending: false })
-        .limit(50);
+  const selectedCategoryName = useMemo(() => {
+    if (!categoryParam) return null;
+    return categories.find((c) => c.slug === categoryParam)?.name || null;
+  }, [categoryParam, categories]);
 
-      if (error) {
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('media_content')
-          .select('*, categories(*), authors(*)')
-          .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
-          .order('published_at', { ascending: false })
-          .limit(50);
-
-        if (fallbackError) throw fallbackError;
-        setSearchResults(fallbackData as MediaContentWithRelations[]);
-      } else {
-        setSearchResults(data as MediaContentWithRelations[]);
-      }
-    } catch (error) {
-      console.error('Error performing search:', error);
-      setSearchResults([]);
-    }
-  }
-
-  const filteredContent = searchQuery
-    ? searchResults
-    : selectedCategory
-    ? allContent.filter((content) => content.categories?.slug === selectedCategory)
-    : allContent;
-
-  const totalPages = Math.ceil(filteredContent.length / articlesPerPage);
-  const startIndex = (currentPage - 1) * articlesPerPage;
-  const endIndex = startIndex + articlesPerPage;
-  const displayContent = filteredContent.slice(startIndex, endIndex);
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  if (loading) {
+  if (loading && !displayContent.length) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
         <div className="text-center">
@@ -152,7 +101,7 @@ function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
       <Header />
-      <LiveNewsIndicator onNewsUpdated={loadData} />
+      <LiveNewsIndicator />
 
       <main className="pt-44" role="main">
         <Hero featuredContent={featuredContent} />
@@ -163,8 +112,8 @@ function HomePage() {
 
         <CategoryFilter
           categories={categories}
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
+          selectedCategory={categoryParam}
+          onSelectCategory={handleCategorySelect}
         />
 
         <TrendingSection trendingContent={trendingContent} />
@@ -179,42 +128,48 @@ function HomePage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-2xl font-semibold text-gray-900">
-                {searchQuery
-                  ? `Search Results for "${searchQuery}"`
-                  : selectedCategory
-                  ? `${categories.find((c) => c.slug === selectedCategory)?.name}`
-                  : 'Latest Stories'}
+                {searchParam
+                  ? `Search Results for "${searchParam}"`
+                  : selectedCategoryName || 'Latest Stories'}
               </h2>
               <p className="text-gray-500 text-sm mt-1">
-                {searchQuery
-                  ? `Found ${displayContent.length} ${displayContent.length === 1 ? 'result' : 'results'}`
+                {searchParam
+                  ? `Found ${totalCount} ${totalCount === 1 ? 'result' : 'results'}`
                   : 'Fresh updates and trending news'}
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {displayContent.map((content) => (
-              <MediaCard key={content.id} content={content} />
-            ))}
-          </div>
-
-          {displayContent.length === 0 && (
-            <div className="text-center py-16">
-              <p className="text-gray-500 text-lg">
-                {searchQuery
-                  ? `No results found for "${searchQuery}". Try different keywords.`
-                  : 'No content found in this category.'}
-              </p>
+          {(articlesLoading || searchLoading) ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-red-600" />
             </div>
-          )}
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                {displayContent.map((content) => (
+                  <MediaCard key={content.id} content={content} />
+                ))}
+              </div>
 
-          {filteredContent.length > articlesPerPage && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-            />
+              {displayContent.length === 0 && (
+                <div className="text-center py-16">
+                  <p className="text-gray-500 text-lg">
+                    {searchParam
+                      ? `No results found for "${searchParam}". Try different keywords.`
+                      : 'No content found in this category.'}
+                  </p>
+                </div>
+              )}
+
+              {!searchParam && totalCount > articlesPerPage && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                />
+              )}
+            </>
           )}
         </section>
 

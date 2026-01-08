@@ -1,0 +1,100 @@
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
+
+interface UseArticlesOptions {
+  category?: string;
+  page?: number;
+  pageSize?: number;
+  featured?: boolean;
+  trending?: boolean;
+}
+
+export function useArticles(options: UseArticlesOptions = {}) {
+  const { category, page = 1, pageSize = 12, featured, trending } = options;
+
+  return useQuery({
+    queryKey: ['articles', { category, page, pageSize, featured, trending }],
+    queryFn: async () => {
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize - 1;
+
+      let query = supabase
+        .from('media_content')
+        .select('*, categories(*), authors(*)', { count: 'exact' })
+        .order('published_at', { ascending: false });
+
+      if (category) {
+        query = query.eq('categories.slug', category);
+      }
+
+      if (featured !== undefined) {
+        query = query.eq('is_featured', featured);
+      }
+
+      if (trending !== undefined) {
+        query = query.eq('is_trending', trending);
+      }
+
+      const { data, error, count } = await query.range(startIndex, endIndex);
+
+      if (error) throw error;
+
+      return { articles: data || [], totalCount: count || 0 };
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useFeaturedArticles(limit = 5) {
+  return useQuery({
+    queryKey: ['articles', 'featured', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('media_content')
+        .select('*, categories(*), authors(*)')
+        .eq('is_featured', true)
+        .order('published_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useTrendingArticles(limit = 5) {
+  return useQuery({
+    queryKey: ['articles', 'trending', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('media_content')
+        .select('*, categories(*), authors(*)')
+        .eq('is_trending', true)
+        .order('published_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useArticle(id: string) {
+  return useQuery({
+    queryKey: ['article', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('media_content')
+        .select('*, categories(*), authors(*)')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  });
+}

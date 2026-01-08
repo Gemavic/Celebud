@@ -1,5 +1,6 @@
 import { Play, Clock, Eye, Volume2, Mic2, FileText, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { memo, useCallback, useMemo } from 'react';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { formatDistanceToNow } from '../utils/date';
 
@@ -14,12 +15,31 @@ const mediaTypeIcons: Record<string, typeof FileText> = {
   article: FileText,
 };
 
-export function MediaCard({ content }: MediaCardProps) {
-  const MediaIcon = content.media_type && content.media_type in mediaTypeIcons
-    ? mediaTypeIcons[content.media_type]
-    : FileText;
+const fallbackImage = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&q=80';
 
-  const fallbackImage = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&q=80';
+export const MediaCard = memo(function MediaCard({ content }: MediaCardProps) {
+  const MediaIcon = useMemo(
+    () =>
+      content.media_type && content.media_type in mediaTypeIcons
+        ? mediaTypeIcons[content.media_type]
+        : FileText,
+    [content.media_type]
+  );
+
+  const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement;
+    target.src = fallbackImage;
+  }, []);
+
+  const formattedTime = useMemo(
+    () => formatDistanceToNow(content.published_at),
+    [content.published_at]
+  );
+
+  const viewsFormatted = useMemo(
+    () => ((content.views_count || 0) / 1000).toFixed(1),
+    [content.views_count]
+  );
 
   return (
     <Link to={`/article/${content.id}`} className="block">
@@ -29,10 +49,7 @@ export function MediaCard({ content }: MediaCardProps) {
           src={content.thumbnail_url || fallbackImage}
           alt={content.title}
           loading="lazy"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = fallbackImage;
-          }}
+          onError={handleImageError}
           className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
         />
 
@@ -91,7 +108,7 @@ export function MediaCard({ content }: MediaCardProps) {
           <div className="flex items-center space-x-3 text-gray-500 text-xs">
             <div className="flex items-center space-x-1">
               <Eye className="w-3.5 h-3.5" />
-              <span>{((content.views_count || 0) / 1000).toFixed(1)}K</span>
+              <span>{viewsFormatted}K</span>
             </div>
             <div className="flex items-center space-x-1">
               <MessageCircle className="w-3.5 h-3.5" />
@@ -99,7 +116,7 @@ export function MediaCard({ content }: MediaCardProps) {
             </div>
             <div className="flex items-center space-x-1">
               <Clock className="w-3.5 h-3.5" />
-              <span>{formatDistanceToNow(content.published_at)}</span>
+              <span>{formattedTime}</span>
             </div>
           </div>
 
@@ -111,4 +128,4 @@ export function MediaCard({ content }: MediaCardProps) {
     </article>
     </Link>
   );
-}
+});

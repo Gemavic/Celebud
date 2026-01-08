@@ -1,28 +1,26 @@
 import { RefreshCw, Radio } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { fetchLatestNews } from '../services/newsService';
+import { useQueryClient } from '@tanstack/react-query';
 
-interface LiveNewsIndicatorProps {
-  onNewsUpdated?: () => void;
-}
-
-export function LiveNewsIndicator({ onNewsUpdated }: LiveNewsIndicatorProps) {
+export function LiveNewsIndicator() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const queryClient = useQueryClient();
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
       await fetchLatestNews();
       setLastUpdate(new Date());
-      onNewsUpdated?.();
+      queryClient.invalidateQueries({ queryKey: ['articles'] });
     } catch (error) {
       console.error('Failed to refresh news:', error);
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [queryClient]);
 
   useEffect(() => {
     if (!autoRefresh) return;
@@ -32,7 +30,7 @@ export function LiveNewsIndicator({ onNewsUpdated }: LiveNewsIndicatorProps) {
     }, 30 * 60 * 1000);
 
     return () => clearInterval(intervalId);
-  }, [autoRefresh]);
+  }, [autoRefresh, handleRefresh]);
 
   return (
     <div className="fixed bottom-6 right-6 z-50">

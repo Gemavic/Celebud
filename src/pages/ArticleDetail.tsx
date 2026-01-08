@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { MediaContentWithRelations } from '../lib/database.types';
@@ -9,109 +9,121 @@ import { formatDistanceToNow } from '../utils/date';
 import { updateMetaTags, generateArticleStructuredData, removeArticleStructuredData } from '../utils/seo';
 import { ArrowLeft, Eye, Clock, Share2, Facebook, Twitter, Linkedin } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
+import { useArticle } from '../hooks/useArticles';
 
 export function ArticleDetail() {
   const { id } = useParams<{ id: string }>();
-  const [article, setArticle] = useState<MediaContentWithRelations | null>(null);
+  const { data: article, isLoading: loading } = useArticle(id || '');
   const [relatedArticles, setRelatedArticles] = useState<MediaContentWithRelations[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (id) {
-      loadArticle(id);
+    if (!id || !article) return;
 
-      const channel = supabase
-        .channel(`article-${id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'media_content',
-            filter: `id=eq.${id}`,
-          },
-          (payload) => {
-            if (payload.new) {
-              setArticle((prev) => {
-                if (!prev) return prev;
-                return {
-                  ...prev,
-                  views_count: (payload.new as any).views_count || prev.views_count,
-                  comments_count: (payload.new as any).comments_count || prev.comments_count,
-                };
-              });
-            }
-          }
-        )
-        .subscribe();
+    const loadRelatedArticles = async () => {
+      if (article.category_id) {
+        const { data: related } = await supabase
+          .from('media_content')
+          .select('*, categories(*), authors(*)')
+          .eq('category_id', article.category_id)
+          .neq('id', id)
+          .limit(3);
 
-      return () => {
-        supabase.removeChannel(channel);
-        removeArticleStructuredData();
-      };
-    } else {
-      return () => {
-        removeArticleStructuredData();
-      };
-    }
-  }, [id]);
-
-  async function loadArticle(articleId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('media_content')
-        .select('*, categories(*), authors(*)')
-        .eq('id', articleId)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        setArticle(data as MediaContentWithRelations);
-
-        updateMetaTags({
-          title: `${data.title} - CelebUD`,
-          description: data.description || data.title,
-          keywords: `${data.categories?.name || 'celebrity news'}, entertainment, celebrity, news`,
-          image: data.thumbnail_url || undefined,
-          url: `/article/${articleId}`,
-          type: 'article',
-          author: data.authors?.name || 'CelebUD',
-          publishedTime: data.published_at,
-          modifiedTime: data.updated_at,
-        });
-
-        generateArticleStructuredData({
-          title: data.title,
-          description: data.description || data.title,
-          image: data.thumbnail_url || undefined,
-          author: data.authors?.name || 'CelebUD',
-          publishedDate: data.published_at,
-          modifiedDate: data.updated_at,
-          url: `${window.location.origin}/article/${articleId}`,
-        });
-
-        await supabase.rpc('increment_article_views', { article_id: articleId });
-
-        if (data.category_id) {
-          const { data: related } = await supabase
-            .from('media_content')
-            .select('*, categories(*), authors(*)')
-            .eq('category_id', data.category_id)
-            .neq('id', articleId)
-            .limit(3);
-
-          if (related) {
-            setRelatedArticles(related as MediaContentWithRelations[]);
-          }
+        if (related) {
+          setRelatedArticles(related as MediaContentWithRelations[]);
         }
       }
-    } catch (error) {
-      console.error('Error loading article:', error);
-    } finally {
-      setLoading(false);
+    };
+
+    loadRelatedArticles();
+  }, [id, article]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const incrementViews = async () => {
+      await supabase.rpc('increment_article_views', { article_id: id });
+    };
+
+    incrementViews();
+  }, [id]);
+
+  useEffect(() => {
+    if (!article) return;
+
+    updateMetaTags({
+      title: `${article.title} - CelebUD`,
+      description: article.description || article.title,
+      keywords: `${article.categories?.name || 'celebrity news'}, entertainment, celebrity, news`,
+      image: article.thumbnail_url || undefined,
+      url: `/article/${id}`,
+      type: 'article',
+      author: article.authors?.name || 'CelebUD',
+      publishedTime: article.published_at,
+      modifiedTime: article.updated_at,
+    });
+
+    generateArticleStructuredData({
+      title: article.title,
+      description: article.description || article.title,
+      image: article.thumbnail_url || undefined,
+      author: article.authors?.name || 'CelebUD',
+      publishedDate: article.published_at,
+      modifiedDate: article.updated_at,
+      url: `${window.location.origin}/article/${id}`,
+    });
+
+    return () => {
+      removeArticleStructuredData();
+    };
+  }, [article, id]);
+
+  useEffect(() => {
+    if (!id || !article) return;
+
+    const channel = supabase
+      .channel(`article-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'media_content',
+          filter: `id=eq.${id}`,
+        },
+        () => {
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+      supabase.removeChannel(channel);
+    };
+  }, [id, article]);
+
+  const handleCopyLink = useCallback(() => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(window.location.href).then(() => {
+        alert('Link copied to clipboard!');
+      }).catch(() => {
+        alert('Failed to copy link');
+      });
+    } else {
+      alert('Clipboard not supported in this browser');
     }
-  }
+  }, []);
+
+  const contentParagraphs = useMemo(() => {
+    if (!article) return [];
+    return (article.content || article.description)
+      .split('\n')
+      .filter(para => para.trim());
+  }, [article]);
+
+  const viewsFormatted = useMemo(
+    () => article ? ((article.views_count || 0) / 1000).toFixed(1) : '0.0',
+    [article]
+  );
 
   if (loading) {
     return (
@@ -196,7 +208,7 @@ export function ArticleDetail() {
               </div>
               <div className="flex items-center space-x-1">
                 <Eye className="w-3.5 h-3.5" />
-                <span>{((article.views_count || 0) / 1000).toFixed(1)}K views</span>
+                <span>{viewsFormatted}K views</span>
               </div>
             </div>
           </div>
@@ -214,32 +226,28 @@ export function ArticleDetail() {
 
           <div className="prose prose-lg max-w-none mb-12" itemProp="articleBody">
             <div className="text-gray-700 text-base leading-relaxed space-y-5">
-              {(article.content || article.description)
-                .split('\n')
-                .filter(para => para.trim())
-                .map((paragraph, index) => {
-                  if (paragraph.startsWith('[IMAGE:') && paragraph.endsWith(']')) {
-                    const imageUrl = paragraph.slice(7, -1);
-                    return (
-                      <div key={index} className="my-6 rounded-lg overflow-hidden">
-                        <img
-                          src={imageUrl}
-                          alt="Article content"
-                          className="w-full h-auto object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    );
-                  }
+              {contentParagraphs.map((paragraph, index) => {
+                if (paragraph.startsWith('[IMAGE:') && paragraph.endsWith(']')) {
+                  const imageUrl = paragraph.slice(7, -1);
                   return (
-                    <p key={index} className="leading-loose text-justify">
-                      {paragraph}
-                    </p>
+                    <div key={index} className="my-6 rounded-lg overflow-hidden">
+                      <img
+                        src={imageUrl}
+                        alt="Article content"
+                        className="w-full h-auto object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    </div>
                   );
-                })
-              }
+                }
+                return (
+                  <p key={index} className="leading-loose text-justify">
+                    {paragraph}
+                  </p>
+                );
+              })}
             </div>
           </div>
 
@@ -274,17 +282,7 @@ export function ArticleDetail() {
                 <Linkedin className="w-4 h-4" />
               </a>
               <button
-                onClick={() => {
-                  if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(window.location.href).then(() => {
-                      alert('Link copied to clipboard!');
-                    }).catch(() => {
-                      alert('Failed to copy link');
-                    });
-                  } else {
-                    alert('Clipboard not supported in this browser');
-                  }
-                }}
+                onClick={handleCopyLink}
                 className="p-2.5 rounded-full bg-gray-700 text-white hover:bg-gray-800 transition-colors shadow-sm"
                 aria-label="Copy link"
               >
