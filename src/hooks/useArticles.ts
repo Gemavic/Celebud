@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { monitorQueryError } from '../utils/errorMonitoring';
 
 interface UseArticlesOptions {
   category?: string;
@@ -37,7 +38,10 @@ export function useArticles(options: UseArticlesOptions = {}) {
 
       const { data, error, count } = await query.range(startIndex, endIndex);
 
-      if (error) throw error;
+      if (error) {
+        monitorQueryError(['articles', 'list'], error);
+        throw error;
+      }
 
       return { articles: data || [], totalCount: count || 0 };
     },
@@ -56,7 +60,10 @@ export function useFeaturedArticles(limit = 5) {
         .order('published_at', { ascending: false })
         .limit(limit);
 
-      if (error) throw error;
+      if (error) {
+        monitorQueryError(['articles', 'featured'], error);
+        throw error;
+      }
       return data || [];
     },
     staleTime: 5 * 60 * 1000,
@@ -74,7 +81,10 @@ export function useTrendingArticles(limit = 5) {
         .order('published_at', { ascending: false })
         .limit(limit);
 
-      if (error) throw error;
+      if (error) {
+        monitorQueryError(['articles', 'trending'], error);
+        throw error;
+      }
       return data || [];
     },
     staleTime: 5 * 60 * 1000,
@@ -91,7 +101,10 @@ export function useArticle(id: string) {
         .eq('id', id)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        monitorQueryError(['article', 'detail'], error);
+        throw error;
+      }
       return data;
     },
     enabled: !!id,
