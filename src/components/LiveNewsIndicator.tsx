@@ -27,7 +27,7 @@ export function LiveNewsIndicator() {
 
     const intervalId = setInterval(() => {
       handleRefresh();
-    }, 30 * 60 * 1000);
+    }, 6 * 60 * 60 * 1000);
 
     return () => clearInterval(intervalId);
   }, [autoRefresh, handleRefresh]);

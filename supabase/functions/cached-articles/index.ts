@@ -4,11 +4,11 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
-  'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
+  'Cache-Control': 'public, max-age=1800, stale-while-revalidate=3600',
 };
 
 const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 30 * 60 * 1000;
 
 function getCacheKey(params: URLSearchParams): string {
   const category = params.get('category') || 'all';

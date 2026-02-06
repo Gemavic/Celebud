@@ -45,7 +45,7 @@ export function useArticles(options: UseArticlesOptions = {}) {
 
       return { articles: data || [], totalCount: count || 0 };
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
   });
 }
 
@@ -66,7 +66,7 @@ export function useFeaturedArticles(limit = 5) {
       }
       return data || [];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
   });
 }
 
@@ -78,7 +78,7 @@ export function useTrendingArticles(limit = 5) {
         .from('media_content')
         .select('*, categories(*), authors(*)')
         .eq('is_trending', true)
-        .order('published_at', { ascending: false })
+        .order('views_count', { ascending: false })
         .limit(limit);
 
       if (error) {
@@ -87,7 +87,7 @@ export function useTrendingArticles(limit = 5) {
       }
       return data || [];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
   });
 }
 
@@ -108,6 +108,6 @@ export function useArticle(id: string) {
       return data;
     },
     enabled: !!id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 60 * 1000,
   });
 }

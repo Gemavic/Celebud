@@ -36,6 +36,6 @@ export function useSearchArticles(searchQuery: string) {
       return data || [];
     },
     enabled: searchQuery.trim().length > 0,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
   });
 }

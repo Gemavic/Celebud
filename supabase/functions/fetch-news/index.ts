@@ -264,6 +264,31 @@ function categorizeArticle(title: string, description: string): string {
   return bestMatch;
 }
 
+function calculatePriorityScore(title: string, description: string): { score: number; isTrending: boolean; isFeatured: boolean } {
+  const text = `${title} ${description}`.toLowerCase();
+  let score = 0;
+
+  const highPriority = ['breaking', 'exclusive', 'urgent', 'just in', 'developing', 'alert', 'confirmed'];
+  const mediumPriority = ['investigation', 'revealed', 'crisis', 'scandal', 'landmark', 'historic', 'unprecedented', 'shocking', 'massive'];
+  const engagementSignals = ['killed', 'dead', 'arrested', 'election', 'president', 'minister', 'governor', 'attack', 'explosion', 'protest', 'strike', 'war', 'crash', 'disaster'];
+
+  for (const keyword of highPriority) {
+    if (text.includes(keyword)) score += 30;
+  }
+  for (const keyword of mediumPriority) {
+    if (text.includes(keyword)) score += 15;
+  }
+  for (const keyword of engagementSignals) {
+    if (text.includes(keyword)) score += 10;
+  }
+
+  return {
+    score,
+    isTrending: score >= 20,
+    isFeatured: score >= 40,
+  };
+}
+
 function generateSlug(title: string): string {
   return title
     .toLowerCase()
@@ -560,6 +585,8 @@ Deno.serve(async (req: Request) => {
               finalThumbnail = getCategoryFallbackImage(finalCategorySlug);
             }
 
+            const priority = calculatePriorityScore(item.title, item.description);
+
             const { error } = await supabase.from('media_content').insert({
               title: item.title,
               slug,
@@ -575,8 +602,8 @@ Deno.serve(async (req: Request) => {
               source_id: source.id,
               source_published_at: item.pubDate,
               published_at: new Date().toISOString(),
-              is_featured: false,
-              is_trending: false,
+              is_featured: priority.isFeatured,
+              is_trending: priority.isTrending,
               views_count: 0,
               comments_count: 0,
             });

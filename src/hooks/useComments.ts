@@ -32,7 +32,7 @@ export function useComments(contentId: string) {
       return comments || [];
     },
     enabled: !!contentId,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
   });
 
   const handleRealtimeUpdate = useCallback(() => {
