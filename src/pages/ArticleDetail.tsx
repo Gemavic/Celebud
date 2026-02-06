@@ -8,7 +8,7 @@ import { AdBanner } from '../components/AdBanner';
 import { formatDistanceToNow } from '../utils/date';
 import { updateMetaTags, generateArticleStructuredData, removeArticleStructuredData } from '../utils/seo';
 import { sanitizeArticleContent } from '../utils/contentSanitizer';
-import { ArrowLeft, Eye, Clock, Share2, Facebook, Twitter, Linkedin } from 'lucide-react';
+import { ArrowLeft, Eye, Clock, Share2, Facebook, Twitter, Linkedin, ExternalLink } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useArticle } from '../hooks/useArticles';
 
@@ -227,30 +227,63 @@ export function ArticleDetail() {
           )}
 
           <div className="prose prose-lg max-w-none mb-12" itemProp="articleBody">
-            <div className="text-gray-700 text-base leading-relaxed space-y-5">
-              {contentParagraphs.map((paragraph, index) => {
-                if (paragraph.startsWith('[IMAGE:') && paragraph.endsWith(']')) {
-                  const imageUrl = paragraph.slice(7, -1);
+            {contentParagraphs.length > 0 ? (
+              <div className="text-gray-700 text-base leading-relaxed space-y-5">
+                {contentParagraphs.map((paragraph, index) => {
+                  if (paragraph.startsWith('[IMAGE:') && paragraph.endsWith(']')) {
+                    const imageUrl = paragraph.slice(7, -1);
+                    return (
+                      <div key={index} className="my-6 rounded-lg overflow-hidden">
+                        <img
+                          src={imageUrl}
+                          alt="Article content"
+                          className="w-full h-auto object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    );
+                  }
                   return (
-                    <div key={index} className="my-6 rounded-lg overflow-hidden">
-                      <img
-                        src={imageUrl}
-                        alt="Article content"
-                        className="w-full h-auto object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    </div>
+                    <p key={index} className="leading-loose text-justify">
+                      {paragraph}
+                    </p>
                   );
-                }
-                return (
-                  <p key={index} className="leading-loose text-justify">
-                    {paragraph}
-                  </p>
-                );
-              })}
-            </div>
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
+                <p className="text-gray-600 text-base mb-6">
+                  This article is available from the original source.
+                </p>
+                {article.external_url && (
+                  <a
+                    href={article.external_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-md"
+                  >
+                    <span>Read Full Article</span>
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+              </div>
+            )}
+
+            {article.external_url && contentParagraphs.length > 0 && (
+              <div className="mt-6">
+                <a
+                  href={article.external_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center space-x-1.5 text-sm text-red-600 hover:text-red-700 transition-colors font-medium"
+                >
+                  <span>View original source</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-6 border-y border-gray-200 mb-12 bg-gray-50 px-5 rounded-lg">

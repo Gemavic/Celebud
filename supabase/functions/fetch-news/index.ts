@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { parse as parseHTML } from 'npm:node-html-parser@6';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -297,177 +298,150 @@ function generateSlug(title: string): string {
     .substring(0, 100);
 }
 
+function resolveImageUrl(src: string, pageUrl: string): string {
+  try {
+    if (src.startsWith('//')) return `https:${src}`;
+    if (src.startsWith('http')) return src;
+    const base = new URL(pageUrl);
+    if (src.startsWith('/')) return `${base.protocol}//${base.host}${src}`;
+    const basePath = base.pathname.substring(0, base.pathname.lastIndexOf('/') + 1);
+    return `${base.protocol}//${base.host}${basePath}${src}`;
+  } catch {
+    return src;
+  }
+}
+
+const junkParagraphPatterns = [
+  /^(share|tweet|comment|subscribe|follow|read more|latest|related)/i,
+  /view\s+(image|photo|picture)\s+in\s+fullscreen/i,
+  /photograph(er)?:/i,
+  /image\s+credit:/i,
+  /photo\s+(by|credit|courtesy)/i,
+  /getty\s+images/i,
+  /^(published|updated|posted)\s+(on|at|:)/i,
+  /^related\s+(stories|articles|posts)/i,
+  /^(sign\s+up|log\s+in|register)/i,
+  /^(facebook|twitter|instagram|linkedin|whatsapp)/i,
+  /^share\s+(this|on|via)/i,
+  /^source:/i,
+  /^\d+\s+(week|day|hour|minute)s?\s+ago$/i,
+  /^tags?:/i,
+  /join.*whatsapp/i,
+  /all rights reserved/i,
+  /written permission/i,
+  /^save this story/i,
+  /casino utan/i,
+  /delivered straight to your phone/i,
+  /do you employ househelps/i,
+];
+
+function isJunkParagraph(text: string): boolean {
+  return junkParagraphPatterns.some(p => p.test(text));
+}
+
 async function fetchFullArticleContent(url: string): Promise<string> {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       },
       redirect: 'follow',
+      signal: controller.signal,
     });
 
+    clearTimeout(timeout);
     if (!response.ok) return '';
 
     const html = await response.text();
+    const root = parseHTML(html);
 
-    let content = '';
+    const junkSelectors = [
+      'script', 'style', 'noscript', 'iframe', 'nav', 'header', 'footer',
+      'aside', 'form', 'figcaption', 'svg',
+      '[class*="comment"]', '[class*="sidebar"]', '[class*="widget"]',
+      '[class*="advert"]', '[class*="banner"]', '[class*="social"]',
+      '[class*="share"]', '[class*="newsletter"]', '[class*="related"]',
+      '[class*="author-bio"]', '[class*="byline"]', '[class*="credit"]',
+      '[class*="breadcrumb"]', '[class*="pagination"]', '[class*="tag-list"]',
+      '[id*="comment"]', '[id*="sidebar"]',
+    ];
+    for (const sel of junkSelectors) {
+      try { root.querySelectorAll(sel).forEach(el => el.remove()); } catch { /* skip */ }
+    }
 
-    const articleSelectors = [
-      /<article[^>]*>([\s\S]*?)<\/article>/i,
-      /<div[^>]*class=\"[^\"]*article[_-]?body[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*class=\"[^\"]*article[_-]?content[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*class=\"[^\"]*post[_-]?content[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*class=\"[^\"]*entry[_-]?content[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*class=\"[^\"]*story[_-]?body[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*class=\"[^\"]*story[_-]?content[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*id=\"[^\"]*article[_-]?body[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*id=\"[^\"]*article[_-]?content[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*id=\"[^\"]*story[_-]?body[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*class=\"[^\"]*td-post-content[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*class=\"[^\"]*content-body[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
-      /<section[^>]*class=\"[^\"]*article[^\"]*\"[^>]*>([\s\S]*?)<\/section>/i,
-      /<main[^>]*class=\"[^\"]*article[^\"]*\"[^>]*>([\s\S]*?)<\/main>/i,
-      /<main[^>]*>([\s\S]*?)<\/main>/i,
+    const containerSelectors = [
+      'article',
+      '.article-body', '.article-content', '.article_body', '.article_content',
+      '.post-content', '.post_content', '.entry-content', '.entry_content',
+      '.story-body', '.story-content', '.story_body', '.story_content',
+      '.td-post-content', '.content-body', '.content_body',
+      '#article-body', '#article-content', '#story-body',
+      '[itemprop="articleBody"]',
+      'main',
     ];
 
-    for (const selector of articleSelectors) {
-      const match = html.match(selector);
-      if (match && match[1]) {
-        const potentialContent = match[1];
-        const textLength = stripHtml(potentialContent).length;
-        if (textLength > 500) {
-          content = potentialContent;
-          break;
+    let source = null;
+    for (const sel of containerSelectors) {
+      try {
+        const el = root.querySelector(sel);
+        if (el) {
+          const paragraphs = el.querySelectorAll('p');
+          const totalText = paragraphs.map(p => p.text.trim()).filter(t => t.length > 30).join(' ');
+          if (totalText.length > 200) {
+            source = el;
+            break;
+          }
         }
-      }
+      } catch { /* skip */ }
     }
 
-    if (!content) {
-      const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-      if (bodyMatch) {
-        content = bodyMatch[1];
-      }
-    }
-
-    if (!content) return '';
-
-    content = content
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
-      .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
-      .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
-      .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
-      .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
-      .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '')
-      .replace(/<form[^>]*>[\s\S]*?<\/form>/gi, '')
-      .replace(/<div[^>]*class=\"[^\"]*comment[s]?[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class=\"[^\"]*sidebar[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class=\"[^\"]*widget[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class=\"[^\"]*ad[s]?[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class=\"[^\"]*banner[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class=\"[^\"]*social[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class=\"[^\"]*share[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class=\"[^\"]*newsletter[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class=\"[^\"]*related[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class=\"[^\"]*author[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class=\"[^\"]*byline[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class=\"[^\"]*credit[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<div[^>]*class=\"[^\"]*caption[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<figcaption[^>]*>[\s\S]*?<\/figcaption>/gi, '')
-      .replace(/<div[^>]*id=\"[^\"]*comment[s]?[^\"]*\"[^>]*>[\s\S]*?<\/div>/gi, '')
-      .replace(/<section[^>]*class=\"[^\"]*related[^\"]*\"[^>]*>[\s\S]*?<\/section>/gi, '')
-      .replace(/<section[^>]*class=\"[^\"]*author[^\"]*\"[^>]*>[\s\S]*?<\/section>/gi, '');
+    if (!source) source = root;
 
     const images: string[] = [];
-    const imageMatches = content.matchAll(/<img[^>]*src=[\"']([^\"']*)[\"'][^>]*>/gi);
-    for (const match of imageMatches) {
-      const imgSrc = match[1];
-      if (imgSrc && !imgSrc.includes('data:image') && !imgSrc.includes('base64')) {
-        let fullUrl = imgSrc;
-        try {
-          if (imgSrc.startsWith('//')) {
-            fullUrl = `https:${imgSrc}`;
-          } else if (imgSrc.startsWith('/')) {
-            const urlObj = new URL(url);
-            fullUrl = `${urlObj.protocol}//${urlObj.host}${imgSrc}`;
-          } else if (!imgSrc.startsWith('http')) {
-            const urlObj = new URL(url);
-            const basePath = urlObj.pathname.substring(0, urlObj.pathname.lastIndexOf('/') + 1);
-            fullUrl = `${urlObj.protocol}//${urlObj.host}${basePath}${imgSrc}`;
-          }
-          if (isValidArticleImage(fullUrl)) {
-            images.push(fullUrl);
-          }
-        } catch (e) {
+    try {
+      const imgs = source.querySelectorAll('img');
+      for (const img of imgs) {
+        const src = img.getAttribute('src') || img.getAttribute('data-src') || '';
+        if (src && !src.includes('data:image') && !src.includes('base64') && isValidArticleImage(src)) {
+          images.push(resolveImageUrl(src, url));
         }
       }
-    }
+    } catch { /* skip */ }
 
-    const contentElements = [
-      ...Array.from(content.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)).map(m => ({ type: 'p', content: m[1] })),
-      ...Array.from(content.matchAll(/<div[^>]*class=\"[^\"]*paragraph[^\"]*\"[^>]*>([\s\S]*?)<\/div>/gi)).map(m => ({ type: 'div', content: m[1] })),
-      ...Array.from(content.matchAll(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi)).map(m => ({ type: 'h', content: m[1] })),
-      ...Array.from(content.matchAll(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi)).map(m => ({ type: 'quote', content: m[1] })),
-      ...Array.from(content.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)).map(m => ({ type: 'li', content: m[1] })),
-    ];
-
+    const paragraphs = source.querySelectorAll('p');
     const textParts: string[] = [];
-    let imageInsertCount = 0;
+    let imgIdx = 0;
 
-    for (let i = 0; i < contentElements.length; i++) {
-      const element = contentElements[i];
-      const cleaned = stripHtml(element.content).trim();
-
-      const minLength = element.type === 'h' ? 5 : element.type === 'li' ? 10 : 40;
-
-      const excludePatterns = [
-        /^(share|tweet|comment|subscribe|follow|read more|latest|related)/i,
-        /view\s+(image|photo|picture)\s+in\s+fullscreen/i,
-        /photograph(er)?:/i,
-        /image\s+credit:/i,
-        /photo\s+(by|credit|courtesy)/i,
-        /getty\s+images/i,
-        /^(published|updated|posted)\s+(on|at|:)/i,
-        /^by\s+\w+\s+\w+/i,
-        /^related\s+(stories|articles|posts)/i,
-        /^(sign\s+up|log\s+in|register)/i,
-        /^(facebook|twitter|instagram|linkedin|whatsapp)/i,
-        /^share\s+(this|on|via)/i,
-        /^source:/i,
-        /^\d+\s+(week|day|hour|minute)s?\s+ago$/i,
-      ];
-
-      const shouldExclude = excludePatterns.some(pattern => pattern.test(cleaned));
-
-      if (cleaned.length >= minLength && !shouldExclude) {
-        textParts.push(cleaned);
-
-        if (images.length > imageInsertCount && textParts.length > 2 && textParts.length % 4 === 0) {
-          textParts.push(`[IMAGE:${images[imageInsertCount]}]`);
-          imageInsertCount++;
+    for (const p of paragraphs) {
+      const text = p.text.trim();
+      if (text.length >= 30 && !isJunkParagraph(text)) {
+        textParts.push(text);
+        if (images[imgIdx] && textParts.length > 2 && textParts.length % 5 === 0) {
+          textParts.push(`[IMAGE:${images[imgIdx]}]`);
+          imgIdx++;
         }
       }
     }
 
-    if (textParts.length === 0) {
-      const allText = stripHtml(content);
-      const sentences = allText.match(/[^.!?]+[.!?]+/g) || [];
+    if (textParts.length < 3) {
+      const allText = source.text;
+      const sentences = allText.match(/[^.!?\n]+[.!?]+/g) || [];
       for (const sentence of sentences) {
         const cleaned = sentence.trim();
-        if (cleaned.length > 50) {
+        if (cleaned.length > 40 && !isJunkParagraph(cleaned)) {
           textParts.push(cleaned);
         }
       }
     }
 
     const finalContent = textParts.join('\n\n');
-
-    return finalContent.length > 200 ? finalContent : '';
-  } catch (error) {
-    console.error('Error fetching full article:', error);
+    return finalContent.length > 100 ? finalContent : '';
+  } catch {
     return '';
   }
 }
