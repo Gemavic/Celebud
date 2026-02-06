@@ -521,10 +521,12 @@ Deno.serve(async (req: Request) => {
 
         const { data: authors } = await supabase
           .from('authors')
-          .select('*')
-          .limit(1);
+          .select('*');
 
-        const defaultAuthor = authors?.[0];
+        const gbengaAyandare = authors?.find((a: any) => a.name === 'Gbenga Ayandare');
+        const defaultAuthor = authors?.find((a: any) => a.name === 'Victoria Odunola') || authors?.[0];
+
+        const authorToUse = source.country === 'Nigeria' ? gbengaAyandare : defaultAuthor;
         const categoryMap = source.category_mapping as Record<string, string>;
         const sourceCategorySlug = categoryMap?.default || 'news';
 
@@ -562,7 +564,7 @@ Deno.serve(async (req: Request) => {
               description: item.description,
               content: fullContent,
               category_id: articleCategory?.id,
-              author_id: defaultAuthor?.id,
+              author_id: authorToUse?.id,
               media_type: 'article',
               thumbnail_url: finalThumbnail,
               external_url: item.link,
