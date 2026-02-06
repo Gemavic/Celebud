@@ -7,6 +7,7 @@ import CommentsSection from '../components/CommentsSection';
 import { AdBanner } from '../components/AdBanner';
 import { formatDistanceToNow } from '../utils/date';
 import { updateMetaTags, generateArticleStructuredData, removeArticleStructuredData } from '../utils/seo';
+import { sanitizeArticleContent } from '../utils/contentSanitizer';
 import { ArrowLeft, Eye, Clock, Share2, Facebook, Twitter, Linkedin } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useArticle } from '../hooks/useArticles';
@@ -115,7 +116,8 @@ export function ArticleDetail() {
 
   const contentParagraphs = useMemo(() => {
     if (!article) return [];
-    return (article.content || article.description)
+    const raw = article.content || article.description || '';
+    return sanitizeArticleContent(raw)
       .split('\n')
       .filter(para => para.trim());
   }, [article]);
