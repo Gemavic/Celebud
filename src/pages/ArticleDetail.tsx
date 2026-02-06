@@ -195,7 +195,7 @@ export function ArticleDetail() {
                   />
                   <div itemProp="author" itemScope itemType="https://schema.org/Person">
                     <p className="font-medium text-gray-900 text-sm" itemProp="name">{article.authors.name}</p>
-                    <p className="text-xs text-gray-500">{article.authors.role}</p>
+                    <p className="text-xs text-gray-500">Reporter</p>
                   </div>
                 </>
               )}

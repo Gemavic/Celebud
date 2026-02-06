@@ -17,7 +17,6 @@ export interface Database {
         Row: {
           id: string;
           name: string;
-          role: string;
           avatar_url: string | null;
           bio: string;
           created_at: string;

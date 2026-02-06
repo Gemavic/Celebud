@@ -74,6 +74,30 @@ const categoryFallbackImages: Record<string, string[]> = {
     'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=1200&q=80',
     'https://images.unsplash.com/photo-1528605105345-5344ea20e269?w=1200&q=80',
   ],
+  'security': [
+    'https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=1200&q=80',
+    'https://images.unsplash.com/photo-1453873531674-2151bcd01707?w=1200&q=80',
+    'https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=1200&q=80',
+    'https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=1200&q=80',
+  ],
+  'sports': [
+    'https://images.unsplash.com/photo-1461896836934-bd45ba3a48e8?w=1200&q=80',
+    'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=1200&q=80',
+    'https://images.unsplash.com/photo-1471295253337-3ceaaedca402?w=1200&q=80',
+    'https://images.unsplash.com/photo-1541252260730-0412e8e2108e?w=1200&q=80',
+  ],
+  'health': [
+    'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=1200&q=80',
+    'https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?w=1200&q=80',
+    'https://images.unsplash.com/photo-1559757175-5700dde675bc?w=1200&q=80',
+    'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=1200&q=80',
+  ],
+  'legal': [
+    'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&q=80',
+    'https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=1200&q=80',
+    'https://images.unsplash.com/photo-1479142506502-19b3a3b7ff33?w=1200&q=80',
+    'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1200&q=80',
+  ],
   'news': [
     'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&q=80',
     'https://images.unsplash.com/photo-1586339949916-3e9457bef6d3?w=1200&q=80',
@@ -103,7 +127,7 @@ function isValidArticleImage(imageUrl: string): boolean {
     'logo', 'icon', 'avatar', 'channel', 'header', 'footer',
     'banner', 'badge', 'button', 'social', 'share', 'favicon',
     'sprite', 'ui', 'nav', 'menu', 'sidebar', 'widget',
-    'ad', 'advertisement', 'sponsor', 'promo',
+    'advertisement', 'sponsor', 'promo',
     '/wp-content/themes/', '/assets/images/logo', '/static/logo',
     'gravatar', 'profile-pic', 'user-image', 'author-',
     'blank.', 'placeholder.', 'default.', 'dummy.',
@@ -128,7 +152,7 @@ function isValidArticleImage(imageUrl: string): boolean {
 
   const validExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
   const hasValidExtension = validExtensions.some(ext => lowerUrl.includes(ext));
-  if (!hasValidExtension && !lowerUrl.includes('image')) {
+  if (!hasValidExtension && !lowerUrl.includes('image') && !lowerUrl.includes('photo') && !lowerUrl.includes('img') && !lowerUrl.includes('resize')) {
     return false;
   }
 
@@ -137,24 +161,24 @@ function isValidArticleImage(imageUrl: string): boolean {
 
 function parseRSS(xmlText: string): RSSItem[] {
   const items: RSSItem[] = [];
-  
+
   const itemMatches = xmlText.match(/<item[\s\S]*?<\/item>/g);
   if (!itemMatches) return items;
 
   for (const itemXml of itemMatches) {
     const title = itemXml.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>|<title>(.*?)<\/title>/)?.[1] || itemXml.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>|<title>(.*?)<\/title>/)?.[2] || '';
-    const description = itemXml.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>|<description>(.*?)<\/description>/)?.[1] || itemXml.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>|<description>(.*?)<\/description>/)?.[2] || '';
+    const description = itemXml.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>|<description>([\s\S]*?)<\/description>/)?.[1] || itemXml.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>|<description>([\s\S]*?)<\/description>/)?.[2] || '';
     const link = itemXml.match(/<link>(.*?)<\/link>/)?.[1] || '';
     const pubDate = itemXml.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || new Date().toISOString();
-    
+
     let thumbnail = '';
-    const mediaContent = itemXml.match(/<media:content[^>]*url=\"([^\"]*)\"/)?.[ 1];
-    const mediaThumbnail = itemXml.match(/<media:thumbnail[^>]*url=\"([^\"]*)\"/)?.[ 1];
-    const enclosure = itemXml.match(/<enclosure[^>]*url=\"([^\"]*)\"[^>]*type=\"image/)?.[1];
+    const mediaContent = itemXml.match(/<media:content[^>]*url="([^"]*)"/)?.[ 1];
+    const mediaThumbnail = itemXml.match(/<media:thumbnail[^>]*url="([^"]*)"/)?.[ 1];
+    const enclosure = itemXml.match(/<enclosure[^>]*url="([^"]*)"[^>]*type="image/)?.[ 1];
     const ogImage = itemXml.match(/<og:image>(.*?)<\/og:image>/)?.[1];
 
-    const content = itemXml.match(/<content:encoded><!\[CDATA\[(.*?)\]\]><\/content:encoded>/)?.[1] || description;
-    const imgInContent = content.match(/<img[^>]*src=\"([^\"]*)\"/)?.[ 1];
+    const content = itemXml.match(/<content:encoded><!\[CDATA\[([\s\S]*?)\]\]><\/content:encoded>/)?.[1] || description;
+    const imgInContent = content.match(/<img[^>]*src="([^"]*)"/)?.[ 1];
 
     const potentialThumbnails = [mediaContent, mediaThumbnail, enclosure, ogImage, imgInContent].filter(Boolean);
 
@@ -186,18 +210,18 @@ function decodeHtmlEntities(text: string): string {
     '&amp;': '&',
     '&lt;': '<',
     '&gt;': '>',
-    '&quot;': '\"',
+    '&quot;': '"',
     '&#39;': "'",
     '&#8216;': "'",
     '&#8217;': "'",
-    '&#8220;': '\"',
-    '&#8221;': '\"',
+    '&#8220;': '"',
+    '&#8221;': '"',
     '&#8211;': '-',
     '&#8212;': '-',
     '&#8230;': '...',
     '&apos;': "'",
-    '&ldquo;': '\"',
-    '&rdquo;': '\"',
+    '&ldquo;': '"',
+    '&rdquo;': '"',
     '&lsquo;': "'",
     '&rsquo;': "'",
     '&mdash;': '-',
@@ -229,21 +253,277 @@ function stripHtml(html: string): string {
   );
 }
 
+function wordMatch(text: string, keyword: string): boolean {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+  return regex.test(text);
+}
+
+function phraseMatchCount(text: string, phrases: string[]): number {
+  let count = 0;
+  for (const phrase of phrases) {
+    if (wordMatch(text, phrase)) {
+      count += phrase.split(/\s+/).length;
+    }
+  }
+  return count;
+}
+
 function categorizeArticle(title: string, description: string): string {
   const text = `${title} ${description}`.toLowerCase();
 
-  const categoryKeywords: Record<string, string[]> = {
-    'immigration': ['immigration', 'visa', 'immigrant', 'citizenship', 'refugee', 'border', 'deportation', 'asylum', 'green card', 'permanent resident'],
-    'politics': ['election', 'government', 'congress', 'senate', 'president', 'minister', 'political', 'parliament', 'vote', 'campaign', 'policy', 'legislation'],
-    'business': ['business', 'company', 'corporate', 'economy', 'market', 'stock', 'trade', 'industry', 'commerce', 'startup', 'ceo', 'investor'],
-    'finance': ['finance', 'investment', 'banking', 'financial', 'money', 'currency', 'cryptocurrency', 'bitcoin', 'stock market', 'trading', 'portfolio'],
-    'technology': ['technology', 'tech', 'software', 'hardware', 'ai', 'artificial intelligence', 'app', 'digital', 'innovation', 'gadget', 'smartphone', 'computer'],
-    'entertainment': ['entertainment', 'movie', 'film', 'music', 'celebrity', 'actor', 'actress', 'hollywood', 'netflix', 'streaming', 'concert', 'album'],
-    'celebrity': ['celebrity', 'star', 'famous', 'kardashian', 'kanye', 'beyonce', 'taylor swift', 'drake', 'rihanna', 'bieber'],
-    'lifestyle': ['lifestyle', 'fashion', 'beauty', 'wellness', 'health', 'fitness', 'food', 'recipe', 'home', 'decor', 'style'],
-    'education': ['education', 'school', 'university', 'college', 'student', 'teacher', 'learning', 'academic', 'scholarship', 'degree'],
-    'travel': ['travel', 'tourism', 'vacation', 'trip', 'destination', 'hotel', 'flight', 'adventure', 'tour', 'tourist'],
-    'society': ['society', 'social', 'community', 'culture', 'religion', 'protest', 'movement', 'justice', 'equality', 'rights']
+  const categoryKeywords: Record<string, { primary: string[]; secondary: string[] }> = {
+    'security': {
+      primary: [
+        'killing', 'killed', 'murder', 'murdered', 'terrorism', 'terrorist',
+        'attack on', 'bomb', 'bombing', 'explosion', 'gunmen', 'gunman',
+        'kidnap', 'kidnapped', 'kidnapping', 'abducted', 'abduction',
+        'bandit', 'bandits', 'insurgent', 'insurgents', 'insurgency',
+        'militant', 'militants', 'massacre', 'lynch', 'lynched', 'lynching',
+        'assassination', 'assassinated', 'armed robbery', 'robbery',
+        'homicide', 'manslaughter', 'shooting', 'stabbing', 'arson',
+        'crisis', 'survivors', 'casualties', 'death toll',
+        'boko haram', 'iswap', 'al-qaeda', 'isis',
+      ],
+      secondary: [
+        'police', 'arrested', 'arrest', 'suspect', 'crime', 'criminal',
+        'security forces', 'military operation', 'troops',
+        'violence', 'violent', 'threat', 'dangerous',
+        'contraband', 'smuggling', 'trafficking',
+      ],
+    },
+    'legal': {
+      primary: [
+        'court orders', 'court ruling', 'court rules', 'court case',
+        'lawsuit', 'litigation', 'tribunal', 'judicial',
+        'verdict', 'sentenced', 'sentencing', 'conviction', 'convicted',
+        'indicted', 'indictment', 'arraigned', 'arraignment',
+        'prosecutor', 'prosecution', 'defendant', 'plaintiff',
+        'supreme court', 'high court', 'appeal court', 'magistrate',
+        'legal battle', 'legal action', 'legal proceedings',
+        'fined', 'penalty', 'bail', 'parole',
+      ],
+      secondary: [
+        'judge', 'lawyer', 'attorney', 'barrister', 'solicitor',
+        'jurisdiction', 'statute', 'legislation', 'regulatory',
+        'compliance', 'injunction', 'restraining order',
+        'status quo', 'habeas corpus',
+      ],
+    },
+    'sports': {
+      primary: [
+        'olympic', 'olympics', 'world cup', 'championship', 'tournament',
+        'football', 'soccer', 'basketball', 'baseball', 'hockey',
+        'tennis', 'cricket', 'rugby', 'boxing', 'wrestling',
+        'marathon', 'athlete', 'athletes', 'medal', 'medals',
+        'premier league', 'champions league', 'la liga', 'serie a',
+        'nba', 'nfl', 'nhl', 'mlb', 'mls', 'fifa',
+        'goalkeeper', 'striker', 'midfielder', 'defender',
+        'coach', 'playoff', 'playoffs', 'semifinal', 'quarterfinal',
+        'blue jays', 'raptors', 'maple leafs', 'canadiens',
+        'winnipeg jets', 'calgary flames', 'edmonton oilers',
+        'toronto fc', 'vancouver whitecaps',
+      ],
+      secondary: [
+        'game', 'match', 'score', 'win', 'loss', 'defeat',
+        'season', 'league', 'team', 'player', 'roster',
+        'stadium', 'arena', 'spectator', 'fan', 'fans',
+        'rivalry', 'derby', 'fixture',
+      ],
+    },
+    'health': {
+      primary: [
+        'cancer', 'disease', 'diagnosis', 'treatment', 'therapy',
+        'hospital', 'hospitalised', 'hospitalized', 'surgery', 'surgeon',
+        'pandemic', 'epidemic', 'outbreak', 'vaccine', 'vaccination',
+        'mental health', 'depression', 'anxiety', 'disorder',
+        'medical', 'medicine', 'pharmaceutical', 'drug trial',
+        'patient', 'patients', 'clinical trial', 'clinical',
+        'public health', 'who', 'cdc',
+        'birth', 'pregnancy', 'maternal', 'fertility',
+      ],
+      secondary: [
+        'doctor', 'nurse', 'physician', 'healthcare',
+        'symptom', 'symptoms', 'chronic', 'acute',
+        'wellness', 'nutrition', 'diet',
+      ],
+    },
+    'immigration': {
+      primary: [
+        'immigration', 'immigrant', 'immigrants', 'visa', 'visas',
+        'citizenship', 'refugee', 'refugees', 'deportation', 'deported',
+        'asylum', 'green card', 'permanent resident', 'permanent residency',
+        'work permit', 'study permit', 'border control',
+        'immigration policy', 'immigration reform',
+        'undocumented', 'migrant', 'migrants', 'migration',
+      ],
+      secondary: [
+        'border', 'customs', 'passport', 'diaspora', 'expatriate',
+        'resettlement', 'naturalization',
+      ],
+    },
+    'politics': {
+      primary: [
+        'election', 'elections', 'government', 'congress', 'senate',
+        'president', 'prime minister', 'minister', 'parliament',
+        'vote', 'voting', 'campaign', 'legislation', 'bill passed',
+        'governor', 'senator', 'representative', 'lawmaker',
+        'political party', 'opposition', 'ruling party',
+        'geopolitical', 'diplomacy', 'diplomatic', 'embassy',
+        'consulate', 'foreign affairs', 'foreign policy',
+        'sanctions', 'tariff', 'tariffs', 'trade deal',
+        'executive order', 'white house', 'capitol',
+        'inec', 'area council', 'polls',
+      ],
+      secondary: [
+        'political', 'policy', 'partisan', 'bipartisan',
+        'debate', 'caucus', 'lobby', 'lobbying',
+        'constituent', 'constituency', 'mandate',
+      ],
+    },
+    'business': {
+      primary: [
+        'company', 'corporate', 'corporation', 'merger', 'acquisition',
+        'startup', 'entrepreneur', 'ceo', 'revenue', 'profit',
+        'quarterly earnings', 'annual report', 'ipo',
+        'factory', 'manufacturing', 'production', 'supply chain',
+        'retail', 'wholesale', 'commerce', 'e-commerce',
+        'unemployment', 'jobs report', 'employment rate',
+        'gdp', 'economic growth', 'recession', 'inflation',
+        'interest rate', 'central bank',
+        'stellantis', 'amazon', 'tesla', 'apple', 'google', 'microsoft',
+      ],
+      secondary: [
+        'business', 'economy', 'market', 'industry', 'trade',
+        'investor', 'investment', 'stock', 'shares',
+        'consumer', 'demand', 'growth',
+      ],
+    },
+    'finance': {
+      primary: [
+        'stock market', 'wall street', 'nasdaq', 'dow jones', 's&p 500',
+        'cryptocurrency', 'bitcoin', 'ethereum', 'blockchain',
+        'banking', 'bank of', 'central bank', 'federal reserve',
+        'portfolio', 'dividend', 'bond', 'bonds', 'treasury',
+        'hedge fund', 'mutual fund', 'etf',
+        'financial crisis', 'market crash', 'bubble',
+        'savings', 'retirement', 'pension', '401k',
+        'forex', 'currency', 'exchange rate',
+      ],
+      secondary: [
+        'finance', 'financial', 'investment', 'trading',
+        'money', 'wealth', 'asset', 'assets',
+        'insurer', 'insurance',
+      ],
+    },
+    'technology': {
+      primary: [
+        'artificial intelligence', 'machine learning', 'deep learning',
+        'software', 'hardware', 'semiconductor', 'chip',
+        'smartphone', 'iphone', 'android', 'gadget', 'gadgets',
+        'cybersecurity', 'data breach', 'hacking', 'ransomware',
+        'cloud computing', 'saas', 'api', 'algorithm',
+        'robotics', 'robot', 'automation', 'autonomous',
+        'virtual reality', 'augmented reality', 'metaverse',
+        'startup tech', '5g', 'broadband', 'internet',
+        'silicon valley', 'big tech',
+        'spotify', 'tiktok', 'netflix', 'streaming service',
+        'charging station', 'wireless charger',
+        'garmin', 'wearable', 'smartwatch',
+      ],
+      secondary: [
+        'technology', 'tech company', 'innovation', 'digital transformation',
+        'computer', 'computing', 'processor', 'server',
+        'programming', 'developer', 'engineering',
+      ],
+    },
+    'entertainment': {
+      primary: [
+        'movie', 'movies', 'film', 'films', 'cinema', 'box office',
+        'album', 'albums', 'concert', 'concerts', 'tour',
+        'hollywood', 'nollywood', 'bollywood',
+        'streaming', 'tv show', 'tv series', 'television',
+        'grammy', 'grammys', 'oscar', 'oscars', 'emmy', 'emmys',
+        'actor', 'actress', 'director', 'producer',
+        'music video', 'single release', 'album release',
+        'heated rivalry', 'casting', 'audition',
+      ],
+      secondary: [
+        'entertainment', 'showbiz', 'celebrity', 'star',
+        'performance', 'performer', 'artist',
+        'comedy', 'drama', 'thriller', 'documentary',
+      ],
+    },
+    'celebrity': {
+      primary: [
+        'kardashian', 'kanye', 'beyonce', 'taylor swift', 'drake',
+        'rihanna', 'bieber', 'selena gomez', 'doja cat',
+        'davido', 'wizkid', 'burna boy', 'tiwa savage',
+        'red carpet', 'paparazzi', 'scandal',
+      ],
+      secondary: [
+        'celebrity', 'famous', 'star-studded', 'a-list',
+        'gossip', 'rumor', 'dating',
+      ],
+    },
+    'lifestyle': {
+      primary: [
+        'fashion', 'beauty', 'fitness', 'workout', 'exercise',
+        'recipe', 'recipes', 'cooking', 'cuisine',
+        'home decor', 'interior design', 'renovation',
+        'skincare', 'makeup', 'cosmetics',
+        'self-care', 'mindfulness', 'meditation', 'yoga',
+        'parenting', 'family life', 'relationship',
+      ],
+      secondary: [
+        'lifestyle', 'wellness', 'style', 'trend', 'trendy',
+        'home', 'living', 'modern living',
+      ],
+    },
+    'education': {
+      primary: [
+        'university', 'college', 'school', 'scholarship', 'scholarships',
+        'academic', 'professor', 'lecturer', 'curriculum',
+        'student', 'students', 'enrollment', 'admission',
+        'graduation', 'degree', 'diploma', 'phd',
+        'research', 'study finds', 'study shows',
+        'jamb', 'waec', 'neco', 'utme',
+      ],
+      secondary: [
+        'education', 'learning', 'teacher', 'teaching',
+        'exam', 'examination', 'tuition', 'campus',
+      ],
+    },
+    'travel': {
+      primary: [
+        'tourism', 'tourist', 'tourists', 'vacation', 'holiday',
+        'destination', 'destinations', 'hotel', 'hotels', 'resort',
+        'airline', 'airlines', 'flight', 'flights', 'airport',
+        'cruise', 'backpacking', 'sightseeing',
+        'travel adapter', 'travel gear', 'travel guide',
+      ],
+      secondary: [
+        'travel', 'trip', 'journey', 'adventure', 'explore',
+        'booking', 'itinerary', 'luggage',
+      ],
+    },
+    'society': {
+      primary: [
+        'community', 'community development', 'social development',
+        'cultural heritage', 'tradition', 'traditions',
+        'charity', 'humanitarian', 'philanthropy',
+        'gender equality', 'women rights', 'human rights',
+        'racial justice', 'social justice', 'civil rights',
+        'protest', 'demonstration', 'rally', 'march',
+        'religious', 'mosque', 'church', 'temple',
+        'empowerment', 'year of families',
+      ],
+      secondary: [
+        'society', 'social', 'culture', 'cultural',
+        'movement', 'activism', 'activist',
+        'equality', 'rights', 'justice',
+      ],
+    },
   };
 
   let bestMatch = 'news';
@@ -251,15 +531,17 @@ function categorizeArticle(title: string, description: string): string {
 
   for (const [category, keywords] of Object.entries(categoryKeywords)) {
     let score = 0;
-    for (const keyword of keywords) {
-      if (text.includes(keyword)) {
-        score += keyword.split(' ').length;
-      }
-    }
+    score += phraseMatchCount(text, keywords.primary) * 3;
+    score += phraseMatchCount(text, keywords.secondary) * 1;
+
     if (score > maxScore) {
       maxScore = score;
       bestMatch = category;
     }
+  }
+
+  if (maxScore < 2) {
+    return 'news';
   }
 
   return bestMatch;
@@ -274,13 +556,13 @@ function calculatePriorityScore(title: string, description: string): { score: nu
   const engagementSignals = ['killed', 'dead', 'arrested', 'election', 'president', 'minister', 'governor', 'attack', 'explosion', 'protest', 'strike', 'war', 'crash', 'disaster'];
 
   for (const keyword of highPriority) {
-    if (text.includes(keyword)) score += 30;
+    if (wordMatch(text, keyword)) score += 30;
   }
   for (const keyword of mediumPriority) {
-    if (text.includes(keyword)) score += 15;
+    if (wordMatch(text, keyword)) score += 15;
   }
   for (const keyword of engagementSignals) {
-    if (text.includes(keyword)) score += 10;
+    if (wordMatch(text, keyword)) score += 10;
   }
 
   return {
@@ -333,16 +615,28 @@ const junkParagraphPatterns = [
   /casino utan/i,
   /delivered straight to your phone/i,
   /do you employ househelps/i,
+  /click here/i,
+  /subscribe to/i,
+  /newsletter/i,
+  /download our app/i,
+  /follow us on/i,
+  /copyright/i,
+  /^\s*advertisement\s*$/i,
+  /^\s*sponsored\s*$/i,
+  /read also/i,
+  /see also/i,
+  /you may also like/i,
+  /recommended for you/i,
 ];
 
 function isJunkParagraph(text: string): boolean {
   return junkParagraphPatterns.some(p => p.test(text));
 }
 
-async function fetchFullArticleContent(url: string): Promise<string> {
+async function fetchFullArticleContent(url: string): Promise<{ content: string; thumbnail: string }> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
     const response = await fetch(url, {
       headers: {
@@ -355,10 +649,25 @@ async function fetchFullArticleContent(url: string): Promise<string> {
     });
 
     clearTimeout(timeout);
-    if (!response.ok) return '';
+    if (!response.ok) return { content: '', thumbnail: '' };
 
     const html = await response.text();
     const root = parseHTML(html);
+
+    let ogImage = '';
+    const ogImageMeta = root.querySelector('meta[property="og:image"]');
+    if (ogImageMeta) {
+      ogImage = ogImageMeta.getAttribute('content') || '';
+    }
+    if (!ogImage) {
+      const twitterImage = root.querySelector('meta[name="twitter:image"]');
+      if (twitterImage) {
+        ogImage = twitterImage.getAttribute('content') || '';
+      }
+    }
+    if (ogImage && !ogImage.startsWith('http')) {
+      ogImage = resolveImageUrl(ogImage, url);
+    }
 
     const junkSelectors = [
       'script', 'style', 'noscript', 'iframe', 'nav', 'header', 'footer',
@@ -368,21 +677,27 @@ async function fetchFullArticleContent(url: string): Promise<string> {
       '[class*="share"]', '[class*="newsletter"]', '[class*="related"]',
       '[class*="author-bio"]', '[class*="byline"]', '[class*="credit"]',
       '[class*="breadcrumb"]', '[class*="pagination"]', '[class*="tag-list"]',
-      '[id*="comment"]', '[id*="sidebar"]',
+      '[class*="cookie"]', '[class*="popup"]', '[class*="modal"]',
+      '[class*="recommended"]', '[class*="also-read"]', '[class*="more-stories"]',
+      '[id*="comment"]', '[id*="sidebar"]', '[id*="footer"]',
     ];
     for (const sel of junkSelectors) {
       try { root.querySelectorAll(sel).forEach(el => el.remove()); } catch { /* skip */ }
     }
 
     const containerSelectors = [
-      'article',
+      '[itemprop="articleBody"]',
+      'article .article-body', 'article .article-content',
       '.article-body', '.article-content', '.article_body', '.article_content',
       '.post-content', '.post_content', '.entry-content', '.entry_content',
       '.story-body', '.story-content', '.story_body', '.story_content',
       '.td-post-content', '.content-body', '.content_body',
+      '.c-article-body', '.article__body', '.article__content',
       '#article-body', '#article-content', '#story-body',
-      '[itemprop="articleBody"]',
-      'main',
+      'article',
+      '[role="article"]',
+      'main .content', 'main',
+      '.post', '.entry',
     ];
 
     let source = null;
@@ -392,7 +707,7 @@ async function fetchFullArticleContent(url: string): Promise<string> {
         if (el) {
           const paragraphs = el.querySelectorAll('p');
           const totalText = paragraphs.map(p => p.text.trim()).filter(t => t.length > 30).join(' ');
-          if (totalText.length > 200) {
+          if (totalText.length > 150) {
             source = el;
             break;
           }
@@ -400,13 +715,21 @@ async function fetchFullArticleContent(url: string): Promise<string> {
       } catch { /* skip */ }
     }
 
-    if (!source) source = root;
+    if (!source) {
+      const allParagraphs = root.querySelectorAll('p');
+      const longParagraphs = allParagraphs.filter(p => p.text.trim().length > 50);
+      if (longParagraphs.length >= 2) {
+        source = root;
+      }
+    }
+
+    if (!source) return { content: '', thumbnail: ogImage };
 
     const images: string[] = [];
     try {
       const imgs = source.querySelectorAll('img');
       for (const img of imgs) {
-        const src = img.getAttribute('src') || img.getAttribute('data-src') || '';
+        const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || '';
         if (src && !src.includes('data:image') && !src.includes('base64') && isValidArticleImage(src)) {
           images.push(resolveImageUrl(src, url));
         }
@@ -419,11 +742,28 @@ async function fetchFullArticleContent(url: string): Promise<string> {
 
     for (const p of paragraphs) {
       const text = p.text.trim();
-      if (text.length >= 30 && !isJunkParagraph(text)) {
+      if (text.length >= 25 && !isJunkParagraph(text)) {
         textParts.push(text);
-        if (images[imgIdx] && textParts.length > 2 && textParts.length % 5 === 0) {
+        if (images[imgIdx] && textParts.length > 2 && textParts.length % 4 === 0) {
           textParts.push(`[IMAGE:${images[imgIdx]}]`);
           imgIdx++;
+        }
+      }
+    }
+
+    if (textParts.length < 3) {
+      const divs = source.querySelectorAll('div');
+      for (const div of divs) {
+        const directText = div.text.trim();
+        if (directText.length > 60 && !isJunkParagraph(directText)) {
+          const sentences = directText.match(/[^.!?\n]+[.!?]+/g) || [];
+          for (const sentence of sentences) {
+            const cleaned = sentence.trim();
+            if (cleaned.length > 35 && !isJunkParagraph(cleaned)) {
+              textParts.push(cleaned);
+            }
+          }
+          if (textParts.length >= 3) break;
         }
       }
     }
@@ -433,16 +773,29 @@ async function fetchFullArticleContent(url: string): Promise<string> {
       const sentences = allText.match(/[^.!?\n]+[.!?]+/g) || [];
       for (const sentence of sentences) {
         const cleaned = sentence.trim();
-        if (cleaned.length > 40 && !isJunkParagraph(cleaned)) {
+        if (cleaned.length > 35 && !isJunkParagraph(cleaned)) {
           textParts.push(cleaned);
         }
       }
     }
 
-    const finalContent = textParts.join('\n\n');
-    return finalContent.length > 100 ? finalContent : '';
+    const seen = new Set<string>();
+    const dedupedParts: string[] = [];
+    for (const part of textParts) {
+      const normalized = part.toLowerCase().trim().substring(0, 80);
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        dedupedParts.push(part);
+      }
+    }
+
+    const finalContent = dedupedParts.join('\n\n');
+    return {
+      content: finalContent.length > 80 ? finalContent : '',
+      thumbnail: ogImage,
+    };
   } catch {
-    return '';
+    return { content: '', thumbnail: '' };
   }
 }
 
@@ -542,21 +895,25 @@ Deno.serve(async (req: Request) => {
 
           if (!existing) {
             let fullContent = item.content;
+            let scrapedThumbnail = '';
 
             if (item.link) {
-              const scrapedContent = await fetchFullArticleContent(item.link);
-              if (scrapedContent && scrapedContent.length > fullContent.length) {
-                fullContent = scrapedContent;
+              const scraped = await fetchFullArticleContent(item.link);
+              if (scraped.content && scraped.content.length > fullContent.length) {
+                fullContent = scraped.content;
+              }
+              if (scraped.thumbnail && isValidArticleImage(scraped.thumbnail)) {
+                scrapedThumbnail = scraped.thumbnail;
               }
             }
 
-            const detectedCategorySlug = categorizeArticle(item.title, item.description);
+            const detectedCategorySlug = categorizeArticle(item.title, item.description + ' ' + fullContent.substring(0, 500));
             const finalCategorySlug = detectedCategorySlug !== 'news' ? detectedCategorySlug : sourceCategorySlug;
             const articleCategory = categories?.find((c: any) => c.slug === finalCategorySlug);
 
             let finalThumbnail = item.thumbnail;
             if (!finalThumbnail || finalThumbnail === '') {
-              finalThumbnail = getCategoryFallbackImage(finalCategorySlug);
+              finalThumbnail = scrapedThumbnail || getCategoryFallbackImage(finalCategorySlug);
             }
 
             const priority = calculatePriorityScore(item.title, item.description);
