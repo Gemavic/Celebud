@@ -524,9 +524,11 @@ Deno.serve(async (req: Request) => {
           .select('*');
 
         const gbengaAyandare = authors?.find((a: any) => a.name === 'Gbenga Ayandare');
-        const defaultAuthor = authors?.find((a: any) => a.name === 'Victoria Odunola') || authors?.[0];
+        const victoriaOdunola = authors?.find((a: any) => a.name === 'Victoria Odunola');
+        const defaultAuthor = victoriaOdunola || authors?.[0];
+        const nigerianAuthors = [gbengaAyandare, victoriaOdunola].filter(Boolean);
 
-        const authorToUse = source.country === 'Nigeria' ? gbengaAyandare : defaultAuthor;
+        let nigerianArticleIndex = 0;
         const categoryMap = source.category_mapping as Record<string, string>;
         const sourceCategorySlug = categoryMap?.default || 'news';
 
@@ -564,7 +566,9 @@ Deno.serve(async (req: Request) => {
               description: item.description,
               content: fullContent,
               category_id: articleCategory?.id,
-              author_id: authorToUse?.id,
+              author_id: source.country === 'Nigeria' && nigerianAuthors.length > 0
+                ? nigerianAuthors[nigerianArticleIndex++ % nigerianAuthors.length]?.id
+                : defaultAuthor?.id,
               media_type: 'article',
               thumbnail_url: finalThumbnail,
               external_url: item.link,
