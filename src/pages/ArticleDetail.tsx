@@ -38,6 +38,15 @@ export function ArticleDetail() {
     loadRelatedArticles();
   }, [id, article]);
 
+  useEffect(() => {
+    if (!id) return;
+
+    const incrementViews = async () => {
+      await supabase.rpc('increment_article_views', { article_id: id });
+    };
+
+    incrementViews();
+  }, [id]);
 
   useEffect(() => {
     if (!article) return;
