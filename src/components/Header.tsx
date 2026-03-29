@@ -1,4 +1,4 @@
-import { Search, Menu, X, Star, User, LogOut, PenSquare } from 'lucide-react';
+import { Search, Menu, X, Star, User, LogOut, SquarePen as PenSquare, FolderOpen } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { SocialLinks } from './SocialLinks';
@@ -120,16 +120,26 @@ export function Header() {
                   <span className="text-sm font-medium">{profile?.username || 'User'}</span>
                 </button>
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-10">
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-2 z-10">
                     {profile?.is_admin && (
-                      <Link
-                        to="/editorial"
-                        onClick={() => setShowUserMenu(false)}
-                        className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100"
-                      >
-                        <PenSquare className="w-4 h-4 mr-2" />
-                        Write Article
-                      </Link>
+                      <>
+                        <Link
+                          to="/editorial"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100"
+                        >
+                          <PenSquare className="w-4 h-4 mr-2" />
+                          Write Article
+                        </Link>
+                        <Link
+                          to="/admin/articles"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100"
+                        >
+                          <FolderOpen className="w-4 h-4 mr-2" />
+                          Manage Articles
+                        </Link>
+                      </>
                     )}
                     <button
                       onClick={handleSignOut}
@@ -218,14 +228,24 @@ export function Header() {
                     <p className="text-gray-900 font-semibold">{profile?.username || 'User'}</p>
                   </div>
                   {profile?.is_admin && (
-                    <Link
-                      to="/editorial"
-                      onClick={() => setIsMenuOpen(false)}
-                      className="flex items-center bg-white text-gray-900 hover:bg-gray-100 font-bold py-3 px-4 rounded-lg"
-                    >
-                      <PenSquare className="w-4 h-4 mr-2" />
-                      Write Article
-                    </Link>
+                    <>
+                      <Link
+                        to="/editorial"
+                        onClick={() => setIsMenuOpen(false)}
+                        className="flex items-center bg-white text-gray-900 hover:bg-gray-100 font-bold py-3 px-4 rounded-lg"
+                      >
+                        <PenSquare className="w-4 h-4 mr-2" />
+                        Write Article
+                      </Link>
+                      <Link
+                        to="/admin/articles"
+                        onClick={() => setIsMenuOpen(false)}
+                        className="flex items-center bg-white text-gray-900 hover:bg-gray-100 font-bold py-3 px-4 rounded-lg"
+                      >
+                        <FolderOpen className="w-4 h-4 mr-2" />
+                        Manage Articles
+                      </Link>
+                    </>
                   )}
                   <button
                     onClick={() => {
