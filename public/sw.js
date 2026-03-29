@@ -1,6 +1,6 @@
-const CACHE_NAME = 'celebud-v1';
-const RUNTIME_CACHE = 'celebud-runtime';
-const IMAGE_CACHE = 'celebud-images';
+const CACHE_NAME = 'celebud-v2';
+const RUNTIME_CACHE = 'celebud-runtime-v2';
+const IMAGE_CACHE = 'celebud-images-v2';
 
 const PRECACHE_ASSETS = [
   '/',
