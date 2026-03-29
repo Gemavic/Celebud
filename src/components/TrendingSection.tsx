@@ -1,4 +1,4 @@
-import { TrendingUp, Play, Eye } from 'lucide-react';
+import { TrendingUp, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { formatDistanceToNow } from '../utils/date';
@@ -63,11 +63,7 @@ export function TrendingSection({ trendingContent }: TrendingSectionProps) {
                 <h3 className="text-white font-semibold text-sm mb-2 line-clamp-2 leading-snug">
                   {content.title}
                 </h3>
-                <div className="flex items-center justify-between text-white/80 text-xs">
-                  <div className="flex items-center space-x-1">
-                    <Eye className="w-3 h-3" />
-                    <span>{(content.views_count / 1000).toFixed(0)}K</span>
-                  </div>
+                <div className="flex items-center text-white/80 text-xs">
                   <span>{formatDistanceToNow(content.published_at)}</span>
                 </div>
               </div>

@@ -8,7 +8,7 @@ import { AdBanner } from '../components/AdBanner';
 import { formatDistanceToNow } from '../utils/date';
 import { updateMetaTags, generateArticleStructuredData, removeArticleStructuredData } from '../utils/seo';
 import { sanitizeArticleContent } from '../utils/contentSanitizer';
-import { ArrowLeft, Eye, Clock, Share2, Facebook, Twitter, Linkedin, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Clock, Share2, Facebook, Twitter, Linkedin, ExternalLink } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useArticle } from '../hooks/useArticles';
 
@@ -38,15 +38,6 @@ export function ArticleDetail() {
     loadRelatedArticles();
   }, [id, article]);
 
-  useEffect(() => {
-    if (!id) return;
-
-    const incrementViews = async () => {
-      await supabase.rpc('increment_article_views', { article_id: id });
-    };
-
-    incrementViews();
-  }, [id]);
 
   useEffect(() => {
     if (!article) return;
@@ -121,11 +112,6 @@ export function ArticleDetail() {
       .split('\n')
       .filter(para => para.trim());
   }, [article]);
-
-  const viewsFormatted = useMemo(
-    () => article ? ((article.views_count || 0) / 1000).toFixed(1) : '0.0',
-    [article]
-  );
 
   if (loading) {
     return (
@@ -207,10 +193,6 @@ export function ArticleDetail() {
                 <time itemProp="datePublished" dateTime={article.published_at}>
                   {formatDistanceToNow(article.published_at)}
                 </time>
-              </div>
-              <div className="flex items-center space-x-1">
-                <Eye className="w-3.5 h-3.5" />
-                <span>{viewsFormatted}K views</span>
               </div>
             </div>
           </div>
