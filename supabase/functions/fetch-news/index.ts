@@ -938,13 +938,30 @@ Deno.serve(async (req: Request) => {
         for (const item of items.slice(0, articlesPerSource)) {
           const slug = generateSlug(item.title);
 
-          const { data: existing } = await supabase
+          // Check for duplicates by slug, title, or external_url
+          const { data: existingBySlug } = await supabase
             .from('media_content')
             .select('id')
             .eq('slug', slug)
             .maybeSingle();
 
-          if (!existing) {
+          if (existingBySlug) continue;
+
+          const { data: existingByUrl } = item.link ? await supabase
+            .from('media_content')
+            .select('id')
+            .eq('external_url', item.link)
+            .maybeSingle() : { data: null };
+
+          if (existingByUrl) continue;
+
+          const { data: existingByTitle } = await supabase
+            .from('media_content')
+            .select('id')
+            .eq('title', item.title)
+            .maybeSingle();
+
+          if (!existingByTitle) {
             let fullContent = item.content;
             let scrapedThumbnail = '';
 

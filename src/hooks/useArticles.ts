@@ -19,6 +19,8 @@ export function useArticles(options: UseArticlesOptions = {}) {
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize - 1;
 
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
       let query = supabase
         .from('media_content')
         .select(
@@ -27,6 +29,7 @@ export function useArticles(options: UseArticlesOptions = {}) {
             : '*, categories(*), authors(*)',
           { count: 'exact' }
         )
+        .gte('published_at', sevenDaysAgo)
         .order('published_at', { ascending: false });
 
       if (category) {
@@ -58,10 +61,13 @@ export function useFeaturedArticles(limit = 5) {
   return useQuery({
     queryKey: ['articles', 'featured', limit],
     queryFn: async () => {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
       const { data, error } = await supabase
         .from('media_content')
         .select('*, categories(*), authors(*)')
         .eq('is_featured', true)
+        .gte('published_at', sevenDaysAgo)
         .order('published_at', { ascending: false })
         .limit(limit);
 
@@ -79,10 +85,13 @@ export function useTrendingArticles(limit = 5) {
   return useQuery({
     queryKey: ['articles', 'trending', limit],
     queryFn: async () => {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
       const { data, error } = await supabase
         .from('media_content')
         .select('*, categories(*), authors(*)')
         .eq('is_trending', true)
+        .gte('published_at', sevenDaysAgo)
         .order('views_count', { ascending: false })
         .limit(limit);
 
