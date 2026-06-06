@@ -7,6 +7,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
+const fifaWorldCupKeywords = [
+  'world cup', 'fifa', 'worldcup', 'qatar 2022', 'usa 2026', 'mexico 2026', 'canada 2026',
+  'world cup 2026', 'fifa world cup', 'group stage', 'round of 16', 'quarter-final',
+  'quarterfinal', 'semi-final', 'semifinal', 'world cup final', 'world cup qualifier',
+  'fifa ranking', 'ballon d\'or', 'golden boot', 'copa america', 'euro 2024', 'afcon',
+  'champions league', 'europa league', 'ucl', 'premier league', 'la liga', 'bundesliga',
+  'serie a', 'ligue 1', 'super eagles', 'three lions', 'les bleus',
+];
+
+const fifaWorldCupThumbnails = [
+  'https://digitalhub.fifa.com/transform/3603e5f0-14e8-4cd4-8a9e-273b3e7b4a58/FIFA-World-Cup-26-Official-Brand',
+  'https://digitalhub.fifa.com/transform/6a9e54e5-f498-4059-aa83-b3190f93f20f/FIFA+WC+2026+Brand+Key+Visual',
+  'https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?w=1200&q=80',
+  'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&q=80',
+  'https://images.unsplash.com/photo-1606925797300-0b35e9d1794e?w=1200&q=80',
+  'https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?w=1200&q=80',
+  'https://images.unsplash.com/photo-1522778119026-d647f0596c20?w=1200&q=80',
+  'https://images.unsplash.com/photo-1551958219-acbc608c6377?w=1200&q=80',
+];
+
+function isWorldCupContent(title: string, description: string): boolean {
+  const text = (title + ' ' + description).toLowerCase();
+  return fifaWorldCupKeywords.some(kw => text.includes(kw));
+}
+
+function getWorldCupThumbnail(): string {
+  return fifaWorldCupThumbnails[Math.floor(Math.random() * fifaWorldCupThumbnails.length)];
+}
+
 const categoryFallbackImages: Record<string, string[]> = {
   'immigration': [
     'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1200&q=80',
@@ -81,10 +110,12 @@ const categoryFallbackImages: Record<string, string[]> = {
     'https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=1200&q=80',
   ],
   'sports': [
-    'https://images.unsplash.com/photo-1461896836934-bd45ba3a48e8?w=1200&q=80',
-    'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=1200&q=80',
-    'https://images.unsplash.com/photo-1471295253337-3ceaaedca402?w=1200&q=80',
-    'https://images.unsplash.com/photo-1541252260730-0412e8e2108e?w=1200&q=80',
+    'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&q=80',
+    'https://images.unsplash.com/photo-1606925797300-0b35e9d1794e?w=1200&q=80',
+    'https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?w=1200&q=80',
+    'https://images.unsplash.com/photo-1522778119026-d647f0596c20?w=1200&q=80',
+    'https://images.unsplash.com/photo-1551958219-acbc608c6377?w=1200&q=80',
+    'https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?w=1200&q=80',
   ],
   'health': [
     'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=1200&q=80',
@@ -1017,7 +1048,11 @@ Deno.serve(async (req: Request) => {
             const articleCategory = categories?.find((c: any) => c.slug === finalCategorySlug);
 
             let finalThumbnail = item.thumbnail;
-            if (!finalThumbnail || finalThumbnail === '') {
+            const isWorldCup = isWorldCupContent(item.title, item.description);
+
+            if (isWorldCup && (!finalThumbnail || finalThumbnail === '' || !isValidArticleImage(finalThumbnail))) {
+              finalThumbnail = scrapedThumbnail || getWorldCupThumbnail();
+            } else if (!finalThumbnail || finalThumbnail === '') {
               finalThumbnail = scrapedThumbnail || getCategoryFallbackImage(finalCategorySlug);
             }
 
