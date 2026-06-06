@@ -34,7 +34,7 @@ export function GoogleAd({ slot, format = 'auto', responsive = true, className =
         <ins
           className="adsbygoogle"
           style={{ display: 'block' }}
-          data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+          data-ad-client="ca-pub-9958970892570664"
           data-ad-slot={slot}
           data-ad-format={format}
           data-full-width-responsive={responsive ? 'true' : 'false'}
