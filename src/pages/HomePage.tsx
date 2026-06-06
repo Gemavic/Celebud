@@ -12,6 +12,9 @@ import { NewsletterSignup } from '../components/NewsletterSignup';
 import { Pagination } from '../components/Pagination';
 import { AdBanner } from '../components/AdBanner';
 import { GoogleAd } from '../components/GoogleAd';
+import { LiveEvents } from '../components/LiveEvents';
+import { CreatorRevShare } from '../components/CreatorRevShare';
+import { ContentLicensing } from '../components/ContentLicensing';
 import { Loader2 } from 'lucide-react';
 import { useFeaturedArticles, useTrendingArticles, useArticles } from '../hooks/useArticles';
 import { useCategories, useSearchArticles } from '../hooks/useCategories';
@@ -178,11 +181,17 @@ function HomePage() {
           <GoogleAd slot="HOME_FEED_AD_SLOT" format="horizontal" />
         </div>
 
+        <LiveEvents />
+
+        <CreatorRevShare />
+
         <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
           <NewsletterSignup />
         </div>
 
         <SubscriptionPlans />
+
+        <ContentLicensing />
       </main>
 
       <footer className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white py-12 px-4 sm:px-6 lg:px-8">
