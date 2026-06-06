@@ -11,6 +11,7 @@ import { SubscriptionPlans } from '../components/SubscriptionPlans';
 import { NewsletterSignup } from '../components/NewsletterSignup';
 import { Pagination } from '../components/Pagination';
 import { AdBanner } from '../components/AdBanner';
+import { GoogleAd } from '../components/GoogleAd';
 import { Loader2 } from 'lucide-react';
 import { useFeaturedArticles, useTrendingArticles, useArticles } from '../hooks/useArticles';
 import { useCategories, useSearchArticles } from '../hooks/useCategories';
@@ -172,6 +173,10 @@ function HomePage() {
             </>
           )}
         </section>
+
+        <div className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto mb-12">
+          <GoogleAd slot="HOME_FEED_AD_SLOT" format="horizontal" />
+        </div>
 
         <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
           <NewsletterSignup />

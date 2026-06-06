@@ -5,6 +5,7 @@ import { MediaContentWithRelations } from '../lib/database.types';
 import { Header } from '../components/Header';
 import CommentsSection from '../components/CommentsSection';
 import { AdBanner } from '../components/AdBanner';
+import { GoogleAd } from '../components/GoogleAd';
 import { formatDistanceToNow } from '../utils/date';
 import { updateMetaTags, generateArticleStructuredData, removeArticleStructuredData } from '../utils/seo';
 import { sanitizeArticleContent } from '../utils/contentSanitizer';
@@ -236,10 +237,18 @@ export function ArticleDetail() {
                       </div>
                     );
                   }
+
+                  const showMidArticleAd = index === Math.floor(contentParagraphs.length / 3) && contentParagraphs.length > 5;
+
                   return (
-                    <p key={index} className="leading-loose text-justify">
-                      {paragraph}
-                    </p>
+                    <div key={index}>
+                      <p className="leading-loose text-justify">
+                        {paragraph}
+                      </p>
+                      {showMidArticleAd && (
+                        <GoogleAd slot="MID_ARTICLE_AD_SLOT" format="rectangle" className="my-6" />
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -347,6 +356,8 @@ export function ArticleDetail() {
           <div className="my-12">
             <AdBanner placement="article" />
           </div>
+
+          <GoogleAd slot="ARTICLE_BOTTOM_AD_SLOT" format="horizontal" className="my-8" />
 
           <CommentsSection contentId={article.id} initialCount={article.comments_count || 0} />
         </div>
