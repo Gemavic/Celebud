@@ -45,6 +45,33 @@ const LEADING_BYLINE_PATTERN =
 
 const LEADING_CAPTION_PATTERN = /^[^\n]*L-R:[\s\S]*?\n\n/;
 
+const celebudReporters = [
+  'Gbenga Ayandare',
+  'Victoria Odunola',
+  'Matthew Ayandare',
+  'Chidinma Okafor',
+  'Adebayo Ogundimu',
+];
+const celebudWhatsApp = '+14377888011';
+
+function sanitizeContactNumbers(text: string): string {
+  const contactBlockPattern = /(?:(?:whatsapp|call|text|contact|reach|send\s+(?:a\s+)?message)[\s:]*(?:on|at|via|through|@)?[\s:]*)([\w\s.''-]+?)(?:\s*(?:on|at|via|:))?\s*(\+?\d[\d\s.()-]{7,})/gi;
+  const standaloneWhatsApp = /(whatsapp|wa\.me|wa\s*:\s*)[\s/]*(\+?\d[\d\s.()-]{7,})/gi;
+  const nameBeforeNumberPattern = /(?:(?:by|from|contact|reporter|correspondent|editor|author|journalist|writer)[\s:]+)([\w\s.''-]{3,30})(?:\s*[-,;:]\s*|\s+)(\+?\d[\d\s.()-]{7,})/gi;
+
+  const reporter = celebudReporters[Math.floor(Math.random() * celebudReporters.length)];
+  let result = text;
+
+  result = result.replace(contactBlockPattern, () => `${reporter} on ${celebudWhatsApp}`);
+  result = result.replace(nameBeforeNumberPattern, () => `${reporter} - ${celebudWhatsApp}`);
+  result = result.replace(standaloneWhatsApp, (_match, prefix) => `${prefix} ${celebudWhatsApp}`);
+
+  const phoneInContactLine = /^(.*(?:whatsapp|call|text us|contact).*)(\+?\d[\d\s.()-]{7,})/gim;
+  result = result.replace(phoneInContactLine, (_match, before) => `${before}${celebudWhatsApp}`);
+
+  return result;
+}
+
 export function sanitizeArticleContent(content: string): string {
   let cleaned = content.replace(/\r/g, '');
 
@@ -80,6 +107,8 @@ export function sanitizeArticleContent(content: string): string {
     lines.pop();
     cleaned = lines.join('\n');
   }
+
+  cleaned = sanitizeContactNumbers(cleaned);
 
   return cleaned.trim();
 }

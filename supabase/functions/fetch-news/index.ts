@@ -641,6 +641,66 @@ function generateSlug(title: string): string {
     .substring(0, 100);
 }
 
+const celebudReporters = [
+  'Gbenga Ayandare',
+  'Victoria Odunola',
+  'Matthew Ayandare',
+  'Chidinma Okafor',
+  'Adebayo Ogundimu',
+];
+const celebudWhatsApp = '+14377888011';
+
+function sanitizeContactInfo(text: string): string {
+  // Replace WhatsApp/phone number patterns with Celebud default
+  const phonePatterns = [
+    /(\+?\d{1,4}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{2,4}[-.\s]?\d{2,4}[-.\s]?\d{0,4})/g,
+    /(\+\d{10,15})/g,
+    /(0\d{10,11})/g,
+    /(\d{3}[-.\s]\d{3}[-.\s]\d{4})/g,
+  ];
+
+  // Patterns that indicate a contact section at end of article
+  const contactBlockPattern = /(?:(?:whatsapp|call|text|contact|reach|send\s+(?:a\s+)?message|chat\s+(?:with\s+)?us?)[\s:]*(?:on|at|via|through|@)?[\s:]*)([\w\s.''-]+?)(?:\s*(?:on|at|via|:))?\s*(\+?\d[\d\s.()-]{7,})/gi;
+  const nameBeforeNumberPattern = /(?:(?:by|from|contact|reporter|correspondent|editor|author|journalist|writer)[\s:]+)([\w\s.''-]{3,30})(?:\s*[-,;:]\s*|\s+)(\+?\d[\d\s.()-]{7,})/gi;
+  const numberWithNamePattern = /(\+?\d[\d\s.()-]{7,})\s*[-–]\s*([\w\s.''-]{3,30})/gi;
+  const standaloneWhatsApp = /(whatsapp|wa\.me|wa\s*:\s*)[\s/]*(\+?\d[\d\s.()-]{7,})/gi;
+
+  let result = text;
+
+  // Replace contact blocks with Celebud reporter info
+  const reporter = celebudReporters[Math.floor(Math.random() * celebudReporters.length)];
+
+  result = result.replace(contactBlockPattern, (match) => {
+    return match.replace(/[\w\s.''-]+?(?:\s*(?:on|at|via|:))?\s*\+?\d[\d\s.()-]{7,}/i, `${reporter} on ${celebudWhatsApp}`);
+  });
+
+  result = result.replace(nameBeforeNumberPattern, (_match, _name, _num) => {
+    return `${reporter} - ${celebudWhatsApp}`;
+  });
+
+  result = result.replace(numberWithNamePattern, (_match, _num, _name) => {
+    return `${celebudWhatsApp} - ${reporter}`;
+  });
+
+  result = result.replace(standaloneWhatsApp, (_match, prefix) => {
+    return `${prefix} ${celebudWhatsApp}`;
+  });
+
+  // Replace remaining standalone phone numbers near WhatsApp mentions
+  const lines = result.split('\n');
+  const cleanedLines = lines.map(line => {
+    const lowerLine = line.toLowerCase();
+    if (lowerLine.includes('whatsapp') || lowerLine.includes('wa.me') || lowerLine.includes('call') || lowerLine.includes('text us') || lowerLine.includes('contact')) {
+      for (const pattern of phonePatterns) {
+        line = line.replace(pattern, celebudWhatsApp);
+      }
+    }
+    return line;
+  });
+
+  return cleanedLines.join('\n');
+}
+
 function resolveImageUrl(src: string, pageUrl: string): string {
   try {
     if (src.startsWith('//')) return `https:${src}`;
@@ -850,7 +910,7 @@ async function fetchFullArticleContent(url: string): Promise<{ content: string; 
       }
     }
 
-    const finalContent = dedupedParts.join('\n\n');
+    const finalContent = sanitizeContactInfo(dedupedParts.join('\n\n'));
     return {
       content: finalContent.length > 80 ? finalContent : '',
       thumbnail: ogImage,
@@ -1061,8 +1121,8 @@ Deno.serve(async (req: Request) => {
             const { error } = await supabase.from('media_content').insert({
               title: item.title,
               slug,
-              description: item.description,
-              content: fullContent,
+              description: sanitizeContactInfo(item.description),
+              content: sanitizeContactInfo(fullContent),
               category_id: articleCategory?.id,
               author_id: source.country === 'Nigeria' && nigerianAuthors.length > 0
                 ? nigerianAuthors[nigerianArticleIndex++ % nigerianAuthors.length]?.id
