@@ -899,13 +899,14 @@ Deno.serve(async (req: Request) => {
       await supabase.from('media_content').delete().lt('published_at', sevenDaysAgo);
     }
 
-    // Priority order: Nigeria 15%, Canada 15%, USA 15%, UK 10%, remaining 45% to Global/others
-    const priorityCountries = ['Nigeria', 'Canada', 'USA', 'UK'];
+    // Priority order: Nigeria 15%, Canada 15%, USA 15%, UK 10%, Sports 10%, remaining 35% to Global/others
+    const priorityCountries = ['Nigeria', 'Canada', 'USA', 'UK', 'Sports'];
     const priorityAllocations: Record<string, number> = {
       'Nigeria': 0.15,
       'Canada': 0.15,
       'USA': 0.15,
       'UK': 0.10,
+      'Sports': 0.10,
     };
 
     const allCountries = [...new Set(sources.map((s: any) => s.country || 'Global'))];
