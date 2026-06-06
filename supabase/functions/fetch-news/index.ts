@@ -1111,6 +1111,13 @@ Deno.serve(async (req: Request) => {
               }
             }
 
+            const finalContent = stripHtml(sanitizeContactInfo(fullContent));
+            const finalDescription = stripHtml(sanitizeContactInfo(item.description));
+
+            if (!finalContent && !finalDescription) {
+              continue;
+            }
+
             const detectedCategorySlug = categorizeArticle(item.title, item.description + ' ' + fullContent.substring(0, 500));
             const finalCategorySlug = detectedCategorySlug !== 'news' ? detectedCategorySlug : sourceCategorySlug;
             const articleCategory = categories?.find((c: any) => c.slug === finalCategorySlug);
@@ -1129,8 +1136,8 @@ Deno.serve(async (req: Request) => {
             const { error } = await supabase.from('media_content').insert({
               title: stripHtml(item.title),
               slug,
-              description: stripHtml(sanitizeContactInfo(item.description)),
-              content: stripHtml(sanitizeContactInfo(fullContent)),
+              description: finalDescription,
+              content: finalContent,
               category_id: articleCategory?.id,
               author_id: source.country === 'Nigeria' && nigerianAuthors.length > 0
                 ? nigerianAuthors[nigerianArticleIndex++ % nigerianAuthors.length]?.id

@@ -204,9 +204,24 @@ Deno.serve(async (req: Request) => {
       const content = await fetchContent(article.external_url);
 
       if (content && content.length > 100) {
+        const cleanContent = content
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<\/p>/gi, '\n\n')
+          .replace(/<\/li>/gi, '\n')
+          .replace(/<\/h[1-6]>/gi, '\n\n')
+          .replace(/<[^>]*>/g, '')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+
         const { error: updateError } = await supabase
           .from('media_content')
-          .update({ content })
+          .update({ content: cleanContent })
           .eq('id', article.id);
 
         if (!updateError) {

@@ -245,9 +245,26 @@ export function ArticleDetail() {
               </div>
             ) : (
               <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
-                <p className="text-gray-600 text-base">
-                  Full article content coming soon. Check back later for updates.
-                </p>
+                {article.external_url ? (
+                  <>
+                    <p className="text-gray-600 text-base mb-4">
+                      This article is available from the original source.
+                    </p>
+                    <a
+                      href={article.external_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center space-x-2 px-6 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors shadow-md"
+                    >
+                      <span>Read Full Article</span>
+                      <ArrowLeft className="w-4 h-4 rotate-180" />
+                    </a>
+                  </>
+                ) : (
+                  <p className="text-gray-600 text-base">
+                    Article content is currently unavailable.
+                  </p>
+                )}
               </div>
             )}
           </div>
