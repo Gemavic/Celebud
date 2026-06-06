@@ -75,6 +75,28 @@ function sanitizeContactNumbers(text: string): string {
 export function sanitizeArticleContent(content: string): string {
   let cleaned = content.replace(/\r/g, '');
 
+  // Strip all HTML tags, converting block elements to line breaks
+  cleaned = cleaned
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<\/h[1-6]>/gi, '\n\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&ldquo;/g, '"')
+    .replace(/&rdquo;/g, '"')
+    .replace(/&lsquo;/g, "'")
+    .replace(/&rsquo;/g, "'")
+    .replace(/&mdash;/g, '-')
+    .replace(/&ndash;/g, '-')
+    .replace(/&hellip;/g, '...');
+
   for (const pattern of INLINE_JUNK_PATTERNS) {
     cleaned = cleaned.replace(pattern, '');
   }

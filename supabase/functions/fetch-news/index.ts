@@ -279,7 +279,12 @@ function decodeHtmlEntities(text: string): string {
 function stripHtml(html: string): string {
   return decodeHtmlEntities(
     html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<\/li>/gi, '\n')
+      .replace(/<\/h[1-6]>/gi, '\n\n')
       .replace(/<[^>]*>/g, '')
+      .replace(/\n{3,}/g, '\n\n')
       .trim()
   );
 }
@@ -1122,10 +1127,10 @@ Deno.serve(async (req: Request) => {
             const priority = calculatePriorityScore(item.title, item.description);
 
             const { error } = await supabase.from('media_content').insert({
-              title: item.title,
+              title: stripHtml(item.title),
               slug,
-              description: sanitizeContactInfo(item.description),
-              content: sanitizeContactInfo(fullContent),
+              description: stripHtml(sanitizeContactInfo(item.description)),
+              content: stripHtml(sanitizeContactInfo(fullContent)),
               category_id: articleCategory?.id,
               author_id: source.country === 'Nigeria' && nigerianAuthors.length > 0
                 ? nigerianAuthors[nigerianArticleIndex++ % nigerianAuthors.length]?.id
