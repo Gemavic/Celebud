@@ -16,9 +16,10 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    font-size: 12pt;
   }
 
   body {
-    @apply antialiased;
+    @apply antialiased font-serif;
   }
 }
