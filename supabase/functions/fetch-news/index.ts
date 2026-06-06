@@ -857,20 +857,41 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const sourcesByCountry = {
-      'Nigeria': sources.filter((s: any) => s.country === 'Nigeria'),
-      'Canada': sources.filter((s: any) => s.country === 'Canada'),
-      'USA': sources.filter((s: any) => s.country === 'USA'),
-      'Global': sources.filter((s: any) => s.country === 'Global' || !s.country),
+    // Delete articles older than 7 days before fetching new ones
+    await supabase
+      .from('media_content')
+      .delete()
+      .lt('published_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+    // Priority order: Nigeria 15%, Canada 15%, USA 15%, UK 10%, remaining 45% to Global/others
+    const priorityCountries = ['Nigeria', 'Canada', 'USA', 'UK'];
+    const priorityAllocations: Record<string, number> = {
+      'Nigeria': 0.15,
+      'Canada': 0.15,
+      'USA': 0.15,
+      'UK': 0.10,
     };
 
+    const allCountries = [...new Set(sources.map((s: any) => s.country || 'Global'))];
+    const otherCountries = allCountries.filter(c => !priorityCountries.includes(c));
+    const remainingShare = 1 - Object.values(priorityAllocations).reduce((a, b) => a + b, 0);
+    const perOtherCountry = otherCountries.length > 0 ? remainingShare / otherCountries.length : remainingShare;
+    for (const c of otherCountries) {
+      priorityAllocations[c] = perOtherCountry;
+    }
+
+    const sourcesByCountry: Record<string, any[]> = {};
+    for (const source of sources) {
+      const key = source.country || 'Global';
+      if (!sourcesByCountry[key]) sourcesByCountry[key] = [];
+      sourcesByCountry[key].push(source);
+    }
+
     const totalArticlesTarget = 100;
-    const articlesPerCountry = {
-      'Nigeria': Math.floor(totalArticlesTarget * 0.50),
-      'Canada': Math.floor(totalArticlesTarget * 0.20),
-      'USA': Math.floor(totalArticlesTarget * 0.10),
-      'Global': Math.floor(totalArticlesTarget * 0.30),
-    };
+    const articlesPerCountry: Record<string, number> = {};
+    for (const [country, share] of Object.entries(priorityAllocations)) {
+      articlesPerCountry[country] = Math.floor(totalArticlesTarget * share);
+    }
 
     let totalFetched = 0;
     let totalAdded = 0;
