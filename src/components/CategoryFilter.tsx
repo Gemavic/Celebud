@@ -1,4 +1,8 @@
-import { Video, Music, Mic, Star, Briefcase, Film, Flame, Landmark, Users, Heart } from 'lucide-react';
+import {
+  Video, Mic, Star, Briefcase, Film, Flame, Landmark, Users, Heart,
+  Newspaper, Trophy, Cpu, Activity, TrendingUp, GraduationCap, Globe,
+  Shield, Scale, Plane, Headphones,
+} from 'lucide-react';
 import { Category } from '../lib/database.types';
 
 interface CategoryFilterProps {
@@ -9,7 +13,6 @@ interface CategoryFilterProps {
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   video: Video,
-  music: Music,
   mic: Mic,
   star: Star,
   briefcase: Briefcase,
@@ -17,6 +20,17 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   landmark: Landmark,
   users: Users,
   heart: Heart,
+  newspaper: Newspaper,
+  trophy: Trophy,
+  cpu: Cpu,
+  activity: Activity,
+  'trending-up': TrendingUp,
+  'graduation-cap': GraduationCap,
+  globe: Globe,
+  shield: Shield,
+  scale: Scale,
+  plane: Plane,
+  headphones: Headphones,
 };
 
 export function CategoryFilter({

@@ -21,7 +21,12 @@ export function useArticles(options: UseArticlesOptions = {}) {
 
       let query = supabase
         .from('media_content')
-        .select('*, categories(*), authors(*)', { count: 'exact' })
+        .select(
+          category
+            ? '*, categories!inner(*), authors(*)'
+            : '*, categories(*), authors(*)',
+          { count: 'exact' }
+        )
         .order('published_at', { ascending: false });
 
       if (category) {
