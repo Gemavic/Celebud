@@ -1024,14 +1024,17 @@ Deno.serve(async (req: Request) => {
     let totalFetched = 0;
     let totalAdded = 0;
     const results = [];
+    const countryAddedCount: Record<string, number> = {};
 
     for (const [country, countrySources] of Object.entries(sourcesByCountry)) {
       if (countrySources.length === 0) continue;
 
       const targetArticles = articlesPerCountry[country as keyof typeof articlesPerCountry];
       const articlesPerSource = Math.ceil(targetArticles / countrySources.length);
+      countryAddedCount[country] = 0;
 
       for (const source of countrySources) {
+      if (countryAddedCount[country] >= targetArticles) break;
       const logEntry = {
         source_id: source.id,
         fetch_started_at: new Date().toISOString(),
@@ -1142,8 +1145,10 @@ Deno.serve(async (req: Request) => {
             if (!error) {
               addedCount++;
               totalAdded++;
+              countryAddedCount[country]++;
             }
           }
+          if (countryAddedCount[country] >= targetArticles) break;
         }
 
         await supabase.from('news_sources').update({
