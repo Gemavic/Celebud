@@ -19,8 +19,6 @@ export function useArticles(options: UseArticlesOptions = {}) {
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize - 1;
 
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
       let query = supabase
         .from('media_content')
         .select(
@@ -30,11 +28,6 @@ export function useArticles(options: UseArticlesOptions = {}) {
           { count: 'exact' }
         )
         .order('published_at', { ascending: false });
-
-      // Only apply date filter when browsing all articles (no category selected)
-      if (!category) {
-        query = query.gte('published_at', sevenDaysAgo);
-      }
 
       if (category) {
         query = query.eq('categories.slug', category);

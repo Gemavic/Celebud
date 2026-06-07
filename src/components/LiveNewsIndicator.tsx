@@ -33,50 +33,37 @@ export function LiveNewsIndicator() {
   }, [autoRefresh, handleRefresh]);
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl p-4 flex items-center space-x-3 border-2 border-red-500">
-        <div className="flex items-center space-x-2">
-          {autoRefresh && (
-            <div className="relative">
-              <Radio className="w-5 h-5 text-red-500" />
-              <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-ping" />
-            </div>
-          )}
-          <span className="text-sm font-semibold text-gray-700">
-            Live News
-          </span>
-        </div>
+    <div className="fixed bottom-4 right-4 z-40 hidden md:block">
+      <div className="bg-white/95 backdrop-blur-sm rounded-full shadow-lg px-3 py-1.5 flex items-center space-x-2 border border-gray-200">
+        {autoRefresh && (
+          <div className="relative">
+            <Radio className="w-3.5 h-3.5 text-red-500" />
+            <span className="absolute top-0 right-0 w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
+          </div>
+        )}
 
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className={`bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all ${
+          className={`text-red-600 hover:text-red-700 flex items-center space-x-1 transition-all ${
             isRefreshing ? 'opacity-50 cursor-not-allowed' : ''
           }`}
         >
-          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          <span className="text-sm font-medium">
-            {isRefreshing ? 'Updating...' : 'Refresh Now'}
+          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span className="text-xs font-medium">
+            {isRefreshing ? '...' : 'Refresh'}
           </span>
         </button>
 
         <button
           onClick={() => setAutoRefresh(!autoRefresh)}
-          className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-            autoRefresh
-              ? 'bg-green-100 text-green-700'
-              : 'bg-gray-100 text-gray-600'
+          className={`text-xs font-medium transition-all ${
+            autoRefresh ? 'text-green-600' : 'text-gray-400'
           }`}
         >
-          {autoRefresh ? 'Auto: ON' : 'Auto: OFF'}
+          {autoRefresh ? 'Live' : 'Off'}
         </button>
       </div>
-
-      {lastUpdate && (
-        <p className="text-xs text-gray-500 text-right mt-2">
-          Last updated: {lastUpdate.toLocaleTimeString()}
-        </p>
-      )}
     </div>
   );
 }
