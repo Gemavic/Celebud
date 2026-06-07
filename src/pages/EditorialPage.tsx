@@ -37,23 +37,36 @@ export default function EditorialPage() {
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
   const authorPhotoInputRef = useRef<HTMLInputElement>(null);
 
-  const [createFormData, setCreateFormData] = useState({
-    title: '',
-    description: '',
-    content: '',
-    category_id: '',
-    thumbnail_url: '',
-    author_id: '',
-    is_featured: false,
-    is_trending: false,
-    seo_title: '',
-    seo_keywords: '',
+  const DRAFT_KEY = 'editorial_draft';
+
+  const [createFormData, setCreateFormData] = useState(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      title: '',
+      description: '',
+      content: '',
+      category_id: '',
+      thumbnail_url: '',
+      author_id: '',
+      is_featured: false,
+      is_trending: false,
+      seo_title: '',
+      seo_keywords: '',
+    };
   });
 
-  const [newAuthor, setNewAuthor] = useState({
-    name: '',
-    bio: '',
+  const [newAuthor, setNewAuthor] = useState(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY + '_author');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { name: '', bio: '' };
   });
+
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTab === 'create' || activeTab === 'dashboard') {
@@ -64,6 +77,26 @@ export default function EditorialPage() {
     loadCategories();
     loadAuthors();
   }, [user, profile, navigate]);
+
+  useEffect(() => {
+    const hasContent = createFormData.title || createFormData.content || createFormData.description;
+    if (hasContent) {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(createFormData));
+      setDraftSavedAt(new Date().toLocaleTimeString());
+    }
+  }, [createFormData]);
+
+  useEffect(() => {
+    if (showNewAuthor && newAuthor.name) {
+      localStorage.setItem(DRAFT_KEY + '_author', JSON.stringify(newAuthor));
+    }
+  }, [newAuthor, showNewAuthor]);
+
+  function clearDraft() {
+    localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(DRAFT_KEY + '_author');
+    setDraftSavedAt(null);
+  }
 
   async function loadCategories() {
     try {
@@ -198,6 +231,7 @@ export default function EditorialPage() {
       if (insertError) throw insertError;
 
       setSuccess(true);
+      clearDraft();
       setCreateFormData({
         title: '',
         description: '',
@@ -299,7 +333,36 @@ export default function EditorialPage() {
 
           {activeTab === 'create' && user && profile?.is_admin && (
             <div className="bg-white rounded-xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Article</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Create New Article</h2>
+                <div className="flex items-center gap-3">
+                  {draftSavedAt && (
+                    <span className="text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-full font-medium">
+                      Draft saved {draftSavedAt}
+                    </span>
+                  )}
+                  {(createFormData.title || createFormData.content) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearDraft();
+                        setCreateFormData({
+                          title: '', description: '', content: '', category_id: '',
+                          thumbnail_url: '', author_id: '', is_featured: false,
+                          is_trending: false, seo_title: '', seo_keywords: '',
+                        });
+                        setNewAuthor({ name: '', bio: '' });
+                        setShowNewAuthor(false);
+                        setThumbnailFile(null);
+                        setThumbnailPreview('');
+                      }}
+                      className="text-xs text-gray-500 hover:text-red-600 px-3 py-1.5 rounded-full border border-gray-200 hover:border-red-200 transition-colors"
+                    >
+                      Clear Draft
+                    </button>
+                  )}
+                </div>
+              </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Title */}
