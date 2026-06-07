@@ -45,8 +45,8 @@ Deno.serve(async (req: Request) => {
     // Run all queries in parallel
     const [categoriesRes, featuredRes, trendingRes, articlesRes, editorialRes] =
       await Promise.all([
-        // 1. Categories
-        supabase.from("categories").select("*").order("display_order"),
+        // 1. Categories (only CelebUD categories with display_order > 0)
+        supabase.from("categories").select("*").gt("display_order", 0).order("display_order"),
 
         // 2. Featured articles (top 3)
         supabase

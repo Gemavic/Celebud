@@ -8,6 +8,7 @@ export function useCategories() {
       const { data, error } = await supabase
         .from('categories')
         .select('*')
+        .gt('display_order', 0)
         .order('display_order');
 
       if (error) throw error;
