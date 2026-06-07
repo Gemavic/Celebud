@@ -1,5 +1,3 @@
-import * as Sentry from '@sentry/react';
-
 interface ErrorContext {
   component?: string;
   action?: string;
@@ -32,16 +30,18 @@ export function logDataAccessError(
   });
 
   if (import.meta.env.PROD) {
-    Sentry.captureException(dataAccessError, {
-      tags: {
-        error_type: 'data_access',
-        component: context.component,
-        action: context.action,
-      },
-      extra: {
-        ...context.additionalData,
-        originalError: error?.message,
-      },
+    import('@sentry/react').then((Sentry) => {
+      Sentry.captureException(dataAccessError, {
+        tags: {
+          error_type: 'data_access',
+          component: context.component,
+          action: context.action,
+        },
+        extra: {
+          ...context.additionalData,
+          originalError: error?.message,
+        },
+      });
     });
   }
 }

@@ -37,6 +37,16 @@ export default defineConfig({
   plugins: [react(), safeCopyPublicDir()],
   build: {
     copyPublicDir: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-sentry': ['@sentry/react'],
+        },
+      },
+    },
   },
   optimizeDeps: {
     exclude: ['lucide-react'],

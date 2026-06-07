@@ -91,13 +91,22 @@ function HomePage() {
     return categories.find((c) => c.slug === categoryParam)?.name || null;
   }, [categoryParam, categories]);
 
-  if (loading && !displayContent.length) {
+  if (loading && !displayContent.length && !featuredContent.length) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-red-600 mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">Loading CelebUD...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+        <Header />
+        <main className="pt-44">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="animate-pulse space-y-6">
+              <div className="h-72 bg-gray-200 rounded-xl" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="h-48 bg-gray-200 rounded-lg" />
+                <div className="h-48 bg-gray-200 rounded-lg" />
+                <div className="h-48 bg-gray-200 rounded-lg" />
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
