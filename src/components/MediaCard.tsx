@@ -44,6 +44,9 @@ export const MediaCard = memo(function MediaCard({ content }: MediaCardProps) {
           src={content.thumbnail_url || fallbackImage}
           alt={content.title}
           loading="lazy"
+          decoding="async"
+          width={400}
+          height={224}
           onError={handleImageError}
           className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
         />

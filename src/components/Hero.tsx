@@ -26,6 +26,10 @@ export function Hero({ featuredContent }: HeroProps) {
             src={mainFeatured.thumbnail_url || fallbackImage}
             alt={mainFeatured.title}
             loading="eager"
+            fetchPriority="high"
+            width={800}
+            height={500}
+            decoding="async"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
               target.src = fallbackImage;

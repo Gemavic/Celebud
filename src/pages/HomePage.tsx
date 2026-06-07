@@ -1,23 +1,23 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Hero } from '../components/Hero';
 import { CategoryFilter } from '../components/CategoryFilter';
 import { MediaCard } from '../components/MediaCard';
 import { TrendingSection } from '../components/TrendingSection';
-import { LiveNewsIndicator } from '../components/LiveNewsIndicator';
-import { EditorialSection } from '../components/EditorialSection';
-import { SubscriptionPlans } from '../components/SubscriptionPlans';
-import { NewsletterSignup } from '../components/NewsletterSignup';
 import { Pagination } from '../components/Pagination';
 import { AdBanner } from '../components/AdBanner';
 import { GoogleAd } from '../components/GoogleAd';
-import { LiveEvents } from '../components/LiveEvents';
-import { CreatorRevShare } from '../components/CreatorRevShare';
-import { ContentLicensing } from '../components/ContentLicensing';
 import { Loader2 } from 'lucide-react';
-import { useFeaturedArticles, useTrendingArticles, useArticles } from '../hooks/useArticles';
-import { useCategories, useSearchArticles } from '../hooks/useCategories';
+import { useHomepageData } from '../hooks/useHomepageData';
+
+const EditorialSection = lazy(() => import('../components/EditorialSection').then(m => ({ default: m.EditorialSection })));
+const LiveNewsIndicator = lazy(() => import('../components/LiveNewsIndicator').then(m => ({ default: m.LiveNewsIndicator })));
+const LiveEvents = lazy(() => import('../components/LiveEvents').then(m => ({ default: m.LiveEvents })));
+const NewsletterSignup = lazy(() => import('../components/NewsletterSignup').then(m => ({ default: m.NewsletterSignup })));
+const SubscriptionPlans = lazy(() => import('../components/SubscriptionPlans').then(m => ({ default: m.SubscriptionPlans })));
+const CreatorRevShare = lazy(() => import('../components/CreatorRevShare').then(m => ({ default: m.CreatorRevShare })));
+const ContentLicensing = lazy(() => import('../components/ContentLicensing').then(m => ({ default: m.ContentLicensing })));
 
 function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -29,36 +29,22 @@ function HomePage() {
   const currentPage = pageParam > 0 ? pageParam : 1;
   const articlesPerPage = 12;
 
-  const { data: categories = [], isLoading: categoriesLoading } = useCategories();
-  const { data: featuredContent = [], isLoading: featuredLoading } = useFeaturedArticles(3);
-  const { data: trendingContent = [], isLoading: trendingLoading } = useTrendingArticles(6);
-
-  const {
-    data: articlesData,
-    isLoading: articlesLoading,
-  } = useArticles({
+  const { data, isLoading } = useHomepageData({
     category: categoryParam || undefined,
     page: currentPage,
     pageSize: articlesPerPage,
+    search: searchParam || undefined,
   });
 
-  const { data: searchResults = [], isLoading: searchLoading } = useSearchArticles(searchParam || '');
-
-  const loading = categoriesLoading || featuredLoading || trendingLoading || articlesLoading;
+  const categories = data?.categories || [];
+  const featuredContent = data?.featured || [];
+  const trendingContent = data?.trending || [];
+  const articles = data?.articles || [];
+  const totalCount = data?.articlesCount || 0;
 
   const displayContent = useMemo(() => {
-    if (searchParam) {
-      return searchResults;
-    }
-    return articlesData?.articles || [];
-  }, [searchParam, searchResults, articlesData]);
-
-  const totalCount = useMemo(() => {
-    if (searchParam) {
-      return searchResults.length;
-    }
-    return articlesData?.totalCount || 0;
-  }, [searchParam, searchResults, articlesData]);
+    return articles;
+  }, [articles]);
 
   const totalPages = useMemo(
     () => Math.ceil(totalCount / articlesPerPage),
@@ -88,10 +74,10 @@ function HomePage() {
 
   const selectedCategoryName = useMemo(() => {
     if (!categoryParam) return null;
-    return categories.find((c) => c.slug === categoryParam)?.name || null;
+    return categories.find((c: any) => c.slug === categoryParam)?.name || null;
   }, [categoryParam, categories]);
 
-  if (loading && !displayContent.length && !featuredContent.length) {
+  if (isLoading && !displayContent.length && !featuredContent.length) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
         <Header />
@@ -114,7 +100,9 @@ function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
       <Header />
-      <LiveNewsIndicator />
+      <Suspense fallback={null}>
+        <LiveNewsIndicator />
+      </Suspense>
 
       <main className="pt-44" role="main">
         <Hero featuredContent={featuredContent} />
@@ -135,7 +123,9 @@ function HomePage() {
           <AdBanner placement="sidebar" className="max-w-md mx-auto" />
         </div>
 
-        <EditorialSection />
+        <Suspense fallback={<div className="h-32" />}>
+          <EditorialSection />
+        </Suspense>
 
         <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16" aria-label="Latest articles">
           <div className="flex items-center justify-between mb-6">
@@ -153,14 +143,14 @@ function HomePage() {
             </div>
           </div>
 
-          {(articlesLoading || searchLoading) ? (
+          {isLoading ? (
             <div className="flex justify-center py-16">
               <Loader2 className="w-8 h-8 animate-spin text-red-600" />
             </div>
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                {displayContent.map((content) => (
+                {displayContent.map((content: any) => (
                   <MediaCard key={content.id} content={content} />
                 ))}
               </div>
@@ -190,17 +180,27 @@ function HomePage() {
           <GoogleAd slot="HOME_FEED_AD_SLOT" format="horizontal" />
         </div>
 
-        <LiveEvents />
+        <Suspense fallback={null}>
+          <LiveEvents />
+        </Suspense>
 
-        <CreatorRevShare />
+        <Suspense fallback={null}>
+          <CreatorRevShare />
+        </Suspense>
 
         <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
-          <NewsletterSignup />
+          <Suspense fallback={null}>
+            <NewsletterSignup />
+          </Suspense>
         </div>
 
-        <SubscriptionPlans />
+        <Suspense fallback={null}>
+          <SubscriptionPlans />
+        </Suspense>
 
-        <ContentLicensing />
+        <Suspense fallback={null}>
+          <ContentLicensing />
+        </Suspense>
       </main>
 
       <footer className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white py-12 px-4 sm:px-6 lg:px-8">
@@ -266,7 +266,7 @@ function HomePage() {
             <div>
               <h4 className="font-bold mb-4">Categories</h4>
               <ul className="space-y-2 text-gray-400">
-                {categories.slice(0, 4).map((category) => (
+                {categories.slice(0, 4).map((category: any) => (
                   <li key={category.id}>
                     <a href="#" className="hover:text-white transition-colors">
                       {category.name}
