@@ -25,14 +25,12 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 30 * 60 * 1000,
       gcTime: 60 * 60 * 1000,
-      retry: 1,
+      retry: 2,
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
-      networkMode: 'online',
     },
     mutations: {
       retry: 2,
-      networkMode: 'online',
       onError: (error) => {
         console.error('Mutation error:', error);
         Sentry.captureException(error);
