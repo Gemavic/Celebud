@@ -47,8 +47,67 @@ export function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
       <div className="bg-gray-800 py-2">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-end">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <SocialLinks />
+          <div className="flex items-center space-x-2">
+            {user ? (
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center space-x-2 px-3 py-1.5 bg-white text-gray-800 rounded hover:bg-gray-100 transition-colors"
+                >
+                  <User className="w-4 h-4" />
+                  <span className="text-sm font-semibold">{profile?.username || 'User'}</span>
+                </button>
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-2 z-[60]">
+                    {profile?.is_admin && (
+                      <>
+                        <Link
+                          to="/editorial"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100"
+                        >
+                          <PenSquare className="w-4 h-4 mr-2" />
+                          Write Article
+                        </Link>
+                        <Link
+                          to="/admin/articles"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100"
+                        >
+                          <FolderOpen className="w-4 h-4 mr-2" />
+                          Manage Articles
+                        </Link>
+                      </>
+                    )}
+                    <button
+                      onClick={handleSignOut}
+                      className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100"
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={() => openAuthModal('signin')}
+                  className="px-3 py-1.5 text-white border border-white/60 hover:bg-white/10 rounded text-sm font-semibold transition-colors"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => openAuthModal('signup')}
+                  className="px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-semibold transition-colors"
+                >
+                  Sign Up
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -108,66 +167,6 @@ export function Header() {
               className="bg-transparent outline-none text-sm text-gray-700 placeholder-gray-500 w-48"
             />
           </form>
-
-          <div className="flex items-center ml-4 space-x-2">
-            {user ? (
-              <div className="relative">
-                <button
-                  onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  <User className="w-4 h-4" />
-                  <span className="text-sm font-medium hidden sm:inline">{profile?.username || 'User'}</span>
-                </button>
-                {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-2 z-10">
-                    {profile?.is_admin && (
-                      <>
-                        <Link
-                          to="/editorial"
-                          onClick={() => setShowUserMenu(false)}
-                          className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100"
-                        >
-                          <PenSquare className="w-4 h-4 mr-2" />
-                          Write Article
-                        </Link>
-                        <Link
-                          to="/admin/articles"
-                          onClick={() => setShowUserMenu(false)}
-                          className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100"
-                        >
-                          <FolderOpen className="w-4 h-4 mr-2" />
-                          Manage Articles
-                        </Link>
-                      </>
-                    )}
-                    <button
-                      onClick={handleSignOut}
-                      className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100"
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Sign Out
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <>
-                <button
-                  onClick={() => openAuthModal('signin')}
-                  className="px-4 py-2 text-red-600 border border-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm font-bold"
-                >
-                  Sign In
-                </button>
-                <button
-                  onClick={() => openAuthModal('signup')}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-bold"
-                >
-                  Sign Up
-                </button>
-              </>
-            )}
-          </div>
 
           <button
             className="lg:hidden p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
