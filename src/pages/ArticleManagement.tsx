@@ -165,6 +165,7 @@ export function ArticleManagement() {
           is_trending: editForm.is_trending,
           seo_title: editForm.seo_title || null,
           seo_keywords: editForm.seo_keywords || null,
+          is_manual: true,
         })
         .eq('id', editingArticle.id);
 

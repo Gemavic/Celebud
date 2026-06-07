@@ -953,13 +953,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Archive articles older than 7 days (move to archive, then remove from live)
+    // Archive RSS-fetched articles older than 7 days
+    // NEVER touch manually posted articles (is_manual = true OR source_id IS NULL)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const { data: staleArticles } = await supabase
       .from('media_content')
       .select('*')
-      .lt('published_at', sevenDaysAgo);
+      .lt('published_at', sevenDaysAgo)
+      .eq('is_manual', false)
+      .not('source_id', 'is', null);
 
     if (staleArticles && staleArticles.length > 0) {
       const archiveRows = staleArticles.map((a: any) => ({
@@ -992,7 +995,9 @@ Deno.serve(async (req: Request) => {
       }));
 
       await supabase.from('media_content_archive').upsert(archiveRows, { onConflict: 'id' });
-      await supabase.from('media_content').delete().lt('published_at', sevenDaysAgo);
+
+      const staleIds = staleArticles.map((a: any) => a.id);
+      await supabase.from('media_content').delete().in('id', staleIds);
     }
 
     // Priority order: Nigeria 15%, Canada 15%, USA 15%, UK 10%, Sports 10%, remaining 35% to Global/others
