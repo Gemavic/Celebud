@@ -174,7 +174,8 @@ export default function EditorialPage() {
       const slug = createFormData.title
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
+        .replace(/(^-|-$)/g, '')
+        .slice(0, 180);
 
       const { error: insertError } = await supabase
         .from('media_content')
