@@ -109,15 +109,15 @@ export function Header() {
             />
           </form>
 
-          <div className="hidden md:flex items-center ml-4 space-x-2">
+          <div className="flex items-center ml-4 space-x-2">
             {user ? (
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 >
                   <User className="w-4 h-4" />
-                  <span className="text-sm font-medium">{profile?.username || 'User'}</span>
+                  <span className="text-sm font-medium hidden sm:inline">{profile?.username || 'User'}</span>
                 </button>
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-2 z-10">
@@ -155,13 +155,13 @@ export function Header() {
               <>
                 <button
                   onClick={() => openAuthModal('signin')}
-                  className="px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm font-medium"
+                  className="px-4 py-2 text-red-600 border border-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm font-bold"
                 >
                   Sign In
                 </button>
                 <button
                   onClick={() => openAuthModal('signup')}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-bold"
                 >
                   Sign Up
                 </button>
