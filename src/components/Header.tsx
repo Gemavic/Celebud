@@ -143,14 +143,14 @@ export function Header() {
             <Link to="/?category=entertainment" className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 transition-colors uppercase text-sm">
               ENTERTAINMENT
             </Link>
-            <Link to="/?category=interview" className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 transition-colors uppercase text-sm">
-              INTERVIEW
+            <Link to="/?category=fin-advisor" className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 transition-colors uppercase text-sm">
+              FIN-ADVISOR
             </Link>
             <Link to="/?category=business" className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 transition-colors uppercase text-sm">
               BUSINESS
             </Link>
-            <Link to="/?category=fin-advisor" className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 transition-colors uppercase text-sm">
-              FIN-ADVISOR
+            <Link to="/?category=lifestyle" className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 transition-colors uppercase text-sm">
+              LIFESTYLE
             </Link>
             <Link to="/?category=videos" className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 transition-colors uppercase text-sm">
               VIDEOS
@@ -195,14 +195,14 @@ export function Header() {
             <Link to="/?category=entertainment" onClick={() => setIsMenuOpen(false)} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">
               ENTERTAINMENT
             </Link>
-            <Link to="/?category=interview" onClick={() => setIsMenuOpen(false)} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">
-              INTERVIEW
+            <Link to="/?category=fin-advisor" onClick={() => setIsMenuOpen(false)} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">
+              FIN-ADVISOR
             </Link>
             <Link to="/?category=business" onClick={() => setIsMenuOpen(false)} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">
               BUSINESS
             </Link>
-            <Link to="/?category=fin-advisor" onClick={() => setIsMenuOpen(false)} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">
-              FIN-ADVISOR
+            <Link to="/?category=lifestyle" onClick={() => setIsMenuOpen(false)} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">
+              LIFESTYLE
             </Link>
             <Link to="/?category=videos" onClick={() => setIsMenuOpen(false)} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">
               VIDEOS
