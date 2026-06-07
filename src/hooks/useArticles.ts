@@ -29,8 +29,12 @@ export function useArticles(options: UseArticlesOptions = {}) {
             : '*, categories(*), authors(*)',
           { count: 'exact' }
         )
-        .gte('published_at', sevenDaysAgo)
         .order('published_at', { ascending: false });
+
+      // Only apply date filter when browsing all articles (no category selected)
+      if (!category) {
+        query = query.gte('published_at', sevenDaysAgo);
+      }
 
       if (category) {
         query = query.eq('categories.slug', category);
@@ -61,13 +65,13 @@ export function useFeaturedArticles(limit = 5) {
   return useQuery({
     queryKey: ['articles', 'featured', limit],
     queryFn: async () => {
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
       const { data, error } = await supabase
         .from('media_content')
         .select('*, categories(*), authors(*)')
         .eq('is_featured', true)
-        .gte('published_at', sevenDaysAgo)
+        .gte('published_at', thirtyDaysAgo)
         .order('published_at', { ascending: false })
         .limit(limit);
 
@@ -85,13 +89,13 @@ export function useTrendingArticles(limit = 5) {
   return useQuery({
     queryKey: ['articles', 'trending', limit],
     queryFn: async () => {
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
       const { data, error } = await supabase
         .from('media_content')
         .select('*, categories(*), authors(*)')
         .eq('is_trending', true)
-        .gte('published_at', sevenDaysAgo)
+        .gte('published_at', thirtyDaysAgo)
         .order('views_count', { ascending: false })
         .limit(limit);
 

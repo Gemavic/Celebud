@@ -39,6 +39,7 @@ Deno.serve(async (req: Request) => {
     });
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const startIndex = (page - 1) * pageSize;
     const endIndex = startIndex + pageSize - 1;
 
@@ -53,7 +54,7 @@ Deno.serve(async (req: Request) => {
           .from("media_content")
           .select("*, categories(*), authors(*)")
           .eq("is_featured", true)
-          .gte("published_at", sevenDaysAgo)
+          .gte("published_at", thirtyDaysAgo)
           .order("published_at", { ascending: false })
           .limit(3),
 
@@ -62,7 +63,7 @@ Deno.serve(async (req: Request) => {
           .from("media_content")
           .select("*, categories(*), authors(*)")
           .eq("is_trending", true)
-          .gte("published_at", sevenDaysAgo)
+          .gte("published_at", thirtyDaysAgo)
           .order("views_count", { ascending: false })
           .limit(6),
 
@@ -85,8 +86,11 @@ Deno.serve(async (req: Request) => {
                     : "*, categories(*), authors(*)",
                   { count: "exact" }
                 )
-                .gte("published_at", sevenDaysAgo)
                 .order("published_at", { ascending: false });
+              // Only apply date filter when no category is selected
+              if (!category) {
+                q = q.gte("published_at", sevenDaysAgo);
+              }
               if (category) {
                 q = q.eq("categories.slug", category);
               }
