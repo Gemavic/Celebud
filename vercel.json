@@ -5,8 +5,25 @@
       "destination": "https://mmqpdaavpcvbsqgpvlsu.supabase.co/functions/v1/generate-sitemap"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!ads\\.txt|robots\\.txt|sw\\.js|.*\\.jpeg|.*\\.jpg|.*\\.png).*)",
       "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/ads.txt",
+      "headers": [
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=86400" },
+        { "key": "X-Robots-Tag", "value": "noindex" }
+      ]
+    },
+    {
+      "source": "/robots.txt",
+      "headers": [
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=86400" }
+      ]
     }
   ]
 }
