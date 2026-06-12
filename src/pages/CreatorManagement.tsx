@@ -27,6 +27,13 @@ import {
   Filter,
   Calendar,
   ArrowLeft,
+  Mail,
+  Phone,
+  Instagram,
+  Youtube,
+  Twitter,
+  Facebook,
+  Globe,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -402,11 +409,62 @@ function CreatorsTab({
                         <h4 className="text-sm font-semibold text-gray-700 mb-1">Bio</h4>
                         <p className="text-sm text-gray-600">{creator.bio || 'No bio provided'}</p>
                       </div>
+
+                      {/* Contact Info */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {creator.email && (
+                          <a href={`mailto:${creator.email}`} className="flex items-center gap-2 p-2.5 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors group">
+                            <Mail className="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-500" />
+                            <span className="text-xs text-gray-700 truncate">{creator.email}</span>
+                          </a>
+                        )}
+                        {creator.phone_number && (
+                          <a href={`tel:${creator.phone_number}`} className="flex items-center gap-2 p-2.5 bg-white rounded-lg border border-gray-200 hover:border-green-300 transition-colors group">
+                            <Phone className="w-3.5 h-3.5 text-gray-400 group-hover:text-green-500" />
+                            <span className="text-xs text-gray-700">{creator.phone_number}</span>
+                          </a>
+                        )}
+                      </div>
+
+                      {/* Social Handles */}
+                      {(creator.instagram_handle || creator.twitter_handle || creator.tiktok_handle || creator.youtube_channel || creator.facebook_url) && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Social Media</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {creator.instagram_handle && (
+                              <span className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 border border-pink-200 text-pink-700 text-xs font-medium rounded-full">
+                                <Instagram className="w-3.5 h-3.5" /> @{creator.instagram_handle}
+                              </span>
+                            )}
+                            {creator.twitter_handle && (
+                              <span className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 border border-sky-200 text-sky-700 text-xs font-medium rounded-full">
+                                <Twitter className="w-3.5 h-3.5" /> @{creator.twitter_handle}
+                              </span>
+                            )}
+                            {creator.tiktok_handle && (
+                              <span className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 border border-gray-200 text-gray-700 text-xs font-medium rounded-full">
+                                <span className="font-black text-[10px]">TT</span> @{creator.tiktok_handle}
+                              </span>
+                            )}
+                            {creator.youtube_channel && (
+                              <span className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 text-red-700 text-xs font-medium rounded-full">
+                                <Youtube className="w-3.5 h-3.5" /> {creator.youtube_channel}
+                              </span>
+                            )}
+                            {creator.facebook_url && (
+                              <a href={creator.facebook_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium rounded-full hover:bg-blue-100 transition-colors">
+                                <Facebook className="w-3.5 h-3.5" /> Facebook
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       {creator.portfolio_url && (
                         <div>
                           <h4 className="text-sm font-semibold text-gray-700 mb-1">Portfolio</h4>
-                          <a href={creator.portfolio_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
-                            {creator.portfolio_url}
+                          <a href={creator.portfolio_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+                            <Globe className="w-3.5 h-3.5" /> {creator.portfolio_url}
                           </a>
                         </div>
                       )}

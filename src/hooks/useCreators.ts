@@ -6,9 +6,15 @@ export interface CreatorApplication {
   user_id: string;
   display_name: string;
   email: string | null;
+  phone_number: string | null;
   bio: string | null;
   portfolio_url: string | null;
   sample_topics: string[] | null;
+  instagram_handle: string | null;
+  tiktok_handle: string | null;
+  twitter_handle: string | null;
+  youtube_channel: string | null;
+  facebook_url: string | null;
   status: 'pending' | 'approved' | 'rejected' | 'onboarded';
   revenue_share_pct: number;
   total_earnings: number;
