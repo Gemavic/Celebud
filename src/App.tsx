@@ -9,6 +9,7 @@ const EditorialPage = lazy(() => import('./pages/EditorialPage'));
 const AdRevenueReport = lazy(() => import('./components/AdRevenueReport').then(module => ({ default: module.AdRevenueReport })));
 const ArticleManagement = lazy(() => import('./pages/ArticleManagement').then(module => ({ default: module.ArticleManagement })));
 const MetricsDashboard = lazy(() => import('./pages/MetricsDashboard').then(module => ({ default: module.MetricsDashboard })));
+const CreatorManagement = lazy(() => import('./pages/CreatorManagement').then(module => ({ default: module.CreatorManagement })));
 
 function LoadingFallback() {
   return (
@@ -34,6 +35,7 @@ function App() {
             <Route path="/admin/ad-revenue" element={<AdRevenueReport />} />
             <Route path="/admin/articles" element={<ArticleManagement />} />
             <Route path="/admin/metrics" element={<MetricsDashboard />} />
+            <Route path="/admin/creators" element={<CreatorManagement />} />
           </Routes>
         </Suspense>
       </Router>

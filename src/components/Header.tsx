@@ -1,4 +1,4 @@
-import { Search, Menu, X, Star, User, LogOut, SquarePen as PenSquare, FolderOpen } from 'lucide-react';
+import { Search, Menu, X, Star, User, LogOut, SquarePen as PenSquare, FolderOpen, Users } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { SocialLinks } from './SocialLinks';
@@ -78,6 +78,14 @@ export function Header() {
                         >
                           <FolderOpen className="w-4 h-4 mr-2" />
                           Manage Articles
+                        </Link>
+                        <Link
+                          to="/admin/creators"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100"
+                        >
+                          <Users className="w-4 h-4 mr-2" />
+                          Manage Creators
                         </Link>
                       </>
                     )}
@@ -243,6 +251,14 @@ export function Header() {
                       >
                         <FolderOpen className="w-4 h-4 mr-2" />
                         Manage Articles
+                      </Link>
+                      <Link
+                        to="/admin/creators"
+                        onClick={() => setIsMenuOpen(false)}
+                        className="flex items-center bg-white text-gray-900 hover:bg-gray-100 font-bold py-3 px-4 rounded-lg"
+                      >
+                        <Users className="w-4 h-4 mr-2" />
+                        Manage Creators
                       </Link>
                     </>
                   )}
