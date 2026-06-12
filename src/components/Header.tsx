@@ -1,4 +1,4 @@
-import { Search, Menu, X, Star, User, LogOut, SquarePen as PenSquare, FolderOpen, Users, Video } from 'lucide-react';
+import { Search, Menu, X, Star, User, LogOut, SquarePen as PenSquare, FolderOpen, Users, Video, LayoutDashboard } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { SocialLinks } from './SocialLinks';
@@ -63,6 +63,15 @@ export function Header() {
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-2 z-[60]">
                     {profile?.is_admin && (
                       <>
+                        <Link
+                          to="/admin"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center px-4 py-2 text-red-600 hover:bg-red-50 font-semibold"
+                        >
+                          <LayoutDashboard className="w-4 h-4 mr-2" />
+                          Admin Portal
+                        </Link>
+                        <div className="border-t border-gray-100 my-1" />
                         <Link
                           to="/editorial"
                           onClick={() => setShowUserMenu(false)}
@@ -244,6 +253,14 @@ export function Header() {
                   </div>
                   {profile?.is_admin && (
                     <>
+                      <Link
+                        to="/admin"
+                        onClick={() => setIsMenuOpen(false)}
+                        className="flex items-center bg-red-700 text-white hover:bg-red-800 font-bold py-3 px-4 rounded-lg"
+                      >
+                        <LayoutDashboard className="w-4 h-4 mr-2" />
+                        Admin Portal
+                      </Link>
                       <Link
                         to="/editorial"
                         onClick={() => setIsMenuOpen(false)}

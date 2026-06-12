@@ -11,6 +11,7 @@ const ArticleManagement = lazy(() => import('./pages/ArticleManagement').then(mo
 const MetricsDashboard = lazy(() => import('./pages/MetricsDashboard').then(module => ({ default: module.MetricsDashboard })));
 const CreatorManagement = lazy(() => import('./pages/CreatorManagement').then(module => ({ default: module.CreatorManagement })));
 const ContentStudio = lazy(() => import('./pages/ContentStudio').then(module => ({ default: module.ContentStudio })));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
 
 function LoadingFallback() {
   return (
@@ -33,6 +34,7 @@ function App() {
             <Route path="/article/:id" element={<ArticleDetail />} />
             <Route path="/editorial" element={<EditorialPage />} />
             <Route path="/editorial/*" element={<EditorialPage />} />
+            <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/ad-revenue" element={<AdRevenueReport />} />
             <Route path="/admin/articles" element={<ArticleManagement />} />
             <Route path="/admin/metrics" element={<MetricsDashboard />} />

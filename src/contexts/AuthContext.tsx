@@ -82,8 +82,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         console.error('Error loading profile:', error);
         setProfile(null);
+      } else if (data) {
+        if (!data.is_admin) {
+          const { data: adminCheck } = await supabase
+            .from('admin_users')
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+          setProfile({ ...data, is_admin: !!adminCheck });
+        } else {
+          setProfile(data);
+        }
       } else {
-        setProfile(data);
+        setProfile(null);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
