@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import AuthModal from './AuthModal';
 import { PenTool, DollarSign, BarChart3, Send, CheckCircle2 } from 'lucide-react';
 
 export function CreatorRevShare() {
@@ -10,6 +11,8 @@ export function CreatorRevShare() {
   const [bio, setBio] = useState('');
   const [portfolioUrl, setPortfolioUrl] = useState('');
   const [topics, setTopics] = useState('');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signup');
 
   async function handleApply(e: React.FormEvent) {
     e.preventDefault();
@@ -139,12 +142,38 @@ export function CreatorRevShare() {
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <PenTool className="w-10 h-10 text-gray-500 mb-3" />
                 <h3 className="text-lg font-semibold text-white mb-2">Sign in to Apply</h3>
-                <p className="text-gray-400 text-sm">Create an account or sign in to join the creator program.</p>
+                <p className="text-gray-400 text-sm mb-6">Create an account or sign in to join the creator program.</p>
+                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
+                  <button
+                    onClick={() => {
+                      setAuthMode('signup');
+                      setIsAuthModalOpen(true);
+                    }}
+                    className="flex-1 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors text-sm"
+                  >
+                    Sign Up
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAuthMode('signin');
+                      setIsAuthModalOpen(true);
+                    }}
+                    className="flex-1 py-3 bg-white/10 border border-white/20 text-white font-semibold rounded-lg hover:bg-white/20 transition-colors text-sm"
+                  >
+                    Sign In
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        mode={authMode}
+      />
     </section>
   );
 }
