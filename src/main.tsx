@@ -11,12 +11,14 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 30 * 60 * 1000,
       gcTime: 60 * 60 * 1000,
-      retry: 2,
+      retry: 1,
+      retryDelay: (attemptIndex) => Math.min(1000 * (attemptIndex + 1), 3000),
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
+      networkMode: 'offlineFirst',
     },
     mutations: {
-      retry: 2,
+      retry: 1,
       onError: (error) => {
         console.error('Mutation error:', error);
       },

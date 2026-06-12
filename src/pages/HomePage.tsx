@@ -29,7 +29,7 @@ function HomePage() {
   const currentPage = pageParam > 0 ? pageParam : 1;
   const articlesPerPage = 12;
 
-  const { data, isLoading } = useHomepageData({
+  const { data, isLoading, isError } = useHomepageData({
     category: categoryParam || undefined,
     page: currentPage,
     pageSize: articlesPerPage,
@@ -91,6 +91,25 @@ function HomePage() {
                 <div className="h-48 bg-gray-200 rounded-lg" />
               </div>
             </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (isError && !displayContent.length) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+        <Header />
+        <main className="pt-44">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
+            <p className="text-gray-600 text-lg mb-4">Unable to load content right now.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Retry
+            </button>
           </div>
         </main>
       </div>
