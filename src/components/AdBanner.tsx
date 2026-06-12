@@ -91,6 +91,15 @@ export function AdBanner({ placement, className = '' }: AdBannerProps) {
           });
         }
 
+        await supabase.from('ad_clicks').insert({
+          article_id: null,
+          ad_position: placement,
+          ad_type: ad.ad_type || 'banner',
+          referrer: document.referrer || null,
+          user_agent: navigator.userAgent,
+          page_url: window.location.pathname,
+        });
+
         window.open(ad.link_url, '_blank', 'noopener,noreferrer');
       } catch (error) {
         console.error('Error tracking click:', error);

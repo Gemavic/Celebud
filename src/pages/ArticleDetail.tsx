@@ -43,7 +43,11 @@ export function ArticleDetail() {
     if (!id) return;
 
     const incrementViews = async () => {
-      await supabase.rpc('increment_article_views', { article_id: id });
+      await supabase.rpc('increment_article_views_with_meta' as any, {
+        p_article_id: id,
+        p_referrer: document.referrer || null,
+        p_user_agent: navigator.userAgent || null,
+      });
     };
 
     incrementViews();

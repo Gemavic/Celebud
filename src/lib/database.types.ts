@@ -151,6 +151,70 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['subscription_tiers']['Row'], 'id' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['subscription_tiers']['Insert']>;
       };
+      view_events: {
+        Row: {
+          id: string;
+          article_id: string;
+          viewed_at: string;
+          referrer: string | null;
+          user_agent: string | null;
+          country: string | null;
+        };
+        Insert: Omit<Database['public']['Tables']['view_events']['Row'], 'id' | 'viewed_at'>;
+        Update: Partial<Database['public']['Tables']['view_events']['Insert']>;
+      };
+      ad_clicks: {
+        Row: {
+          id: string;
+          article_id: string | null;
+          ad_position: string;
+          ad_type: string;
+          clicked_at: string;
+          referrer: string | null;
+          user_agent: string | null;
+          page_url: string | null;
+        };
+        Insert: Omit<Database['public']['Tables']['ad_clicks']['Row'], 'id' | 'clicked_at'>;
+        Update: Partial<Database['public']['Tables']['ad_clicks']['Insert']>;
+      };
+    };
+    Functions: {
+      get_total_views: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      get_daily_views: {
+        Args: { days_back?: number };
+        Returns: { date: string; count: number }[];
+      };
+      get_category_views_breakdown: {
+        Args: Record<string, never>;
+        Returns: { name: string; color: string; views: number; articles: number }[];
+      };
+      increment_article_views: {
+        Args: { article_id: string };
+        Returns: void;
+      };
+      increment_article_views_with_meta: {
+        Args: { p_article_id: string; p_referrer?: string | null; p_user_agent?: string | null };
+        Returns: void;
+      };
+      get_ad_click_stats: {
+        Args: { days_back?: number };
+        Returns: { total_clicks: number; clicks_today: number; clicks_this_week: number; top_position: string; top_position_clicks: number }[];
+      };
+      get_recent_activity: {
+        Args: { activity_limit?: number };
+        Returns: { activity_type: string; article_id: string; article_title: string; occurred_at: string; extra_info: string }[];
+      };
+      get_hourly_views: {
+        Args: { days_back?: number };
+        Returns: { hour_of_day: number; view_count: number }[];
+      };
+      get_top_referrers: {
+        Args: { ref_limit?: number };
+        Returns: { referrer_source: string; visit_count: number }[];
+      };
     };
   };
 }
