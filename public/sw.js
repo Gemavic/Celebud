@@ -1,6 +1,6 @@
-const CACHE_NAME = 'celebud-v3';
-const RUNTIME_CACHE = 'celebud-runtime-v3';
-const IMAGE_CACHE = 'celebud-images-v3';
+const CACHE_NAME = 'celebud-v4';
+const RUNTIME_CACHE = 'celebud-runtime-v4';
+const IMAGE_CACHE = 'celebud-images-v4';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -18,6 +18,12 @@ self.addEventListener('install', (event) => {
     })
   );
   self.skipWaiting();
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', (event) => {
