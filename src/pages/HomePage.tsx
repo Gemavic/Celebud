@@ -1,5 +1,5 @@
 import { useMemo, useCallback, lazy, Suspense } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Hero } from '../components/Hero';
 import { CategoryFilter } from '../components/CategoryFilter';
@@ -275,9 +275,9 @@ function HomePage() {
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white transition-colors">
+                  <Link to="/privacy" className="hover:text-white transition-colors">
                     Privacy Policy
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </div>
@@ -297,7 +297,12 @@ function HomePage() {
           </div>
 
           <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400 text-sm">
-            <p>&copy; 2024 CelebUD. All rights reserved.</p>
+            <div className="flex items-center justify-center gap-4 flex-wrap mb-3">
+              <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+              <span className="text-gray-600">|</span>
+              <a href="mailto:privacy@celebud.com" className="hover:text-white transition-colors">Contact</a>
+            </div>
+            <p>&copy; {new Date().getFullYear()} CelebUD. All rights reserved.</p>
           </div>
         </div>
       </footer>
