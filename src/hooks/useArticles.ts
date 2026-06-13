@@ -120,5 +120,7 @@ export function useArticle(id: string) {
     },
     enabled: !!id,
     staleTime: 60 * 60 * 1000,
+    retry: 2,
+    retryDelay: 1500,
   });
 }

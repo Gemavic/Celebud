@@ -15,7 +15,7 @@ import { useArticle } from '../hooks/useArticles';
 
 export function ArticleDetail() {
   const { id } = useParams<{ id: string }>();
-  const { data: article, isLoading: loading } = useArticle(id || '');
+  const { data: article, isLoading: loading, isError, refetch } = useArticle(id || '');
   const [relatedArticles, setRelatedArticles] = useState<MediaContentWithRelations[]>([]);
 
   useEffect(() => {
@@ -133,6 +133,30 @@ export function ArticleDetail() {
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-red-600 mx-auto mb-4" />
           <p className="text-gray-600 font-medium">Loading article...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        <Header />
+        <div className="pt-32 px-4 text-center max-w-md mx-auto">
+          <div className="text-5xl mb-4">!</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Could not load article</h1>
+          <p className="text-gray-500 mb-6">There was a problem connecting to the server. Please check your connection and try again.</p>
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() => refetch()}
+              className="inline-flex items-center px-5 py-2.5 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition-colors"
+            >
+              Try Again
+            </button>
+            <Link to="/" className="inline-flex items-center text-gray-600 hover:text-gray-900 font-medium">
+              <ArrowLeft className="w-4 h-4 mr-1" /> Home
+            </Link>
+          </div>
         </div>
       </div>
     );
