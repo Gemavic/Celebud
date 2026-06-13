@@ -5,7 +5,7 @@ import { ArrowLeft, Shield } from 'lucide-react';
 const EFFECTIVE_DATE = 'June 13, 2026';
 const SITE_NAME = 'CelebUD';
 const SITE_URL = 'https://www.celebud.com';
-const CONTACT_EMAIL = 'privacy@celebud.com';
+const CONTACT_EMAIL = 'mattocanada1@gmail.com';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
