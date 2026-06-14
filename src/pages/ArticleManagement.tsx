@@ -172,9 +172,11 @@ export function ArticleManagement() {
       if (error) throw error;
       setEditingArticle(null);
       fetchArticles();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error saving article:', err);
-      alert('Failed to save article. Please try again.');
+      const msg = err instanceof Error ? err.message
+        : (err as { message?: string })?.message ?? JSON.stringify(err);
+      alert(`Failed to save article: ${msg}`);
     } finally {
       setSaving(false);
     }
