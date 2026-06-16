@@ -43,7 +43,6 @@ export function AdminDashboard() {
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
   const [articlesLoading, setArticlesLoading] = useState(true);
-  const [myAuthorId, setMyAuthorId] = useState('');
 
   const stats = {
     totalCreators: creators.length,
@@ -63,10 +62,10 @@ export function AdminDashboard() {
   const loadAssignmentData = async () => {
     setArticlesLoading(true);
     try {
-      // Load authors with counts
+      // Load authors (only safe columns — no user_id to avoid schema cache issues)
       const { data: authorsRaw } = await supabase
         .from('authors')
-        .select('id, name, user_id')
+        .select('id, name')
         .order('name');
 
       const { data: countData } = await supabase
@@ -85,11 +84,6 @@ export function AdminDashboard() {
         article_count: countMap[a.id] || 0,
       }));
       setAuthors(authorList);
-
-      if (user) {
-        const mine = (authorsRaw || []).find((a: any) => a.user_id === user.id);
-        if (mine) setMyAuthorId(mine.id);
-      }
 
       // Load 8 most recent articles for quick assignment
       const { data: articles } = await supabase
@@ -232,63 +226,65 @@ export function AdminDashboard() {
               ) : (
                 <div className="space-y-2">
                   {recentArticles.map(article => {
-                    const currentAuthorName = authorName(article.author_id);
+                    const currentAuthor = authors.find(a => a.id === article.author_id);
                     const isSuccess = assignSuccess === article.id;
                     const isAssigning = assigningId === article.id;
 
                     return (
                       <div
                         key={article.id}
-                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                          isSuccess
-                            ? 'bg-green-50 border-green-200'
-                            : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                        className={`p-3 rounded-xl border transition-all ${
+                          isSuccess ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'
                         }`}
                       >
-                        {/* Category tag */}
-                        <span className="hidden sm:block flex-shrink-0 text-xs px-2 py-1 bg-gray-200 text-gray-600 rounded-md w-24 text-center truncate">
-                          {article.categories?.name || 'General'}
-                        </span>
-
-                        {/* Title */}
-                        <p className="flex-1 text-sm text-gray-800 line-clamp-1 font-medium min-w-0">
-                          {article.title}
-                        </p>
-
-                        {/* Current author badge */}
-                        {isSuccess ? (
-                          <span className="flex items-center gap-1 text-xs font-semibold text-green-700 flex-shrink-0">
-                            <CheckCircle className="w-4 h-4" /> Saved
+                        {/* Top row: category + title */}
+                        <div className="flex items-start gap-2 mb-2">
+                          <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-medium">
+                            {article.categories?.name || 'General'}
                           </span>
-                        ) : (
-                          <span className={`hidden md:block flex-shrink-0 text-xs font-medium px-2 py-1 rounded-full ${authorColor(currentAuthorName)}`}>
-                            {currentAuthorName.split(' ')[0]}
-                          </span>
-                        )}
+                          <p className="text-sm text-gray-900 font-medium line-clamp-1 flex-1">
+                            {article.title}
+                          </p>
+                          {isSuccess && (
+                            <span className="flex items-center gap-1 text-xs font-bold text-green-700 flex-shrink-0">
+                              <CheckCircle className="w-4 h-4" /> Saved!
+                            </span>
+                          )}
+                        </div>
 
-                        {/* Assign dropdown */}
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {/* Bottom row: current author + assign buttons */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-gray-500 font-medium">
+                            Now: <span className="font-bold text-gray-800">{currentAuthor?.name ?? 'Unassigned'}</span>
+                          </span>
+                          <span className="text-gray-300 text-xs">→</span>
+                          <span className="text-xs text-gray-500">Assign to:</span>
                           {isAssigning ? (
-                            <RefreshCw className="w-4 h-4 animate-spin text-gray-400" />
+                            <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
                           ) : (
-                            <>
-                              <span className="text-xs text-gray-400 hidden lg:block">Assign to:</span>
-                              {authors.map(author => (
+                            authors.map(author => {
+                              const isCurrent = article.author_id === author.id;
+                              const firstName = author.name.split(' ')[0];
+                              const colClass = author.name.includes('Matthew')
+                                ? isCurrent ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white'
+                                : author.name.includes('Gbenga')
+                                ? isCurrent ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-600 hover:text-white'
+                                : author.name.includes('Victoria')
+                                ? isCurrent ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-700 hover:bg-orange-500 hover:text-white'
+                                : isCurrent ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-600 hover:text-white';
+                              return (
                                 <button
                                   key={author.id}
-                                  onClick={() => assignArticle(article.id, author.id)}
-                                  disabled={article.author_id === author.id}
-                                  title={`Assign to ${author.name}`}
-                                  className={`w-7 h-7 rounded-full text-xs font-bold transition-all flex items-center justify-center ${
-                                    article.author_id === author.id
-                                      ? `${authorColor(author.name)} ring-2 ring-offset-1 ring-gray-400`
-                                      : `${authorColor(author.name)} opacity-50 hover:opacity-100 hover:ring-2 hover:ring-offset-1 hover:ring-gray-300`
-                                  }`}
+                                  onClick={() => !isCurrent && assignArticle(article.id, author.id)}
+                                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all border ${
+                                    isCurrent ? 'border-transparent cursor-default' : 'border-transparent cursor-pointer'
+                                  } ${colClass}`}
+                                  title={isCurrent ? `Currently: ${author.name}` : `Assign to ${author.name}`}
                                 >
-                                  {author.name.charAt(0)}
+                                  {isCurrent ? `✓ ${firstName}` : firstName}
                                 </button>
-                              ))}
-                            </>
+                              );
+                            })
                           )}
                         </div>
                       </div>
@@ -299,7 +295,7 @@ export function AdminDashboard() {
 
               <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
                 <p className="text-xs text-gray-500">
-                  Click an author's initial circle to reassign instantly. Highlighted circle = current author.
+                  Solid colored button = current author. Click any other name to reassign instantly.
                 </p>
                 <Link
                   to="/admin/articles"
