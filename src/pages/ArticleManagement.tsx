@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { RecategorizeArticle } from '../components/RecategorizeArticle';
-import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save } from 'lucide-react';
+import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, UserPlus, CheckCircle } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
 interface Author {
   id: string;
   name: string;
-  user_id: string | null;
 }
 
 interface Article {
@@ -42,7 +41,6 @@ export function ArticleManagement() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
-  const [myAuthorId, setMyAuthorId] = useState<string>('');
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
   const [editForm, setEditForm] = useState({
     title: '',
@@ -58,6 +56,8 @@ export function ArticleManagement() {
   });
   const [saving, setSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [assignedId, setAssignedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (profile?.is_admin) {
@@ -71,13 +71,10 @@ export function ArticleManagement() {
     try {
       const { data, error } = await supabase
         .from('authors')
-        .select('id, name, user_id')
+        .select('id, name')
         .order('name');
       if (error) throw error;
-      const list = data || [];
-      setAuthors(list);
-      const mine = list.find((a: Author) => a.user_id === user?.id);
-      if (mine) setMyAuthorId(mine.id);
+      setAuthors(data || []);
     } catch (err) {
       console.error('Error fetching authors:', err);
     }
@@ -147,19 +144,34 @@ export function ArticleManagement() {
     }
   };
 
-  const assignToMe = async (articleId: string) => {
-    if (!myAuthorId) { alert('No author record linked to your account.'); return; }
+  const assignAuthor = async (articleId: string, authorId: string) => {
+    setAssigningId(articleId);
     try {
       const { error } = await supabase
         .from('media_content')
-        .update({ author_id: myAuthorId })
+        .update({ author_id: authorId })
         .eq('id', articleId);
       if (error) throw error;
-      fetchArticles();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : JSON.stringify(err);
-      alert(`Failed to assign author: ${msg}`);
+      setArticles(prev => prev.map(a => a.id === articleId ? { ...a, author_id: authorId } : a));
+      setAssignedId(articleId);
+      setTimeout(() => setAssignedId(null), 2000);
+    } catch (err) {
+      console.error('Error assigning author:', err);
+      alert('Failed to assign author. Please try again.');
+    } finally {
+      setAssigningId(null);
     }
+  };
+
+  const authorBtnClass = (authorName: string, isCurrent: boolean) => {
+    const base = 'px-3 py-1.5 rounded-lg text-xs font-bold transition-all border-0 cursor-pointer';
+    if (authorName.includes('Matthew'))
+      return `${base} ${isCurrent ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white'}`;
+    if (authorName.includes('Gbenga'))
+      return `${base} ${isCurrent ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-600 hover:text-white'}`;
+    if (authorName.includes('Victoria'))
+      return `${base} ${isCurrent ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-700 hover:bg-orange-500 hover:text-white'}`;
+    return `${base} ${isCurrent ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-700 hover:text-white'}`;
   };
 
   const handleRecategorize = () => {
@@ -377,23 +389,36 @@ export function ArticleManagement() {
                       />
                     </div>
 
-                    <div className="flex items-center gap-3 mt-2 flex-wrap">
-                      <span className="text-sm text-gray-500">
-                        Author: <span className="font-medium text-gray-700">
-                          {authors.find(a => a.id === article.author_id)?.name || <span className="text-red-500 italic">Unassigned</span>}
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className="text-sm text-gray-500 font-medium">Author:</span>
+                      {assignedId === article.id ? (
+                        <span className="flex items-center gap-1 text-xs font-bold text-green-700">
+                          <CheckCircle className="w-4 h-4" /> Saved!
                         </span>
-                      </span>
-                      {article.author_id !== myAuthorId && myAuthorId && (
-                        <button
-                          onClick={() => assignToMe(article.id)}
-                          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
-                        >
-                          <Save className="w-3 h-3" />
-                          Assign to me
-                        </button>
-                      )}
-                      {article.author_id === myAuthorId && (
-                        <span className="text-xs text-green-600 font-medium">✓ Credited to you</span>
+                      ) : assigningId === article.id ? (
+                        <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
+                      ) : (
+                        <>
+                          {/* Current author label */}
+                          <span className="text-sm font-semibold text-gray-800">
+                            {authors.find(a => a.id === article.author_id)?.name ?? <span className="text-red-500 italic">Unassigned</span>}
+                          </span>
+                          <span className="text-gray-300 text-xs mx-1">|</span>
+                          <span className="text-xs text-gray-400">Assign to:</span>
+                          {authors.map(author => {
+                            const isCurrent = article.author_id === author.id;
+                            return (
+                              <button
+                                key={author.id}
+                                onClick={() => !isCurrent && assignAuthor(article.id, author.id)}
+                                className={authorBtnClass(author.name, isCurrent)}
+                                title={isCurrent ? `Currently: ${author.name}` : `Assign to ${author.name}`}
+                              >
+                                {isCurrent ? `✓ ${author.name.split(' ')[0]}` : author.name.split(' ')[0]}
+                              </button>
+                            );
+                          })}
+                        </>
                       )}
                     </div>
                   </div>
@@ -527,9 +552,7 @@ export function ArticleManagement() {
                 >
                   <option value="">— Unassigned —</option>
                   {authors.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}{a.user_id === user?.id ? ' (you)' : ''}
-                    </option>
+                    <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
                 </select>
               </div>
