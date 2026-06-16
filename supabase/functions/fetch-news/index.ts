@@ -1071,23 +1071,40 @@ Deno.serve(async (req: Request) => {
         const gbengaAyandare  = authors?.find((a: any) => a.name === 'Gbenga Ayandare');
         const victoriaOdunola = authors?.find((a: any) => a.name === 'Victoria Odunola');
 
-        // Route by source country
-        const country = (source.country || '').toLowerCase();
-        let assignedAuthor: any;
-        if (['nigeria', 'ng'].includes(country)) {
-          assignedAuthor = victoriaOdunola;               // Victoria — Nigeria only
-        } else if (['canada', 'usa', 'us', 'united states'].includes(country)) {
-          assignedAuthor = matthewAyandare;                // Matthew — North America
-        } else if (['uk', 'europe', 'france', 'germany', 'spain', 'italy', 'netherlands', 'poland', 'sweden', 'portugal', 'greece', 'switzerland'].includes(country)) {
-          assignedAuthor = matthewAyandare;                // Matthew — Europe
-        } else if (['africa', 'ghana', 'kenya', 'south africa', 'ethiopia', 'tanzania', 'uganda', 'rwanda', 'cameroon', 'zimbabwe', 'senegal'].includes(country)) {
-          assignedAuthor = matthewAyandare;                // Matthew — Africa (non-Nigeria)
-        } else if (['sports', 'international', 'global'].includes(country)) {
-          assignedAuthor = matthewAyandare;                // Matthew — Sports / Global
-        } else if (['middle east', 'uae', 'saudi arabia', 'iran', 'israel', 'jordan', 'iraq', 'syria', 'qatar', 'kuwait', 'lebanon', 'turkey', 'pakistan', 'asia', 'china', 'india', 'japan', 'south korea', 'indonesia', 'vietnam', 'philippines', 'malaysia', 'bangladesh', 'singapore'].includes(country)) {
-          assignedAuthor = gbengaAyandare;                 // Gbenga — Middle East + Asia
+        // Route by source country + content check
+        const sourceCountry = (source.country || '').toLowerCase();
+
+        // Nigerian content keywords — article must actually be about Nigeria to go to Victoria
+        const nigerianKeywords = [
+          'nigeria', 'nigerian', 'lagos', 'abuja', 'kano', 'ibadan', 'port harcourt',
+          'ogun', 'oyo', 'anambra', 'imo', 'rivers', 'delta', 'edo', 'kwara',
+          'naira', 'inec', 'efcc', 'nnpc', 'dss', 'cbn', 'nass', 'tinubu',
+          'buhari', 'obi peter', 'atiku', 'sowore', 'el-zakzaky',
+          'house of reps', 'nigerian senate', 'nigerian army', 'nigerian police',
+          'nollywood', 'afrobeats', 'afcon', 'super eagles', 'falcons',
+        ];
+
+        function isNigerianContent(title: string, description: string): boolean {
+          const text = (title + ' ' + description).toLowerCase();
+          return nigerianKeywords.some(kw => text.includes(kw));
+        }
+
+        // Determine base author by source country
+        let defaultAuthorForSource: any;
+        if (['canada', 'usa', 'us', 'united states'].includes(sourceCountry)) {
+          defaultAuthorForSource = matthewAyandare;        // Matthew — North America
+        } else if (['uk', 'europe', 'france', 'germany', 'spain', 'italy', 'netherlands', 'poland', 'sweden', 'portugal', 'greece', 'switzerland'].includes(sourceCountry)) {
+          defaultAuthorForSource = matthewAyandare;        // Matthew — Europe
+        } else if (['africa', 'ghana', 'kenya', 'south africa', 'ethiopia', 'tanzania', 'uganda', 'rwanda', 'cameroon', 'zimbabwe', 'senegal'].includes(sourceCountry)) {
+          defaultAuthorForSource = matthewAyandare;        // Matthew — Africa (non-Nigeria)
+        } else if (['sports', 'international', 'global'].includes(sourceCountry)) {
+          defaultAuthorForSource = matthewAyandare;        // Matthew — Sports / Global
+        } else if (['middle east', 'uae', 'saudi arabia', 'iran', 'israel', 'jordan', 'iraq', 'syria', 'qatar', 'kuwait', 'lebanon', 'turkey', 'pakistan', 'asia', 'china', 'india', 'japan', 'south korea', 'indonesia', 'vietnam', 'philippines', 'malaysia', 'bangladesh', 'singapore'].includes(sourceCountry)) {
+          defaultAuthorForSource = gbengaAyandare;         // Gbenga — Middle East + Asia
+        } else if (['nigeria', 'ng'].includes(sourceCountry)) {
+          defaultAuthorForSource = matthewAyandare;        // Nigerian source default = Matthew (content check below overrides)
         } else {
-          assignedAuthor = matthewAyandare || authors?.[0]; // Default: Matthew
+          defaultAuthorForSource = matthewAyandare || authors?.[0]; // Default: Matthew
         }
 
         const categoryMap = source.category_mapping as Record<string, string>;
@@ -1154,6 +1171,15 @@ Deno.serve(async (req: Request) => {
             }
 
             const priority = calculatePriorityScore(item.title, item.description);
+
+            // For Nigerian sources: only assign Victoria if the article is actually about Nigeria
+            // Otherwise fall back to Matthew (default for uncategorized/global content)
+            let assignedAuthor: any;
+            if (['nigeria', 'ng'].includes(sourceCountry) && isNigerianContent(item.title, item.description)) {
+              assignedAuthor = victoriaOdunola;
+            } else {
+              assignedAuthor = defaultAuthorForSource;
+            }
 
             const { error } = await supabase.from('media_content').insert({
               title: stripHtml(item.title),
