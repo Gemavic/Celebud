@@ -110,6 +110,7 @@ export function ArticleManagement() {
           content,
           thumbnail_url,
           category_id,
+          author_id,
           published_at,
           views_count,
           comments_count,
@@ -143,6 +144,21 @@ export function ArticleManagement() {
       console.error('Error fetching articles:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const assignToMe = async (articleId: string) => {
+    if (!myAuthorId) { alert('No author record linked to your account.'); return; }
+    try {
+      const { error } = await supabase
+        .from('media_content')
+        .update({ author_id: myAuthorId })
+        .eq('id', articleId);
+      if (error) throw error;
+      fetchArticles();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : JSON.stringify(err);
+      alert(`Failed to assign author: ${msg}`);
     }
   };
 
@@ -194,12 +210,14 @@ export function ArticleManagement() {
           is_trending: editForm.is_trending,
           seo_title: editForm.seo_title || null,
           seo_keywords: editForm.seo_keywords || null,
-          is_manual: true,
-          submitted_by: user?.id || null,
         })
         .eq('id', editingArticle.id);
 
       if (error) throw error;
+
+      // Best-effort: mark as manually edited (won't block save if schema cache is stale)
+      await supabase.from('media_content').update({ is_manual: true, submitted_by: user?.id || null }).eq('id', editingArticle.id);
+
       setEditingArticle(null);
       fetchArticles();
     } catch (err: unknown) {
@@ -357,6 +375,26 @@ export function ArticleManagement() {
                         currentCategoryName={article.categories?.name || 'Uncategorized'}
                         onRecategorize={handleRecategorize}
                       />
+                    </div>
+
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      <span className="text-sm text-gray-500">
+                        Author: <span className="font-medium text-gray-700">
+                          {authors.find(a => a.id === article.author_id)?.name || <span className="text-red-500 italic">Unassigned</span>}
+                        </span>
+                      </span>
+                      {article.author_id !== myAuthorId && myAuthorId && (
+                        <button
+                          onClick={() => assignToMe(article.id)}
+                          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+                        >
+                          <Save className="w-3 h-3" />
+                          Assign to me
+                        </button>
+                      )}
+                      {article.author_id === myAuthorId && (
+                        <span className="text-xs text-green-600 font-medium">✓ Credited to you</span>
+                      )}
                     </div>
                   </div>
 

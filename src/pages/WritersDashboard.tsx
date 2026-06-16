@@ -35,7 +35,7 @@ interface ArticleRow {
   views_count: number;
   comments_count: number;
   published_at: string;
-  is_manual: boolean;
+  author_id: string | null;
   categories: { name: string } | null;
 }
 
@@ -65,7 +65,7 @@ export function WritersDashboard() {
         .from('media_content')
         .select(`
           id, title, author_id, views_count, comments_count,
-          published_at, is_manual,
+          published_at,
           categories:category_id (name)
         `)
         .eq('media_type', 'article')
@@ -76,10 +76,10 @@ export function WritersDashboard() {
       const allArticles: ArticleRow[] = (articles || []).map((a: any) => ({
         id: a.id,
         title: a.title,
+        author_id: a.author_id,
         views_count: a.views_count || 0,
         comments_count: a.comments_count || 0,
         published_at: a.published_at,
-        is_manual: a.is_manual || false,
         categories: a.categories,
       }));
 
@@ -312,14 +312,7 @@ export function WritersDashboard() {
                           {author.articles.map((article) => (
                             <tr key={article.id} className="hover:bg-gray-50">
                               <td className="px-5 py-3">
-                                <div className="flex items-start gap-2">
-                                  {article.is_manual && (
-                                    <span className="flex-shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                                      Original
-                                    </span>
-                                  )}
-                                  <span className="text-gray-800 line-clamp-2">{article.title}</span>
-                                </div>
+                                <span className="text-gray-800 line-clamp-2">{article.title}</span>
                               </td>
                               <td className="px-5 py-3 text-gray-500 whitespace-nowrap hidden md:table-cell">
                                 {article.categories?.name || '—'}
@@ -360,11 +353,11 @@ export function WritersDashboard() {
             <BarChart3 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-semibold text-blue-800">For Remuneration Purposes</p>
-              <p className="text-sm text-blue-700 mt-0.5">
-                Articles marked <span className="font-semibold">Original</span> were written directly by the credited writer.
-                Articles without that badge were sourced from external feeds but may be credited after editing.
-                Use the Article Management page to assign or update authorship on any article.
-              </p>
+            <p className="text-sm text-blue-700 mt-0.5">
+              Every article credited to a writer counts toward their production total.
+              Use the Article Management page to assign or update authorship on any article —
+              each article has an <strong>Assign to me</strong> button for quick crediting.
+            </p>
             </div>
           </div>
 
