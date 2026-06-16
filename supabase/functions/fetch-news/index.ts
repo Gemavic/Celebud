@@ -1065,14 +1065,31 @@ Deno.serve(async (req: Request) => {
 
         const { data: authors } = await supabase
           .from('authors')
-          .select('*');
+          .select('id, name');
 
-        const gbengaAyandare = authors?.find((a: any) => a.name === 'Gbenga Ayandare');
+        const matthewAyandare = authors?.find((a: any) => a.name === 'Matthew Ayandare');
+        const gbengaAyandare  = authors?.find((a: any) => a.name === 'Gbenga Ayandare');
         const victoriaOdunola = authors?.find((a: any) => a.name === 'Victoria Odunola');
-        const defaultAuthor = victoriaOdunola || authors?.[0];
-        const nigerianAuthors = [gbengaAyandare, victoriaOdunola].filter(Boolean);
 
-        let nigerianArticleIndex = 0;
+        // Route by source country
+        const country = (source.country || '').toLowerCase();
+        let assignedAuthor: any;
+        if (['nigeria', 'ng'].includes(country)) {
+          assignedAuthor = victoriaOdunola;               // Victoria — Nigeria only
+        } else if (['canada', 'usa', 'us', 'united states'].includes(country)) {
+          assignedAuthor = matthewAyandare;                // Matthew — North America
+        } else if (['uk', 'europe', 'france', 'germany', 'spain', 'italy', 'netherlands', 'poland', 'sweden', 'portugal', 'greece', 'switzerland'].includes(country)) {
+          assignedAuthor = matthewAyandare;                // Matthew — Europe
+        } else if (['africa', 'ghana', 'kenya', 'south africa', 'ethiopia', 'tanzania', 'uganda', 'rwanda', 'cameroon', 'zimbabwe', 'senegal'].includes(country)) {
+          assignedAuthor = matthewAyandare;                // Matthew — Africa (non-Nigeria)
+        } else if (['sports', 'international', 'global'].includes(country)) {
+          assignedAuthor = matthewAyandare;                // Matthew — Sports / Global
+        } else if (['middle east', 'uae', 'saudi arabia', 'iran', 'israel', 'jordan', 'iraq', 'syria', 'qatar', 'kuwait', 'lebanon', 'turkey', 'pakistan', 'asia', 'china', 'india', 'japan', 'south korea', 'indonesia', 'vietnam', 'philippines', 'malaysia', 'bangladesh', 'singapore'].includes(country)) {
+          assignedAuthor = gbengaAyandare;                 // Gbenga — Middle East + Asia
+        } else {
+          assignedAuthor = matthewAyandare || authors?.[0]; // Default: Matthew
+        }
+
         const categoryMap = source.category_mapping as Record<string, string>;
         const sourceCategorySlug = categoryMap?.default || 'news';
 
@@ -1144,9 +1161,7 @@ Deno.serve(async (req: Request) => {
               description: finalDescription,
               content: finalContent,
               category_id: articleCategory?.id,
-              author_id: source.country === 'Nigeria' && nigerianAuthors.length > 0
-                ? nigerianAuthors[nigerianArticleIndex++ % nigerianAuthors.length]?.id
-                : defaultAuthor?.id,
+              author_id: assignedAuthor?.id || null,
               media_type: 'article',
               thumbnail_url: finalThumbnail,
               external_url: item.link,
