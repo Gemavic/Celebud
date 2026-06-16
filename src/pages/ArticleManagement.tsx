@@ -5,6 +5,12 @@ import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
+interface Author {
+  id: string;
+  name: string;
+  user_id: string | null;
+}
+
 interface Article {
   id: string;
   title: string;
@@ -13,6 +19,7 @@ interface Article {
   content: string | null;
   thumbnail_url: string | null;
   category_id: string;
+  author_id: string | null;
   published_at: string;
   views_count: number;
   comments_count: number;
@@ -28,12 +35,14 @@ interface Article {
 }
 
 export function ArticleManagement() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [authors, setAuthors] = useState<Author[]>([]);
+  const [myAuthorId, setMyAuthorId] = useState<string>('');
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
   const [editForm, setEditForm] = useState({
     title: '',
@@ -41,6 +50,7 @@ export function ArticleManagement() {
     content: '',
     thumbnail_url: '',
     category_id: '',
+    author_id: '',
     is_featured: false,
     is_trending: false,
     seo_title: '',
@@ -52,9 +62,26 @@ export function ArticleManagement() {
   useEffect(() => {
     if (profile?.is_admin) {
       fetchCategories();
+      fetchAuthors();
       fetchArticles();
     }
   }, [profile, selectedCategory]);
+
+  const fetchAuthors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('authors')
+        .select('id, name, user_id')
+        .order('name');
+      if (error) throw error;
+      const list = data || [];
+      setAuthors(list);
+      const mine = list.find((a: Author) => a.user_id === user?.id);
+      if (mine) setMyAuthorId(mine.id);
+    } catch (err) {
+      console.error('Error fetching authors:', err);
+    }
+  };
 
   const fetchCategories = async () => {
     try {
@@ -131,6 +158,7 @@ export function ArticleManagement() {
       content: article.content || '',
       thumbnail_url: article.thumbnail_url || '',
       category_id: article.category_id || '',
+      author_id: article.author_id || myAuthorId || '',
       is_featured: article.is_featured || false,
       is_trending: article.is_trending || false,
       seo_title: article.seo_title || '',
@@ -161,11 +189,13 @@ export function ArticleManagement() {
           content: editForm.content || null,
           thumbnail_url: editForm.thumbnail_url || null,
           category_id: editForm.category_id || null,
+          author_id: editForm.author_id || null,
           is_featured: editForm.is_featured,
           is_trending: editForm.is_trending,
           seo_title: editForm.seo_title || null,
           seo_keywords: editForm.seo_keywords || null,
           is_manual: true,
+          submitted_by: user?.id || null,
         })
         .eq('id', editingArticle.id);
 
@@ -448,6 +478,22 @@ export function ArticleManagement() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Author / Writer</label>
+                <select
+                  value={editForm.author_id}
+                  onChange={(e) => setEditForm({ ...editForm, author_id: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">— Unassigned —</option>
+                  {authors.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}{a.user_id === user?.id ? ' (you)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

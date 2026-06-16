@@ -13,6 +13,7 @@ const CreatorManagement = lazy(() => import('./pages/CreatorManagement').then(mo
 const ContentStudio = lazy(() => import('./pages/ContentStudio').then(module => ({ default: module.ContentStudio })));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy').then(module => ({ default: module.PrivacyPolicy })));
+const WritersDashboard = lazy(() => import('./pages/WritersDashboard').then(module => ({ default: module.WritersDashboard })));
 
 function LoadingFallback() {
   return (
@@ -42,6 +43,7 @@ function App() {
             <Route path="/admin/creators" element={<CreatorManagement />} />
             <Route path="/studio" element={<ContentStudio />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/admin/writers" element={<WritersDashboard />} />
           </Routes>
         </Suspense>
       </Router>

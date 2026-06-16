@@ -17,6 +17,7 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
+  PenLine,
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -28,6 +29,7 @@ interface AdminLayoutProps {
 const NAV_ITEMS = [
   { path: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { path: '/admin/articles', label: 'Articles', icon: FileText },
+  { path: '/admin/writers', label: "Writer's Production", icon: PenLine },
   { path: '/admin/creators', label: 'Creators', icon: Users },
   { path: '/studio', label: 'Content Studio', icon: Video },
   { path: '/admin/metrics', label: 'Analytics', icon: BarChart3 },

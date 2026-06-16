@@ -115,10 +115,21 @@ export default function EditorialPage() {
     try {
       const { data, error } = await supabase
         .from('authors')
-        .select('id, name, avatar_url, bio')
+        .select('id, name, avatar_url, bio, user_id')
         .order('name');
       if (error) throw error;
-      setAuthors(data || []);
+      const list = data || [];
+      setAuthors(list);
+      // Auto-select the author record that belongs to the logged-in user
+      if (user) {
+        const mine = list.find((a: Author & { user_id?: string }) => a.user_id === user.id);
+        if (mine) {
+          setCreateFormData((prev: typeof createFormData) => ({
+            ...prev,
+            author_id: prev.author_id || mine.id,
+          }));
+        }
+      }
     } catch (err) {
       console.error('Error loading authors:', err);
     }
@@ -220,7 +231,9 @@ export default function EditorialPage() {
           category_id: createFormData.category_id || null,
           thumbnail_url: thumbnailUrl,
           author_id: authorId,
+          submitted_by: user?.id || null,
           media_type: 'article',
+          is_manual: true,
           is_featured: createFormData.is_featured,
           is_trending: createFormData.is_trending,
           seo_title: createFormData.seo_title || null,
