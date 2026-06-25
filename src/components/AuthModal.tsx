@@ -43,7 +43,7 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
       return 'Incorrect email or password. Please try again.';
     }
     if (message.includes('Email not confirmed')) {
-      return 'Please check your email and confirm your account.';
+      return 'Your email address has not been confirmed. Please contact the admin to activate your account, or check your inbox for a confirmation email.';
     }
     if (message.includes('duplicate key') && message.includes('username')) {
       return 'This username is already taken. Please choose another.';
