@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Mail, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import type { Provider } from '@supabase/supabase-js';
+
+type ModalMode = 'signin' | 'signup' | 'forgot' | 'forgot_sent';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -10,48 +12,25 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthModalProps) {
-  const [mode, setMode] = useState(initialMode);
+  const [mode, setMode] = useState<ModalMode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp, signInWithOAuth } = useAuth();
+  const { signIn, signUp, signInWithOAuth, resetPassword } = useAuth();
 
   if (!isOpen) return null;
 
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
+  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const validatePassword = (password: string): boolean => {
-    return password.length >= 8;
-  };
-
-  const validateUsername = (username: string): boolean => {
-    return username.trim().length >= 3 && username.trim().length <= 30;
-  };
-
-  const getFriendlyErrorMessage = (error: any): string => {
-    const message = error.message || '';
-
-    if (message.includes('User already registered')) {
-      return 'An account with this email already exists. Please sign in instead.';
-    }
-    if (message.includes('Invalid login credentials')) {
-      return 'Incorrect email or password. Please try again.';
-    }
-    if (message.includes('Email not confirmed')) {
-      return 'Your email address has not been confirmed. Please contact the admin to activate your account, or check your inbox for a confirmation email.';
-    }
-    if (message.includes('duplicate key') && message.includes('username')) {
-      return 'This username is already taken. Please choose another.';
-    }
-    if (message.includes('Password should be at least')) {
-      return 'Password must be at least 8 characters long.';
-    }
-
+  const getFriendlyError = (err: any): string => {
+    const msg = err?.message || '';
+    if (msg.includes('User already registered')) return 'An account with this email already exists. Please sign in instead.';
+    if (msg.includes('Invalid login credentials')) return 'Incorrect email or password. Please try again.';
+    if (msg.includes('Email not confirmed')) return 'Your email address has not been confirmed. Please contact the admin or use "Forgot password?" below.';
+    if (msg.includes('duplicate key') && msg.includes('username')) return 'This username is already taken. Please choose another.';
+    if (msg.includes('Password should be at least')) return 'Password must be at least 8 characters long.';
     return 'Something went wrong. Please try again.';
   };
 
@@ -59,25 +38,13 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
     e.preventDefault();
     setError('');
 
-    if (!validateEmail(email)) {
-      setError('Please enter a valid email address.');
-      return;
-    }
-
-    if (!validatePassword(password)) {
-      setError('Password must be at least 8 characters long.');
-      return;
-    }
-
-    if (mode === 'signup') {
-      if (!validateUsername(username)) {
-        setError('Username must be between 3 and 30 characters.');
-        return;
-      }
+    if (!validateEmail(email)) { setError('Please enter a valid email address.'); return; }
+    if (mode === 'signup' && password.length < 8) { setError('Password must be at least 8 characters long.'); return; }
+    if (mode === 'signup' && (username.trim().length < 3 || username.trim().length > 30)) {
+      setError('Username must be between 3 and 30 characters.'); return;
     }
 
     setLoading(true);
-
     try {
       if (mode === 'signup') {
         await signUp(email, password, username.trim());
@@ -85,40 +52,145 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
         await signIn(email, password);
       }
       onClose();
-      setEmail('');
-      setPassword('');
-      setUsername('');
+      setEmail(''); setPassword(''); setUsername('');
     } catch (err: any) {
-      setError(getFriendlyErrorMessage(err));
+      setError(getFriendlyError(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleMode = () => {
-    setMode(mode === 'signin' ? 'signup' : 'signin');
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
+    if (!validateEmail(email)) { setError('Please enter a valid email address.'); return; }
+    setLoading(true);
+    try {
+      await resetPassword(email);
+      setMode('forgot_sent');
+    } catch (err: any) {
+      setError(getFriendlyError(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOAuthSignIn = async (provider: Provider) => {
     setError('');
     setLoading(true);
-
     try {
       await signInWithOAuth(provider);
     } catch (err: any) {
-      setError(getFriendlyErrorMessage(err));
+      setError(getFriendlyError(err));
       setLoading(false);
     }
   };
 
+  const handleClose = () => {
+    onClose();
+    setEmail(''); setPassword(''); setUsername(''); setError('');
+    setMode(initialMode);
+  };
+
+  // --- Forgot password sent confirmation ---
+  if (mode === 'forgot_sent') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl p-8 m-4 text-center">
+          <button onClick={handleClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+            <X className="w-6 h-6" />
+          </button>
+          <div className="flex justify-center mb-4">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">Check your inbox</h2>
+          <p className="text-gray-600 mb-2">
+            We sent a password reset link to:
+          </p>
+          <p className="font-semibold text-gray-900 mb-6 break-all">{email}</p>
+          <p className="text-sm text-gray-500 mb-6">
+            Click the link in the email to set a new password. If you don't see it, check your spam folder.
+          </p>
+          <button
+            onClick={() => { setMode('signin'); setError(''); }}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Back to Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Forgot password form ---
+  if (mode === 'forgot') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl p-8 m-4">
+          <button onClick={handleClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+            <X className="w-6 h-6" />
+          </button>
+
+          <div className="flex justify-center mb-5">
+            <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center">
+              <Mail className="w-7 h-7 text-blue-600" />
+            </div>
+          </div>
+
+          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Reset your password</h2>
+          <p className="text-gray-500 text-sm text-center mb-6">
+            Enter your email address and we'll send you a link to reset your password.
+          </p>
+
+          <form onSubmit={handleForgotSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="your@email.com"
+                required
+                autoFocus
+              />
+            </div>
+
+            {error && (
+              <div className="text-red-600 text-sm bg-red-50 border border-red-100 p-3 rounded-lg">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? 'Sending reset link...' : 'Send reset link'}
+            </button>
+          </form>
+
+          <div className="mt-5 text-center">
+            <button
+              onClick={() => { setMode('signin'); setError(''); }}
+              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+            >
+              Back to Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Sign in / Sign up form ---
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl p-8 m-4">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-        >
+        <button onClick={handleClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
           <X className="w-6 h-6" />
         </button>
 
@@ -191,9 +263,7 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'signup' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Username
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
               <input
                 type="text"
                 value={username}
@@ -206,9 +276,7 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
             <input
               type="email"
               value={email}
@@ -220,9 +288,18 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">Password</label>
+              {mode === 'signin' && (
+                <button
+                  type="button"
+                  onClick={() => { setMode('forgot'); setError(''); }}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
             <input
               type="password"
               value={password}
@@ -235,7 +312,7 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
           </div>
 
           {error && (
-            <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">
+            <div className="text-red-600 text-sm bg-red-50 border border-red-100 p-3 rounded-lg">
               {error}
             </div>
           )}
@@ -251,12 +328,10 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
 
         <div className="mt-6 text-center">
           <button
-            onClick={toggleMode}
+            onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); }}
             className="text-blue-600 hover:text-blue-700 text-sm font-medium"
           >
-            {mode === 'signin'
-              ? "Don't have an account? Sign up"
-              : 'Already have an account? Sign in'}
+            {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
           </button>
         </div>
       </div>
