@@ -1067,45 +1067,36 @@ Deno.serve(async (req: Request) => {
           .from('authors')
           .select('id, name');
 
-        const matthewAyandare = authors?.find((a: any) => a.name === 'Matthew Ayandare');
-        const gbengaAyandare  = authors?.find((a: any) => a.name === 'Gbenga Ayandare');
-        const victoriaOdunola = authors?.find((a: any) => a.name === 'Victoria Odunola');
+        // Fetch routing rules from the database — single source of truth
+        const { data: routingRules } = await supabase
+          .from('author_routing_rules')
+          .select('country_values, author_id, priority')
+          .order('priority');
 
-        // Route by source country + content check
         const sourceCountry = (source.country || '').toLowerCase();
 
-        // Nigerian content keywords — article must actually be about Nigeria to go to Victoria
-        const nigerianKeywords = [
-          'nigeria', 'nigerian', 'lagos', 'abuja', 'kano', 'ibadan', 'port harcourt',
-          'ogun', 'oyo', 'anambra', 'imo', 'rivers', 'delta', 'edo', 'kwara',
-          'naira', 'inec', 'efcc', 'nnpc', 'dss', 'cbn', 'nass', 'tinubu',
-          'buhari', 'obi peter', 'atiku', 'sowore', 'el-zakzaky',
-          'house of reps', 'nigerian senate', 'nigerian army', 'nigerian police',
-          'nollywood', 'afrobeats', 'afcon', 'super eagles', 'falcons',
-        ];
+        // Victoria's category beats: entertainment, celebrity, lifestyle
+        const victoriaAuthor = authors?.find((a: any) => a.name === 'Victoria Odunola');
+        const victoriaCategorySlugs = ['entertainment', 'celebrity', 'lifestyle'];
 
-        function isNigerianContent(title: string, description: string): boolean {
-          const text = (title + ' ' + description).toLowerCase();
-          return nigerianKeywords.some(kw => text.includes(kw));
+        // Resolve author by matching source country against routing rules
+        function resolveAuthorByCountry(country: string): any {
+          const lowerCountry = country.toLowerCase();
+          if (!routingRules) return authors?.[0];
+          for (const rule of routingRules) {
+            const matches = (rule.country_values as string[]).some(
+              (cv: string) => cv.toLowerCase() === lowerCountry
+            );
+            if (matches) {
+              return authors?.find((a: any) => a.id === rule.author_id);
+            }
+          }
+          // Fallback: last rule (Global / International) or first author
+          const fallbackRule = routingRules[routingRules.length - 1];
+          return authors?.find((a: any) => a.id === fallbackRule?.author_id) || authors?.[0];
         }
 
-        // Determine base author by source country
-        let defaultAuthorForSource: any;
-        if (['canada', 'usa', 'us', 'united states'].includes(sourceCountry)) {
-          defaultAuthorForSource = matthewAyandare;        // Matthew — North America
-        } else if (['uk', 'europe', 'france', 'germany', 'spain', 'italy', 'netherlands', 'poland', 'sweden', 'portugal', 'greece', 'switzerland'].includes(sourceCountry)) {
-          defaultAuthorForSource = matthewAyandare;        // Matthew — Europe
-        } else if (['africa', 'ghana', 'kenya', 'south africa', 'ethiopia', 'tanzania', 'uganda', 'rwanda', 'cameroon', 'zimbabwe', 'senegal'].includes(sourceCountry)) {
-          defaultAuthorForSource = matthewAyandare;        // Matthew — Africa (non-Nigeria)
-        } else if (['sports', 'international', 'global'].includes(sourceCountry)) {
-          defaultAuthorForSource = matthewAyandare;        // Matthew — Sports / Global
-        } else if (['middle east', 'uae', 'saudi arabia', 'iran', 'israel', 'jordan', 'iraq', 'syria', 'qatar', 'kuwait', 'lebanon', 'turkey', 'pakistan', 'asia', 'china', 'india', 'japan', 'south korea', 'indonesia', 'vietnam', 'philippines', 'malaysia', 'bangladesh', 'singapore'].includes(sourceCountry)) {
-          defaultAuthorForSource = gbengaAyandare;         // Gbenga — Middle East + Asia
-        } else if (['nigeria', 'ng'].includes(sourceCountry)) {
-          defaultAuthorForSource = matthewAyandare;        // Nigerian source default = Matthew (content check below overrides)
-        } else {
-          defaultAuthorForSource = matthewAyandare || authors?.[0]; // Default: Matthew
-        }
+        const defaultAuthorForSource = resolveAuthorByCountry(source.country || 'Global');
 
         const categoryMap = source.category_mapping as Record<string, string>;
         const sourceCategorySlug = categoryMap?.default || 'news';
@@ -1172,11 +1163,12 @@ Deno.serve(async (req: Request) => {
 
             const priority = calculatePriorityScore(item.title, item.description);
 
-            // For Nigerian sources: only assign Victoria if the article is actually about Nigeria
-            // Otherwise fall back to Matthew (default for uncategorized/global content)
+            // Assign author: first check if the article category is Victoria's beat
+            // (entertainment/celebrity/lifestyle), otherwise use the routing rules
             let assignedAuthor: any;
-            if (['nigeria', 'ng'].includes(sourceCountry) && isNigerianContent(item.title, item.description)) {
-              assignedAuthor = victoriaOdunola;
+            const isVictoriaCategory = victoriaAuthor && victoriaCategorySlugs.includes(finalCategorySlug);
+            if (isVictoriaCategory) {
+              assignedAuthor = victoriaAuthor;
             } else {
               assignedAuthor = defaultAuthorForSource;
             }
