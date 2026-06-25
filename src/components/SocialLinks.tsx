@@ -1,7 +1,7 @@
 import { Facebook, Youtube, Instagram } from 'lucide-react';
-import { SOCIAL_LINKS, WHATSAPP_CHANNEL_URL } from '../config/socialMedia';
+import { SOCIAL_LINKS } from '../config/socialMedia';
 
-export { WHATSAPP_CHANNEL_URL };
+export { WHATSAPP_CHANNEL_URL } from '../config/socialMedia';
 
 // --- Custom SVG icons for platforms not in lucide-react ---
 
@@ -37,44 +37,58 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
-// Top-bar compact social strip (used in the header)
+// Top-bar compact social strip (header)
 export function SocialLinks() {
   return (
     <div className="flex items-center space-x-1.5">
-      <a href={SOCIAL_LINKS.facebook.url} target="_blank" rel="noopener noreferrer"
-        className="bg-blue-600 hover:bg-blue-700 p-2 rounded transition-colors" aria-label="Facebook">
-        <Facebook className="w-4 h-4 text-white" />
-      </a>
-      <a href={SOCIAL_LINKS.x.url} target="_blank" rel="noopener noreferrer"
-        className="bg-black hover:bg-gray-800 p-2 rounded transition-colors" aria-label="X">
-        <XIcon className="w-4 h-4 text-white" />
-      </a>
-      <a href={SOCIAL_LINKS.instagram.url} target="_blank" rel="noopener noreferrer"
-        className="bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 hover:opacity-90 p-2 rounded transition-colors" aria-label="Instagram">
-        <Instagram className="w-4 h-4 text-white" />
-      </a>
-      <a href={SOCIAL_LINKS.tiktok.url} target="_blank" rel="noopener noreferrer"
-        className="bg-black hover:bg-gray-800 p-2 rounded transition-colors" aria-label="TikTok">
-        <TikTokIcon className="w-4 h-4 text-white" />
-      </a>
-      <a href={SOCIAL_LINKS.youtube.url} target="_blank" rel="noopener noreferrer"
-        className="bg-red-600 hover:bg-red-700 p-2 rounded transition-colors" aria-label="YouTube">
-        <Youtube className="w-4 h-4 text-white" />
-      </a>
-      <a href={SOCIAL_LINKS.telegram.url} target="_blank" rel="noopener noreferrer"
-        className="bg-sky-500 hover:bg-sky-600 p-2 rounded transition-colors" aria-label="Telegram">
-        <TelegramIcon className="w-4 h-4 text-white" />
-      </a>
-      <a href={SOCIAL_LINKS.whatsapp.url} target="_blank" rel="noopener noreferrer"
-        className="flex items-center space-x-1.5 bg-green-600 hover:bg-green-700 px-3 py-2 rounded transition-colors" aria-label="WhatsApp Channel">
-        <WhatsAppIcon className="w-4 h-4 text-white" />
-        <span className="text-white text-xs font-semibold hidden lg:inline">Follow</span>
-      </a>
+      {SOCIAL_LINKS.facebook.active && (
+        <a href={SOCIAL_LINKS.facebook.url} target="_blank" rel="noopener noreferrer"
+          className="bg-blue-600 hover:bg-blue-700 p-2 rounded transition-colors" aria-label="Facebook">
+          <Facebook className="w-4 h-4 text-white" />
+        </a>
+      )}
+      {SOCIAL_LINKS.x.active && (
+        <a href={SOCIAL_LINKS.x.url} target="_blank" rel="noopener noreferrer"
+          className="bg-black hover:bg-gray-800 p-2 rounded transition-colors" aria-label="X">
+          <XIcon className="w-4 h-4 text-white" />
+        </a>
+      )}
+      {SOCIAL_LINKS.instagram.active && (
+        <a href={SOCIAL_LINKS.instagram.url} target="_blank" rel="noopener noreferrer"
+          className="bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 hover:opacity-90 p-2 rounded transition-colors" aria-label="Instagram">
+          <Instagram className="w-4 h-4 text-white" />
+        </a>
+      )}
+      {SOCIAL_LINKS.tiktok.active && (
+        <a href={SOCIAL_LINKS.tiktok.url} target="_blank" rel="noopener noreferrer"
+          className="bg-black hover:bg-gray-800 p-2 rounded transition-colors" aria-label="TikTok">
+          <TikTokIcon className="w-4 h-4 text-white" />
+        </a>
+      )}
+      {SOCIAL_LINKS.youtube.active && (
+        <a href={SOCIAL_LINKS.youtube.url} target="_blank" rel="noopener noreferrer"
+          className="bg-red-600 hover:bg-red-700 p-2 rounded transition-colors" aria-label="YouTube">
+          <Youtube className="w-4 h-4 text-white" />
+        </a>
+      )}
+      {SOCIAL_LINKS.telegram.active && (
+        <a href={SOCIAL_LINKS.telegram.url} target="_blank" rel="noopener noreferrer"
+          className="bg-sky-500 hover:bg-sky-600 p-2 rounded transition-colors" aria-label="Telegram">
+          <TelegramIcon className="w-4 h-4 text-white" />
+        </a>
+      )}
+      {SOCIAL_LINKS.whatsapp.active && (
+        <a href={SOCIAL_LINKS.whatsapp.url} target="_blank" rel="noopener noreferrer"
+          className="flex items-center space-x-1.5 bg-green-600 hover:bg-green-700 px-3 py-2 rounded transition-colors" aria-label="WhatsApp Channel">
+          <WhatsAppIcon className="w-4 h-4 text-white" />
+          <span className="text-white text-xs font-semibold hidden lg:inline">Follow</span>
+        </a>
+      )}
     </div>
   );
 }
 
-// Full-size social button used in the footer / standalone CTAs
+// Full-size social button
 interface SocialButtonProps {
   href: string;
   label: string;
@@ -100,59 +114,76 @@ export function SocialButton({ href, label, sublabel, icon, colorClass }: Social
   );
 }
 
-// Pre-built grid of all platform buttons for footer / pages
+// Footer grid — only shows platforms that are active
 export function SocialMediaGrid() {
+  const platforms = [
+    {
+      key: 'facebook' as const,
+      label: 'Facebook',
+      sublabel: 'Like our page',
+      icon: <Facebook className="w-5 h-5" />,
+      colorClass: 'bg-blue-600 hover:bg-blue-700',
+    },
+    {
+      key: 'x' as const,
+      label: 'X / Twitter',
+      sublabel: 'Follow for live updates',
+      icon: <XIcon className="w-5 h-5" />,
+      colorClass: 'bg-black hover:bg-gray-800',
+    },
+    {
+      key: 'instagram' as const,
+      label: 'Instagram',
+      sublabel: 'Behind-the-scenes',
+      icon: <Instagram className="w-5 h-5" />,
+      colorClass: 'bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600',
+    },
+    {
+      key: 'tiktok' as const,
+      label: 'TikTok',
+      sublabel: 'Short clips & trends',
+      icon: <TikTokIcon className="w-5 h-5" />,
+      colorClass: 'bg-gray-900 hover:bg-black',
+    },
+    {
+      key: 'youtube' as const,
+      label: 'YouTube',
+      sublabel: 'Subscribe for videos',
+      icon: <Youtube className="w-5 h-5" />,
+      colorClass: 'bg-red-600 hover:bg-red-700',
+    },
+    {
+      key: 'telegram' as const,
+      label: 'Telegram',
+      sublabel: 'Join our channel',
+      icon: <TelegramIcon className="w-5 h-5" />,
+      colorClass: 'bg-sky-500 hover:bg-sky-600',
+    },
+    {
+      key: 'whatsapp' as const,
+      label: 'WhatsApp',
+      sublabel: 'Breaking news alerts',
+      icon: <WhatsAppIcon className="w-5 h-5" />,
+      colorClass: 'bg-green-600 hover:bg-green-700',
+    },
+  ];
+
+  const active = platforms.filter(p => SOCIAL_LINKS[p.key].active);
+
+  if (active.length === 0) return null;
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-      <SocialButton
-        href={SOCIAL_LINKS.facebook.url}
-        label="Facebook"
-        sublabel="Like our page"
-        icon={<Facebook className="w-5 h-5" />}
-        colorClass="bg-blue-600 hover:bg-blue-700"
-      />
-      <SocialButton
-        href={SOCIAL_LINKS.x.url}
-        label="X / Twitter"
-        sublabel="Follow for live updates"
-        icon={<XIcon className="w-5 h-5" />}
-        colorClass="bg-black hover:bg-gray-800"
-      />
-      <SocialButton
-        href={SOCIAL_LINKS.instagram.url}
-        label="Instagram"
-        sublabel="Behind-the-scenes"
-        icon={<Instagram className="w-5 h-5" />}
-        colorClass="bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600"
-      />
-      <SocialButton
-        href={SOCIAL_LINKS.tiktok.url}
-        label="TikTok"
-        sublabel="Short clips & trends"
-        icon={<TikTokIcon className="w-5 h-5" />}
-        colorClass="bg-gray-900 hover:bg-black"
-      />
-      <SocialButton
-        href={SOCIAL_LINKS.youtube.url}
-        label="YouTube"
-        sublabel="Subscribe for videos"
-        icon={<Youtube className="w-5 h-5" />}
-        colorClass="bg-red-600 hover:bg-red-700"
-      />
-      <SocialButton
-        href={SOCIAL_LINKS.telegram.url}
-        label="Telegram"
-        sublabel="Join our channel"
-        icon={<TelegramIcon className="w-5 h-5" />}
-        colorClass="bg-sky-500 hover:bg-sky-600"
-      />
-      <SocialButton
-        href={SOCIAL_LINKS.whatsapp.url}
-        label="WhatsApp"
-        sublabel="Breaking news alerts"
-        icon={<WhatsAppIcon className="w-5 h-5" />}
-        colorClass="bg-green-600 hover:bg-green-700"
-      />
+      {active.map(p => (
+        <SocialButton
+          key={p.key}
+          href={SOCIAL_LINKS[p.key].url}
+          label={p.label}
+          sublabel={p.sublabel}
+          icon={p.icon}
+          colorClass={p.colorClass}
+        />
+      ))}
     </div>
   );
 }
