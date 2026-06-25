@@ -1,8 +1,34 @@
-import { Facebook, Twitter, Rss } from 'lucide-react';
+import { Facebook, Youtube, Instagram } from 'lucide-react';
+import { SOCIAL_LINKS, WHATSAPP_CHANNEL_URL } from '../config/socialMedia';
 
-const WHATSAPP_CHANNEL_URL = 'https://whatsapp.com/channel/0029VbCybN9J93wW55NAtb15';
+export { WHATSAPP_CHANNEL_URL };
 
-// WhatsApp icon as SVG since lucide-react doesn't include it
+// --- Custom SVG icons for platforms not in lucide-react ---
+
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
+    </svg>
+  );
+}
+
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.19 8.19 0 004.79 1.54V6.79a4.85 4.85 0 01-1.02-.1z" />
+    </svg>
+  );
+}
+
+function TelegramIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 12 12 12 0 0011.944 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+    </svg>
+  );
+}
+
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -11,42 +37,122 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
-export { WHATSAPP_CHANNEL_URL };
-
+// Top-bar compact social strip (used in the header)
 export function SocialLinks() {
   return (
-    <div className="flex items-center space-x-2">
-      <a
-        href="#"
-        className="bg-blue-600 hover:bg-blue-700 p-2 rounded transition-colors"
-        aria-label="Facebook"
-      >
-        <Facebook className="w-5 h-5 text-white" />
+    <div className="flex items-center space-x-1.5">
+      <a href={SOCIAL_LINKS.facebook.url} target="_blank" rel="noopener noreferrer"
+        className="bg-blue-600 hover:bg-blue-700 p-2 rounded transition-colors" aria-label="Facebook">
+        <Facebook className="w-4 h-4 text-white" />
       </a>
-      <a
-        href="#"
-        className="bg-sky-500 hover:bg-sky-600 p-2 rounded transition-colors"
-        aria-label="Twitter"
-      >
-        <Twitter className="w-5 h-5 text-white" />
+      <a href={SOCIAL_LINKS.x.url} target="_blank" rel="noopener noreferrer"
+        className="bg-black hover:bg-gray-800 p-2 rounded transition-colors" aria-label="X">
+        <XIcon className="w-4 h-4 text-white" />
       </a>
-      <a
-        href="#"
-        className="bg-orange-500 hover:bg-orange-600 p-2 rounded transition-colors"
-        aria-label="RSS Feed"
-      >
-        <Rss className="w-5 h-5 text-white" />
+      <a href={SOCIAL_LINKS.instagram.url} target="_blank" rel="noopener noreferrer"
+        className="bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 hover:opacity-90 p-2 rounded transition-colors" aria-label="Instagram">
+        <Instagram className="w-4 h-4 text-white" />
       </a>
-      <a
-        href={WHATSAPP_CHANNEL_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center space-x-1.5 bg-green-600 hover:bg-green-700 px-3 py-2 rounded transition-colors"
-        aria-label="Follow on WhatsApp Channel"
-      >
+      <a href={SOCIAL_LINKS.tiktok.url} target="_blank" rel="noopener noreferrer"
+        className="bg-black hover:bg-gray-800 p-2 rounded transition-colors" aria-label="TikTok">
+        <TikTokIcon className="w-4 h-4 text-white" />
+      </a>
+      <a href={SOCIAL_LINKS.youtube.url} target="_blank" rel="noopener noreferrer"
+        className="bg-red-600 hover:bg-red-700 p-2 rounded transition-colors" aria-label="YouTube">
+        <Youtube className="w-4 h-4 text-white" />
+      </a>
+      <a href={SOCIAL_LINKS.telegram.url} target="_blank" rel="noopener noreferrer"
+        className="bg-sky-500 hover:bg-sky-600 p-2 rounded transition-colors" aria-label="Telegram">
+        <TelegramIcon className="w-4 h-4 text-white" />
+      </a>
+      <a href={SOCIAL_LINKS.whatsapp.url} target="_blank" rel="noopener noreferrer"
+        className="flex items-center space-x-1.5 bg-green-600 hover:bg-green-700 px-3 py-2 rounded transition-colors" aria-label="WhatsApp Channel">
         <WhatsAppIcon className="w-4 h-4 text-white" />
-        <span className="text-white text-xs font-semibold hidden sm:inline">Follow</span>
+        <span className="text-white text-xs font-semibold hidden lg:inline">Follow</span>
       </a>
+    </div>
+  );
+}
+
+// Full-size social button used in the footer / standalone CTAs
+interface SocialButtonProps {
+  href: string;
+  label: string;
+  sublabel?: string;
+  icon: React.ReactNode;
+  colorClass: string;
+}
+
+export function SocialButton({ href, label, sublabel, icon, colorClass }: SocialButtonProps) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`flex items-center gap-3 ${colorClass} text-white rounded-xl px-4 py-3 hover:opacity-90 active:scale-95 transition-all`}
+    >
+      <span className="flex-shrink-0">{icon}</span>
+      <span className="min-w-0">
+        <span className="block font-bold text-sm leading-tight">{label}</span>
+        {sublabel && <span className="block text-xs opacity-80 leading-tight">{sublabel}</span>}
+      </span>
+    </a>
+  );
+}
+
+// Pre-built grid of all platform buttons for footer / pages
+export function SocialMediaGrid() {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <SocialButton
+        href={SOCIAL_LINKS.facebook.url}
+        label="Facebook"
+        sublabel="Like our page"
+        icon={<Facebook className="w-5 h-5" />}
+        colorClass="bg-blue-600 hover:bg-blue-700"
+      />
+      <SocialButton
+        href={SOCIAL_LINKS.x.url}
+        label="X / Twitter"
+        sublabel="Follow for live updates"
+        icon={<XIcon className="w-5 h-5" />}
+        colorClass="bg-black hover:bg-gray-800"
+      />
+      <SocialButton
+        href={SOCIAL_LINKS.instagram.url}
+        label="Instagram"
+        sublabel="Behind-the-scenes"
+        icon={<Instagram className="w-5 h-5" />}
+        colorClass="bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600"
+      />
+      <SocialButton
+        href={SOCIAL_LINKS.tiktok.url}
+        label="TikTok"
+        sublabel="Short clips & trends"
+        icon={<TikTokIcon className="w-5 h-5" />}
+        colorClass="bg-gray-900 hover:bg-black"
+      />
+      <SocialButton
+        href={SOCIAL_LINKS.youtube.url}
+        label="YouTube"
+        sublabel="Subscribe for videos"
+        icon={<Youtube className="w-5 h-5" />}
+        colorClass="bg-red-600 hover:bg-red-700"
+      />
+      <SocialButton
+        href={SOCIAL_LINKS.telegram.url}
+        label="Telegram"
+        sublabel="Join our channel"
+        icon={<TelegramIcon className="w-5 h-5" />}
+        colorClass="bg-sky-500 hover:bg-sky-600"
+      />
+      <SocialButton
+        href={SOCIAL_LINKS.whatsapp.url}
+        label="WhatsApp"
+        sublabel="Breaking news alerts"
+        icon={<WhatsAppIcon className="w-5 h-5" />}
+        colorClass="bg-green-600 hover:bg-green-700"
+      />
     </div>
   );
 }
