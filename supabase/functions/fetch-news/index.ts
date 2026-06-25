@@ -650,8 +650,8 @@ const celebudReporters = [
   'Gbenga Ayandare',
   'Victoria Odunola',
   'Matthew Ayandare',
-  'Chidinma Okafor',
-  'Adebayo Ogundimu',
+  'Princess Bola',
+  'Amusa Babatunde',
 ];
 const celebudWhatsApp = '+14377888011';
 
@@ -1079,6 +1079,16 @@ Deno.serve(async (req: Request) => {
         const victoriaAuthor = authors?.find((a: any) => a.name === 'Victoria Odunola');
         const victoriaCategorySlugs = ['entertainment', 'celebrity', 'lifestyle'];
 
+        // Matthew's financial/insurance/business override for Canada (not USA)
+        const matthewAuthor = authors?.find((a: any) => a.name === 'Matthew Ayandare');
+        const financialCategorySlugs = ['business', 'finance-accounting', 'fin-advisor'];
+        const financialKeywords = ['finance', 'financial', 'insurance', 'banking', 'mortgage', 'investment', 'economy', 'economic', 'stock market', 'tax', 'budget', 'fiscal'];
+
+        function isFinancialContent(title: string, description: string): boolean {
+          const text = (title + ' ' + description).toLowerCase();
+          return financialKeywords.some(kw => text.includes(kw));
+        }
+
         // Resolve author by matching source country against routing rules
         function resolveAuthorByCountry(country: string): any {
           const lowerCountry = country.toLowerCase();
@@ -1163,11 +1173,18 @@ Deno.serve(async (req: Request) => {
 
             const priority = calculatePriorityScore(item.title, item.description);
 
-            // Assign author: first check if the article category is Victoria's beat
-            // (entertainment/celebrity/lifestyle), otherwise use the routing rules
+            // Assign author with priority overrides:
+            // 1. Financial/insurance/business from Canada -> Matthew
+            // 2. Entertainment/celebrity/lifestyle -> Victoria
+            // 3. Default: routing rules by source country
             let assignedAuthor: any;
-            const isVictoriaCategory = victoriaAuthor && victoriaCategorySlugs.includes(finalCategorySlug);
-            if (isVictoriaCategory) {
+            const isFinancialCategory = financialCategorySlugs.includes(finalCategorySlug);
+            const isCanadianSource = sourceCountry === 'canada';
+            const isFinancialCanadian = matthewAuthor && isCanadianSource && (isFinancialCategory || isFinancialContent(item.title, item.description));
+
+            if (isFinancialCanadian) {
+              assignedAuthor = matthewAuthor;
+            } else if (victoriaAuthor && victoriaCategorySlugs.includes(finalCategorySlug)) {
               assignedAuthor = victoriaAuthor;
             } else {
               assignedAuthor = defaultAuthorForSource;
