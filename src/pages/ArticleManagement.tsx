@@ -5,12 +5,10 @@ import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
-// Server-side share: insert into share_requests → pg_net trigger calls the edge function
-// Avoids all browser CORS issues with direct edge function calls
-async function queueShareRequest(articleId: string, userId: string): Promise<void> {
-  const { error } = await supabase
-    .from('share_requests')
-    .insert({ article_id: articleId, requested_by: userId });
+// Calls a PostgreSQL function via supabase.rpc() → /rest/v1/rpc/ (same path as DB queries, no CORS issue)
+// The PG function uses pg_net server-side to call the edge function — no browser network call involved
+async function queueShareRequest(articleId: string): Promise<void> {
+  const { error } = await supabase.rpc('share_article_to_socials', { article_id: articleId });
   if (error) throw new Error(error.message);
 }
 
@@ -303,11 +301,10 @@ export function ArticleManagement() {
   };
 
   const pushSingleArticle = async (articleId: string) => {
-    if (!user) return;
     setSharePosting(true);
     setShareResult(null);
     try {
-      await queueShareRequest(articleId, user.id);
+      await queueShareRequest(articleId);
       setShareResult('Queued — posting to Facebook & Telegram now (takes ~5 seconds)');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -318,7 +315,7 @@ export function ArticleManagement() {
   };
 
   const bulkPushToChannels = async () => {
-    if (selectedArticles.size === 0 || !user) return;
+    if (selectedArticles.size === 0) return;
     setBulkPosting(true);
     const ids = Array.from(selectedArticles);
     setBulkProgress({ done: 0, total: ids.length, results: [] });
@@ -328,7 +325,7 @@ export function ArticleManagement() {
       const article = articles.find(a => a.id === id);
       const title = article?.title.slice(0, 40) + (article && article.title.length > 40 ? '...' : '') || id;
       try {
-        await queueShareRequest(id, user.id);
+        await queueShareRequest(id);
         setBulkProgress(prev => ({
           done: i + 1,
           total: ids.length,
