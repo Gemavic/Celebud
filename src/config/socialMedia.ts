@@ -7,7 +7,7 @@ export const SOCIAL_LINKS = {
     active: true,
   },
   facebook: {
-    url: 'https://www.facebook.com/celebudmedia',
+    url: 'https://www.facebook.com/profile.php?id=61591656230605',
     label: 'Facebook',
     active: true,
   },

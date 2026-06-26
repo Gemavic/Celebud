@@ -687,7 +687,8 @@ export function ArticleManagement() {
                 </a>
               </div>
 
-              <div className="border-t border-gray-200 pt-4">
+              <div className="border-t border-gray-200 pt-4 space-y-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Auto-Post to Channels</p>
                 <button
                   onClick={async () => {
                     setSharePosting(true);
@@ -698,8 +699,15 @@ export function ArticleManagement() {
                       });
                       if (resp.error) throw resp.error;
                       const data = resp.data;
-                      const telegramOk = data?.results?.telegram?.[0]?.success;
-                      setShareResult(telegramOk ? 'Posted to Telegram channel!' : 'Share links generated. Configure TELEGRAM_BOT_TOKEN to enable auto-posting.');
+                      const result = data?.results?.[0];
+                      const fb = result?.facebook;
+                      const tg = result?.telegram;
+                      const parts: string[] = [];
+                      if (fb?.success) parts.push('Facebook: Posted');
+                      else if (fb?.error) parts.push(`Facebook: ${fb.error.includes('FACEBOOK_PAGE_ACCESS_TOKEN') ? 'Token needed (see setup below)' : fb.error}`);
+                      if (tg) parts.push('Telegram: Posted');
+                      else parts.push('Telegram: Token needed (see setup below)');
+                      setShareResult(parts.join('  |  '));
                     } catch (err: any) {
                       setShareResult('Error: ' + (err.message || 'Failed to post'));
                     } finally {
@@ -707,17 +715,13 @@ export function ArticleManagement() {
                     }
                   }}
                   disabled={sharePosting}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-xl font-semibold text-sm hover:from-sky-600 hover:to-blue-700 disabled:opacity-50 transition-all"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold text-sm hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 transition-all"
                 >
-                  {sharePosting ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Share2 className="w-4 h-4" />
-                  )}
-                  {sharePosting ? 'Posting...' : 'Auto-Post to Telegram Channel'}
+                  {sharePosting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+                  {sharePosting ? 'Posting to Facebook & Telegram...' : 'Auto-Post to Facebook Page + Telegram'}
                 </button>
                 {shareResult && (
-                  <p className={`text-sm mt-3 text-center font-medium ${shareResult.startsWith('Error') ? 'text-red-600' : 'text-green-600'}`}>
+                  <p className={`text-xs mt-2 text-center font-medium leading-relaxed ${shareResult.startsWith('Error') ? 'text-red-600' : 'text-gray-700'}`}>
                     {shareResult}
                   </p>
                 )}
