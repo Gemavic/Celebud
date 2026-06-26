@@ -61,7 +61,14 @@ export function CreatorRevShare() {
       setFormState('success');
     } else {
       setFormState('error');
-      setErrorMsg(error.message.includes('duplicate') ? 'You have already submitted an application.' : 'Something went wrong. Please try again.');
+      const msg = error.message || '';
+      if (msg.includes('duplicate')) {
+        setErrorMsg('You have already submitted an application.');
+      } else if (msg.includes('row-level security') || msg.includes('JWT') || msg.includes('not authenticated')) {
+        setErrorMsg('Your session may have expired. Please refresh the page and try again.');
+      } else {
+        setErrorMsg(msg || 'Something went wrong. Please try again.');
+      }
     }
   }
 
