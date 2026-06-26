@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { Header } from '../components/Header';
 import {
   BarChart3,
@@ -61,6 +62,7 @@ interface ReferrerData {
 }
 
 export function MetricsDashboard() {
+  const { profile, user, loading: authLoading } = useAuth();
   const [topArticles, setTopArticles] = useState<ArticleMetric[]>([]);
   const [recentArticles, setRecentArticles] = useState<ArticleMetric[]>([]);
   const [dailyViews, setDailyViews] = useState<DailyViews[]>([]);
@@ -192,10 +194,11 @@ export function MetricsDashboard() {
   };
 
   useEffect(() => {
+    if (!profile?.is_admin) return;
     fetchMetrics();
     const interval = setInterval(fetchMetrics, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [profile]);
 
   const avgViewsPerArticle = useMemo(() => {
     return totalArticles > 0 ? Math.round(totalViews / totalArticles) : 0;
@@ -208,6 +211,47 @@ export function MetricsDashboard() {
   const maxHourlyViews = useMemo(() => {
     return Math.max(...hourlyViews.map((h) => h.view_count), 1);
   }, [hourlyViews]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="pt-32 flex items-center justify-center">
+          <div className="text-center">
+            <RefreshCw className="w-10 h-10 animate-spin text-red-600 mx-auto mb-3" />
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile?.is_admin) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="pt-32 flex items-center justify-center">
+          <div className="text-center max-w-sm">
+            <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">Admin Access Required</h2>
+            <p className="text-gray-500 text-sm mb-6">
+              {user
+                ? 'Your account does not have admin privileges to view analytics.'
+                : 'Please sign in with an admin account to access the analytics dashboard.'}
+            </p>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   if (loading) {
     return (
