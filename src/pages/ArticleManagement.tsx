@@ -5,31 +5,13 @@ import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
-async function callShareToSocials(articleId: string): Promise<{ facebook: { success: boolean; error?: string }; telegram: boolean }> {
-  const resp = await fetch(`${SUPABASE_URL}/functions/v1/share-to-socials`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({ article_id: articleId }),
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => `HTTP ${resp.status}`);
-    throw new Error(`Function returned ${resp.status}: ${text.slice(0, 200)}`);
-  }
-
-  const data = await resp.json();
-  const result = data?.results?.[0];
-  return {
-    facebook: result?.facebook ?? { success: false, error: 'No response' },
-    telegram: result?.telegram ?? false,
-  };
+// Server-side share: insert into share_requests → pg_net trigger calls the edge function
+// Avoids all browser CORS issues with direct edge function calls
+async function queueShareRequest(articleId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('share_requests')
+    .insert({ article_id: articleId, requested_by: userId });
+  if (error) throw new Error(error.message);
 }
 
 interface Author {
@@ -321,16 +303,12 @@ export function ArticleManagement() {
   };
 
   const pushSingleArticle = async (articleId: string) => {
+    if (!user) return;
     setSharePosting(true);
     setShareResult(null);
     try {
-      const result = await callShareToSocials(articleId);
-      const parts: string[] = [];
-      if (result.facebook.success) parts.push('Facebook: Posted');
-      else parts.push(`Facebook: ${result.facebook.error?.slice(0, 80) ?? 'Failed'}`);
-      if (result.telegram) parts.push('Telegram: Posted');
-      else parts.push('Telegram: Failed');
-      setShareResult(parts.join('  |  '));
+      await queueShareRequest(articleId, user.id);
+      setShareResult('Queued — posting to Facebook & Telegram now (takes ~5 seconds)');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setShareResult('Error: ' + msg);
@@ -340,7 +318,7 @@ export function ArticleManagement() {
   };
 
   const bulkPushToChannels = async () => {
-    if (selectedArticles.size === 0) return;
+    if (selectedArticles.size === 0 || !user) return;
     setBulkPosting(true);
     const ids = Array.from(selectedArticles);
     setBulkProgress({ done: 0, total: ids.length, results: [] });
@@ -350,13 +328,11 @@ export function ArticleManagement() {
       const article = articles.find(a => a.id === id);
       const title = article?.title.slice(0, 40) + (article && article.title.length > 40 ? '...' : '') || id;
       try {
-        const result = await callShareToSocials(id);
-        const fb = result.facebook.success ? 'FB ok' : 'FB failed';
-        const tg = result.telegram ? 'TG ok' : 'TG failed';
+        await queueShareRequest(id, user.id);
         setBulkProgress(prev => ({
           done: i + 1,
           total: ids.length,
-          results: [...(prev?.results || []), `${title}: ${fb}, ${tg}`],
+          results: [...(prev?.results || []), `${title}: Queued`],
         }));
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message.slice(0, 60) : 'Error';
@@ -366,7 +342,6 @@ export function ArticleManagement() {
           results: [...(prev?.results || []), `${title}: ${msg}`],
         }));
       }
-      if (i < ids.length - 1) await new Promise(r => setTimeout(r, 800));
     }
 
     setBulkPosting(false);
