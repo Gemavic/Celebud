@@ -29,36 +29,63 @@ async function postToFacebook(article: ArticlePayload): Promise<{ success: boole
 
   const articleUrl = `${SITE_URL}/article/${article.id}`;
 
-  // Build a compelling post message
-  const lines: string[] = [];
-  lines.push(article.title);
-  if (article.description) {
-    const excerpt = article.description.length > 280
-      ? article.description.slice(0, 277) + "..."
-      : article.description;
-    lines.push("", excerpt);
-  }
-  lines.push("", `Read more: ${articleUrl}`);
-  lines.push("", "#CelebUD #News #Canada");
+  const excerpt = article.description
+    ? (article.description.length > 280 ? article.description.slice(0, 277) + "..." : article.description)
+    : "";
 
-  const message = lines.join("\n");
-
-  const body = new URLSearchParams({
-    message,
-    link: articleUrl,
-    access_token: pageToken,
-  });
-
-  // If there's a thumbnail, use it as the og:image (Facebook will scrape it)
-  // For direct image upload we'd need multipart; the link preview is sufficient
+  const message = [
+    article.title,
+    excerpt ? `\n${excerpt}` : "",
+    `\nRead more: ${articleUrl}`,
+    "\n#CelebUD #News #Canada",
+  ].join("");
 
   try {
+    // If thumbnail is available, post as a photo with a caption — this guarantees the image shows
+    if (article.thumbnail_url) {
+      const photoBody = new URLSearchParams({
+        url: article.thumbnail_url,
+        caption: message,
+        access_token: pageToken,
+      });
+
+      const photoResp = await fetch(
+        `https://graph.facebook.com/v19.0/${FACEBOOK_PAGE_ID}/photos`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: photoBody.toString(),
+        }
+      );
+
+      const photoData = await photoResp.json() as Record<string, unknown>;
+
+      if (photoResp.ok && !photoData.error) {
+        return { success: true, post_id: (photoData.post_id || photoData.id) as string };
+      }
+
+      // If photo post fails (e.g. image URL not accessible), fall through to link post
+      console.warn("Photo post failed, falling back to link post:", JSON.stringify(photoData));
+    }
+
+    // Link post with picture field to suggest thumbnail
+    const feedParams: Record<string, string> = {
+      message,
+      link: articleUrl,
+      access_token: pageToken,
+    };
+    if (article.thumbnail_url) {
+      feedParams.picture = article.thumbnail_url;
+      feedParams.name = article.title;
+      if (excerpt) feedParams.description = excerpt;
+    }
+
     const resp = await fetch(
       `https://graph.facebook.com/v19.0/${FACEBOOK_PAGE_ID}/feed`,
       {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: body.toString(),
+        body: new URLSearchParams(feedParams).toString(),
       }
     );
 
@@ -79,67 +106,73 @@ async function postToFacebook(article: ArticlePayload): Promise<{ success: boole
 
 // ─── Telegram ────────────────────────────────────────────────────────────────
 
-async function postToTelegram(article: ArticlePayload): Promise<boolean> {
+async function postToTelegram(article: ArticlePayload): Promise<{ ok: boolean; error?: string }> {
   const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN");
   const channelId = Deno.env.get("TELEGRAM_CHANNEL_ID");
-  if (!botToken || !channelId) return false;
+  if (!botToken || !channelId) {
+    return { ok: false, error: "TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID not configured" };
+  }
 
   const articleUrl = `${SITE_URL}/article/${article.id}`;
   const category = article.category_name
     ? `#${article.category_name.replace(/\s+/g, "").toLowerCase()}`
     : "";
 
-  const message = [
-    `*${escapeMarkdown(article.title)}*`,
+  const baseUrl = `https://api.telegram.org/bot${botToken}`;
+
+  // Build plain caption (safe — no markdown parsing, avoids all escape issues)
+  const caption = [
+    article.title,
     "",
-    article.description
-      ? escapeMarkdown(article.description.slice(0, 200)) + (article.description.length > 200 ? "..." : "")
-      : "",
+    article.description ? article.description.slice(0, 250) + (article.description.length > 250 ? "..." : "") : "",
     "",
     category ? `${category} #celebud #news` : "#celebud #news",
     "",
-    `[Read Full Article](${articleUrl})`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    `Read: ${articleUrl}`,
+  ].filter((line, idx, arr) => !(line === "" && (idx === 0 || idx === arr.length - 1))).join("\n");
 
   try {
-    const resp = await fetch(url, {
+    // If thumbnail available, post as photo with caption
+    if (article.thumbnail_url) {
+      const photoResp = await fetch(`${baseUrl}/sendPhoto`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: channelId,
+          photo: article.thumbnail_url,
+          caption: caption.slice(0, 1024), // Telegram caption limit
+        }),
+      });
+
+      const photoData = await photoResp.json() as Record<string, unknown>;
+      if (photoResp.ok && photoData.ok) {
+        return { ok: true };
+      }
+      // Photo failed (bad URL, unsupported format, etc.) — fall through to text
+      console.warn("Telegram photo post failed:", JSON.stringify(photoData));
+    }
+
+    // Plain text message — no markdown, guaranteed to work
+    const textResp = await fetch(`${baseUrl}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: channelId,
-        text: message,
-        parse_mode: "MarkdownV2",
-        disable_web_page_preview: false,
+        text: caption,
       }),
     });
 
-    if (!resp.ok) {
-      // Retry without markdown if formatting fails
-      const plain = [
-        article.title,
-        article.description?.slice(0, 200) || "",
-        `Read: ${articleUrl}`,
-      ].filter(Boolean).join("\n\n");
-
-      const retry = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: channelId, text: plain }),
-      });
-      return retry.ok;
+    const textData = await textResp.json() as Record<string, unknown>;
+    if (!textResp.ok || !textData.ok) {
+      const errMsg = (textData.description as string) || JSON.stringify(textData);
+      console.error("Telegram message failed:", errMsg);
+      return { ok: false, error: errMsg };
     }
-    return true;
-  } catch {
-    return false;
-  }
-}
 
-function escapeMarkdown(text: string): string {
-  return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
 }
 
 // ─── Share link generators ────────────────────────────────────────────────────
@@ -153,7 +186,6 @@ function generateShareLinks(article: ArticlePayload) {
     telegram: `https://t.me/share/url?url=${url}&text=${text}`,
     twitter: `https://twitter.com/intent/tweet?url=${url}&text=${text}&via=celebudmedia`,
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
-    linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
   };
 }
 
@@ -170,6 +202,17 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     let articles: ArticlePayload[] = [];
+
+    if (req.method === "GET") {
+      return new Response(
+        JSON.stringify({
+          status: "ok",
+          facebook_configured: !!Deno.env.get("FACEBOOK_PAGE_ACCESS_TOKEN"),
+          telegram_configured: !!(Deno.env.get("TELEGRAM_BOT_TOKEN") && Deno.env.get("TELEGRAM_CHANNEL_ID")),
+        }),
+        { headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
     if (req.method === "POST") {
       const body = await req.json();
@@ -211,28 +254,18 @@ Deno.serve(async (req: Request) => {
           }));
         }
       }
-    } else if (req.method === "GET") {
-      // Health check / status endpoint
-      return new Response(
-        JSON.stringify({
-          status: "ok",
-          facebook_configured: !!Deno.env.get("FACEBOOK_PAGE_ACCESS_TOKEN"),
-          telegram_configured: !!(Deno.env.get("TELEGRAM_BOT_TOKEN") && Deno.env.get("TELEGRAM_CHANNEL_ID")),
-          facebook_page_id: FACEBOOK_PAGE_ID,
-        }),
-        { headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
     }
 
     const results: {
       id: string;
       facebook: { success: boolean; post_id?: string; error?: string };
       telegram: boolean;
+      telegram_error?: string;
       shareLinks: ReturnType<typeof generateShareLinks>;
     }[] = [];
 
     for (const article of articles) {
-      const [facebookResult, telegramOk] = await Promise.all([
+      const [facebookResult, telegramResult] = await Promise.all([
         postToFacebook(article),
         postToTelegram(article),
       ]);
@@ -240,17 +273,14 @@ Deno.serve(async (req: Request) => {
       results.push({
         id: article.id,
         facebook: facebookResult,
-        telegram: telegramOk,
+        telegram: telegramResult.ok,
+        telegram_error: telegramResult.error,
         shareLinks: generateShareLinks(article),
       });
     }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        processed: articles.length,
-        results,
-      }),
+      JSON.stringify({ success: true, processed: articles.length, results }),
       { headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (err) {
