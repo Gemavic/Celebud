@@ -8,29 +8,24 @@ import {
   BarChart3,
   Send,
   CheckCircle2,
-  Mail,
-  Phone,
-  Instagram,
-  Youtube,
-  Twitter,
-  Facebook,
-  Globe,
+  ChevronDown,
+  ChevronUp,
+  Zap,
+  Shield,
+  Clock,
 } from 'lucide-react';
 
 export function CreatorRevShare() {
   const { user } = useAuth();
-  const [formState, setFormState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [step, setStep] = useState<'form' | 'submitting' | 'success' | 'error'>('form');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [showOptional, setShowOptional] = useState(false);
   const [bio, setBio] = useState('');
-  const [portfolioUrl, setPortfolioUrl] = useState('');
   const [topics, setTopics] = useState('');
   const [instagramHandle, setInstagramHandle] = useState('');
-  const [tiktokHandle, setTiktokHandle] = useState('');
   const [twitterHandle, setTwitterHandle] = useState('');
-  const [youtubeChannel, setYoutubeChannel] = useState('');
-  const [facebookUrl, setFacebookUrl] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signup');
@@ -38,51 +33,61 @@ export function CreatorRevShare() {
   async function handleApply(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
-
-    setFormState('submitting');
+    setStep('submitting');
     setErrorMsg('');
 
-    const { error } = await supabase.from('creator_applications').insert({
-      user_id: user.id,
-      display_name: displayName,
-      email: email || null,
-      phone_number: phoneNumber || null,
-      bio,
-      portfolio_url: portfolioUrl || null,
-      sample_topics: topics.split(',').map(t => t.trim()).filter(Boolean),
-      instagram_handle: instagramHandle ? instagramHandle.replace(/^@/, '') : null,
-      tiktok_handle: tiktokHandle ? tiktokHandle.replace(/^@/, '') : null,
-      twitter_handle: twitterHandle ? twitterHandle.replace(/^@/, '') : null,
-      youtube_channel: youtubeChannel || null,
-      facebook_url: facebookUrl || null,
+    const topicsArray = topics
+      ? topics.split(',').map(t => t.trim()).filter(Boolean)
+      : [];
+
+    const { data, error } = await supabase.rpc('submit_creator_application', {
+      p_display_name:  displayName.trim(),
+      p_email:         email.trim(),
+      p_phone_number:  phoneNumber.trim() || null,
+      p_bio:           bio.trim() || null,
+      p_topics:        topicsArray.length > 0 ? topicsArray : null,
+      p_instagram:     instagramHandle.replace(/^@/, '').trim() || null,
+      p_twitter:       twitterHandle.replace(/^@/, '').trim() || null,
     });
 
-    if (!error) {
-      setFormState('success');
-    } else {
-      setFormState('error');
-      const msg = error.message || '';
-      if (msg.includes('duplicate')) {
-        setErrorMsg('You have already submitted an application.');
-      } else if (msg.includes('row-level security') || msg.includes('JWT') || msg.includes('not authenticated')) {
-        setErrorMsg('Your session may have expired. Please refresh the page and try again.');
-      } else {
-        setErrorMsg(msg || 'Something went wrong. Please try again.');
-      }
+    if (error) {
+      setStep('error');
+      setErrorMsg('Something went wrong. Please try again.');
+      return;
     }
+
+    const result = data as { success: boolean; error?: string } | null;
+
+    if (!result?.success) {
+      setStep('error');
+      if (result?.error === 'duplicate') {
+        setErrorMsg('You have already submitted an application. Our team will contact you soon.');
+      } else if (result?.error === 'Not authenticated') {
+        setErrorMsg('Your session expired. Please refresh the page and try again.');
+      } else {
+        setErrorMsg(result?.error || 'Something went wrong. Please try again.');
+      }
+      return;
+    }
+
+    setStep('success');
   }
 
-  if (formState === 'success') {
+  if (step === 'success') {
     return (
       <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
-        <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl p-10 text-center">
-          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-9 h-9 text-emerald-600" />
+        <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl p-10 text-center max-w-xl mx-auto">
+          <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-9 h-9 text-white" />
           </div>
-          <h3 className="text-2xl font-bold text-emerald-900 mb-2">Application Submitted!</h3>
-          <p className="text-emerald-700 max-w-md mx-auto">
-            We'll review your application and get back to you within 48 hours. Welcome to the CelebUD creator program!
+          <h3 className="text-2xl font-bold text-emerald-900 mb-2">Application Received!</h3>
+          <p className="text-emerald-700 text-sm leading-relaxed max-w-sm mx-auto">
+            Our team will review your application within 24 hours. Once approved, you'll receive an email with next steps for verification and onboarding.
           </p>
+          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-emerald-600">
+            <Clock className="w-4 h-4" />
+            <span>Review within 24 hours</span>
+          </div>
         </div>
       </section>
     );
@@ -99,213 +104,183 @@ export function CreatorRevShare() {
               <span className="text-xs font-semibold uppercase tracking-wider text-red-400">Creator Program</span>
             </div>
             <h2 className="text-2xl lg:text-3xl font-bold text-white mb-4">
-              Write for CelebUD. <br />
+              Write for CelebUD.<br />
               <span className="text-red-400">Earn 50% of ad revenue.</span>
             </h2>
-            <p className="text-gray-300 text-sm mb-6 leading-relaxed">
+            <p className="text-gray-300 text-sm mb-8 leading-relaxed">
               Join our creator program and earn money from every article you publish.
-              We split ad revenue 50/50 -- you write, we handle distribution, and you get paid monthly.
+              We split ad revenue 50/50 — you write, we handle distribution, you get paid monthly.
             </p>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-3 bg-white/5 rounded-lg">
-                <DollarSign className="w-5 h-5 text-green-400 mx-auto mb-1" />
+            <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="text-center p-3 bg-white/5 rounded-xl">
+                <DollarSign className="w-5 h-5 text-green-400 mx-auto mb-1.5" />
                 <p className="text-white text-xs font-semibold">50/50 Split</p>
-                <p className="text-gray-400 text-[10px]">Fair revenue share</p>
+                <p className="text-gray-400 text-[10px] mt-0.5">Fair revenue share</p>
               </div>
-              <div className="text-center p-3 bg-white/5 rounded-lg">
-                <BarChart3 className="w-5 h-5 text-blue-400 mx-auto mb-1" />
-                <p className="text-white text-xs font-semibold">Real-Time Stats</p>
-                <p className="text-gray-400 text-[10px]">Track your earnings</p>
+              <div className="text-center p-3 bg-white/5 rounded-xl">
+                <BarChart3 className="w-5 h-5 text-blue-400 mx-auto mb-1.5" />
+                <p className="text-white text-xs font-semibold">Live Stats</p>
+                <p className="text-gray-400 text-[10px] mt-0.5">Track your earnings</p>
               </div>
-              <div className="text-center p-3 bg-white/5 rounded-lg">
-                <Send className="w-5 h-5 text-yellow-400 mx-auto mb-1" />
-                <p className="text-white text-xs font-semibold">Monthly Payouts</p>
-                <p className="text-gray-400 text-[10px]">Direct deposit</p>
+              <div className="text-center p-3 bg-white/5 rounded-xl">
+                <Send className="w-5 h-5 text-yellow-400 mx-auto mb-1.5" />
+                <p className="text-white text-xs font-semibold">Monthly Pay</p>
+                <p className="text-gray-400 text-[10px] mt-0.5">Direct deposit</p>
               </div>
+            </div>
+
+            {/* Process Steps */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">How it works</p>
+              {[
+                { icon: Zap, color: 'text-yellow-400', label: 'Apply in 30 seconds', sub: 'Name, email & phone — that\'s it' },
+                { icon: Shield, color: 'text-blue-400', label: 'Admin reviews & approves', sub: 'Within 24 hours' },
+                { icon: CheckCircle2, color: 'text-green-400', label: 'Get verified & onboarded', sub: 'Start writing and earning' },
+              ].map(({ icon: Icon, color, label, sub }) => (
+                <div key={label} className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0">
+                    <Icon className={`w-4 h-4 ${color}`} />
+                  </div>
+                  <div>
+                    <p className="text-white text-xs font-semibold">{label}</p>
+                    <p className="text-gray-500 text-[11px]">{sub}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Right: Application Form */}
-          <div className="p-8 lg:p-12 bg-white/5 backdrop-blur-sm">
+          {/* Right: Form */}
+          <div className="p-8 lg:p-12 bg-white/5 backdrop-blur-sm flex flex-col justify-center">
             {user ? (
               <form onSubmit={handleApply} className="space-y-4">
-                <h3 className="text-lg font-semibold text-white mb-1">Apply to Join</h3>
-                <p className="text-xs text-gray-400 mb-4">Fields marked * are required</p>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Apply to Join</h3>
+                  <p className="text-gray-400 text-sm mt-1">Fill 3 fields — done in 30 seconds</p>
+                </div>
 
-                {formState === 'error' && (
+                {step === 'error' && (
                   <div className="p-3 bg-red-900/40 border border-red-500/40 rounded-lg text-red-300 text-sm">
                     {errorMsg}
                   </div>
                 )}
 
-                {/* Display Name */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-300 mb-1">Display Name *</label>
+                {/* The 3 essential fields */}
+                <div className="space-y-3">
                   <input
                     type="text"
                     required
                     value={displayName}
                     onChange={e => setDisplayName(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                    placeholder="Your creator name"
+                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                    placeholder="Your name or pen name *"
                   />
-                </div>
-
-                {/* Email + Phone row */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="flex items-center gap-1.5 text-xs font-medium text-gray-300 mb-1">
-                      <Mail className="w-3.5 h-3.5" /> Email Address *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                      placeholder="you@email.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-1.5 text-xs font-medium text-gray-300 mb-1">
-                      <Phone className="w-3.5 h-3.5" /> Phone Number *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={phoneNumber}
-                      onChange={e => setPhoneNumber(e.target.value)}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                      placeholder="+1 (555) 000-0000"
-                    />
-                  </div>
-                </div>
-
-                {/* Bio */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-300 mb-1">Short Bio *</label>
-                  <textarea
-                    required
-                    value={bio}
-                    onChange={e => setBio(e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none resize-none"
-                    placeholder="Tell us about your writing experience..."
-                  />
-                </div>
-
-                {/* Topics */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-300 mb-1">Topics you'd cover *</label>
                   <input
-                    type="text"
+                    type="email"
                     required
-                    value={topics}
-                    onChange={e => setTopics(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                    placeholder="Celebrity news, Music, Fashion"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                    placeholder="Email address *"
                   />
-                  <p className="text-[11px] text-gray-500 mt-1">Comma-separated list</p>
+                  <input
+                    type="tel"
+                    required
+                    value={phoneNumber}
+                    onChange={e => setPhoneNumber(e.target.value)}
+                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                    placeholder="Phone number *"
+                  />
                 </div>
 
-                {/* Social Media Handles */}
+                {/* Optional extras — collapsed by default */}
                 <div>
-                  <p className="text-xs font-semibold text-gray-300 mb-2">Social Media Handles</p>
-                  <div className="space-y-2.5">
-                    <div className="relative">
-                      <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-pink-400" />
+                  <button
+                    type="button"
+                    onClick={() => setShowOptional(v => !v)}
+                    className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+                  >
+                    {showOptional ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    {showOptional ? 'Hide' : 'Add'} optional details (bio, topics, socials)
+                  </button>
+
+                  {showOptional && (
+                    <div className="mt-3 space-y-3 animate-in fade-in duration-200">
+                      <textarea
+                        value={bio}
+                        onChange={e => setBio(e.target.value)}
+                        rows={2}
+                        className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none resize-none transition-all"
+                        placeholder="Short bio (optional)"
+                      />
                       <input
                         type="text"
-                        value={instagramHandle}
-                        onChange={e => setInstagramHandle(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                        placeholder="@instagram_handle"
+                        value={topics}
+                        onChange={e => setTopics(e.target.value)}
+                        className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                        placeholder="Topics: Celebrity, Sports, Tech (comma-separated)"
                       />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div className="relative">
-                        <Twitter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-sky-400" />
+                      <div className="grid grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          value={instagramHandle}
+                          onChange={e => setInstagramHandle(e.target.value)}
+                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                          placeholder="@Instagram"
+                        />
                         <input
                           type="text"
                           value={twitterHandle}
                           onChange={e => setTwitterHandle(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                          placeholder="@x_handle"
-                        />
-                      </div>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-white/50 select-none">TT</span>
-                        <input
-                          type="text"
-                          value={tiktokHandle}
-                          onChange={e => setTiktokHandle(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                          placeholder="@tiktok_handle"
+                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                          placeholder="@X / Twitter"
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div className="relative">
-                        <Youtube className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-red-400" />
-                        <input
-                          type="text"
-                          value={youtubeChannel}
-                          onChange={e => setYoutubeChannel(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                          placeholder="YouTube channel name"
-                        />
-                      </div>
-                      <div className="relative">
-                        <Facebook className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blue-400" />
-                        <input
-                          type="url"
-                          value={facebookUrl}
-                          onChange={e => setFacebookUrl(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                          placeholder="Facebook profile URL"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Portfolio */}
-                <div>
-                  <label className="flex items-center gap-1.5 text-xs font-medium text-gray-300 mb-1">
-                    <Globe className="w-3.5 h-3.5" /> Portfolio URL (optional)
-                  </label>
-                  <input
-                    type="url"
-                    value={portfolioUrl}
-                    onChange={e => setPortfolioUrl(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                    placeholder="https://your-portfolio.com"
-                  />
+                  )}
                 </div>
 
                 <button
                   type="submit"
-                  disabled={formState === 'submitting'}
-                  className="w-full py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 text-sm shadow-lg shadow-red-900/30"
+                  disabled={step === 'submitting'}
+                  className="w-full py-3.5 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-50 text-sm shadow-lg shadow-red-900/30 flex items-center justify-center gap-2"
                 >
-                  {formState === 'submitting' ? 'Submitting...' : 'Apply Now'}
+                  {step === 'submitting' ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4" />
+                      Apply Now — 30 Seconds
+                    </>
+                  )}
                 </button>
+
+                <p className="text-center text-[11px] text-gray-500">
+                  After approval, you'll receive verification & onboarding instructions via email
+                </p>
               </form>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <PenTool className="w-10 h-10 text-gray-500 mb-3" />
-                <h3 className="text-lg font-semibold text-white mb-2">Sign in to Apply</h3>
-                <p className="text-gray-400 text-sm mb-6">Create an account or sign in to join the creator program.</p>
+              <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center mb-4">
+                  <PenTool className="w-7 h-7 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Ready to earn?</h3>
+                <p className="text-gray-400 text-sm mb-6 max-w-xs">
+                  Create a free account or sign in to apply. Takes under a minute.
+                </p>
                 <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
                   <button
                     onClick={() => { setAuthMode('signup'); setIsAuthModalOpen(true); }}
-                    className="flex-1 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors text-sm"
+                    className="flex-1 py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition-colors text-sm"
                   >
-                    Sign Up
+                    Create Account
                   </button>
                   <button
                     onClick={() => { setAuthMode('signin'); setIsAuthModalOpen(true); }}
-                    className="flex-1 py-3 bg-white/10 border border-white/20 text-white font-semibold rounded-lg hover:bg-white/20 transition-colors text-sm"
+                    className="flex-1 py-3 bg-white/10 border border-white/20 text-white font-semibold rounded-xl hover:bg-white/20 transition-colors text-sm"
                   >
                     Sign In
                   </button>
