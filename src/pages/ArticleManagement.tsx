@@ -5,6 +5,33 @@ import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+async function callShareToSocials(articleId: string): Promise<{ facebook: { success: boolean; error?: string }; telegram: boolean }> {
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/share-to-socials`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ article_id: articleId }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => `HTTP ${resp.status}`);
+    throw new Error(`Function returned ${resp.status}: ${text.slice(0, 200)}`);
+  }
+
+  const data = await resp.json();
+  const result = data?.results?.[0];
+  return {
+    facebook: result?.facebook ?? { success: false, error: 'No response' },
+    telegram: result?.telegram ?? false,
+  };
+}
+
 interface Author {
   id: string;
   name: string;
@@ -297,18 +324,11 @@ export function ArticleManagement() {
     setSharePosting(true);
     setShareResult(null);
     try {
-      const resp = await supabase.functions.invoke('share-to-socials', {
-        body: { article_id: articleId },
-      });
-      if (resp.error) throw resp.error;
-      const data = resp.data;
-      const result = data?.results?.[0];
-      const fb = result?.facebook;
-      const tg = result?.telegram;
+      const result = await callShareToSocials(articleId);
       const parts: string[] = [];
-      if (fb?.success) parts.push('Facebook: Posted');
-      else if (fb?.error) parts.push(`Facebook: ${fb.error.includes('FACEBOOK_PAGE_ACCESS_TOKEN') ? 'Token missing' : fb.error.slice(0, 60)}`);
-      if (tg) parts.push('Telegram: Posted');
+      if (result.facebook.success) parts.push('Facebook: Posted');
+      else parts.push(`Facebook: ${result.facebook.error?.slice(0, 80) ?? 'Failed'}`);
+      if (result.telegram) parts.push('Telegram: Posted');
       else parts.push('Telegram: Failed');
       setShareResult(parts.join('  |  '));
     } catch (err: unknown) {
@@ -330,25 +350,22 @@ export function ArticleManagement() {
       const article = articles.find(a => a.id === id);
       const title = article?.title.slice(0, 40) + (article && article.title.length > 40 ? '...' : '') || id;
       try {
-        const resp = await supabase.functions.invoke('share-to-socials', {
-          body: { article_id: id },
-        });
-        const result = resp.data?.results?.[0];
-        const fb = result?.facebook?.success ? 'FB ok' : 'FB failed';
-        const tg = result?.telegram ? 'TG ok' : 'TG failed';
+        const result = await callShareToSocials(id);
+        const fb = result.facebook.success ? 'FB ok' : 'FB failed';
+        const tg = result.telegram ? 'TG ok' : 'TG failed';
         setBulkProgress(prev => ({
           done: i + 1,
           total: ids.length,
           results: [...(prev?.results || []), `${title}: ${fb}, ${tg}`],
         }));
-      } catch {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message.slice(0, 60) : 'Error';
         setBulkProgress(prev => ({
           done: i + 1,
           total: ids.length,
-          results: [...(prev?.results || []), `${title}: Error`],
+          results: [...(prev?.results || []), `${title}: ${msg}`],
         }));
       }
-      // small delay to avoid rate limiting
       if (i < ids.length - 1) await new Promise(r => setTimeout(r, 800));
     }
 
