@@ -410,7 +410,7 @@ function CreateEditorialFeatureModal({ onClose, onCreated, availableContent }: C
           discussion_enabled: formData.discussion_enabled,
           call_to_action: formData.call_to_action,
           engagement_goal: formData.engagement_goal || null,
-          created_by: supabase.auth.user()?.id,
+          created_by: user?.id,
         });
 
       if (error) throw error;

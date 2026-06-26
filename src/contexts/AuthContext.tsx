@@ -58,7 +58,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        loadProfile(session.user.id);
+        // Defer loadProfile outside the auth callback to prevent a GoTrue lock deadlock.
+        // Calling supabase.from() directly inside onAuthStateChange can block because
+        // the auth client holds a lock during the broadcast, causing getSession() to hang.
+        const userId = session.user.id;
+        setTimeout(() => { if (mounted) loadProfile(userId); }, 0);
       } else {
         setProfile(null);
         setLoading(false);

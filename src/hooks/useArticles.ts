@@ -106,21 +106,27 @@ export function useArticle(id: string) {
   return useQuery({
     queryKey: ['article', id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Race the Supabase query against a 15-second timeout so the loading
+      // spinner never hangs forever (e.g. during a Supabase cold start).
+      const fetchPromise = supabase
         .from('media_content')
         .select('*, categories(*), authors(*)')
         .eq('id', id)
-        .maybeSingle();
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) throw error;
+          return data;
+        });
 
-      if (error) {
-        monitorQueryError(['article', 'detail'], error);
-        throw error;
-      }
-      return data;
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('The server is taking too long to respond. Please try again.')), 15000)
+      );
+
+      return Promise.race([fetchPromise, timeoutPromise]);
     },
     enabled: !!id,
-    staleTime: 60 * 60 * 1000,
-    retry: 2,
-    retryDelay: 1500,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 2000,
   });
 }

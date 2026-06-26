@@ -143,9 +143,11 @@ export function ArticleDetail() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
         <Header />
         <div className="pt-32 px-4 text-center max-w-md mx-auto">
-          <div className="text-5xl mb-4">!</div>
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-red-600 text-2xl font-bold">!</span>
+          </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Could not load article</h1>
-          <p className="text-gray-500 mb-6">There was a problem connecting to the server. Please check your connection and try again.</p>
+          <p className="text-gray-500 mb-6">The server is taking longer than usual. This may be a temporary issue — please try again.</p>
           <div className="flex items-center justify-center gap-4">
             <button
               onClick={() => refetch()}
