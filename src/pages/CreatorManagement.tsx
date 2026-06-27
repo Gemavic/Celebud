@@ -956,40 +956,55 @@ function RegisterCreatorModal({ onClose }: { onClose: () => void }) {
     setErrorMsg('');
 
     const topicsArray = topics ? topics.split(',').map(t => t.trim()).filter(Boolean) : null;
+    const cleanEmail = email.trim() || null;
+    const now = new Date().toISOString();
 
-    const { data, error } = await supabase.rpc('admin_register_creator', {
-      p_display_name: displayName.trim(),
-      p_email: email.trim() || null,
-      p_phone_number: phone.trim() || null,
-      p_bio: bio.trim() || null,
-      p_topics: topicsArray,
-      p_instagram: instagram.replace(/^@/, '').trim() || null,
-      p_twitter: twitter.replace(/^@/, '').trim() || null,
-      p_status: status,
-      p_admin_notes: adminNotes.trim() || null,
-    } as any);
+    // Check for duplicate email first
+    if (cleanEmail) {
+      const { data: existing } = await supabase
+        .from('creator_applications')
+        .select('id')
+        .eq('email', cleanEmail)
+        .maybeSingle();
+
+      if (existing) {
+        setStep('error');
+        setErrorMsg('A creator with this email already exists. Search for the existing record instead.');
+        return;
+      }
+    }
+
+    // Direct insert — uses admin INSERT RLS policy, no RPC schema cache needed
+    const { data, error } = await supabase
+      .from('creator_applications')
+      .insert({
+        display_name: displayName.trim(),
+        email: cleanEmail,
+        phone_number: phone.trim() || null,
+        bio: bio.trim() || null,
+        sample_topics: topicsArray,
+        instagram_handle: instagram.replace(/^@/, '').trim() || null,
+        twitter_handle: twitter.replace(/^@/, '').trim() || null,
+        status,
+        revenue_share_pct: 50,
+        admin_notes: adminNotes.trim() || null,
+        reviewed_at: now,
+        onboarded_at: status === 'onboarded' ? now : null,
+      })
+      .select('id')
+      .single();
 
     if (error) {
       setStep('error');
-      setErrorMsg('Server error: ' + error.message);
-      return;
-    }
-
-    const result = data as { success: boolean; id?: string; error?: string } | null;
-
-    if (!result?.success) {
-      setStep('error');
-      if (result?.error === 'duplicate_email') {
-        setErrorMsg('A creator with this email already exists. Use a different email or search for the existing record.');
-      } else if (result?.error === 'Not authorized') {
-        setErrorMsg('Admin privileges required. Please refresh and try again.');
+      if (error.message.includes('violates row-level security')) {
+        setErrorMsg('Admin access required. Please ensure you are signed in as an admin.');
       } else {
-        setErrorMsg(result?.error || 'Unknown error. Please try again.');
+        setErrorMsg('Error: ' + error.message);
       }
       return;
     }
 
-    setCreatedId(result.id || '');
+    setCreatedId(data?.id || '');
     setStep('success');
   };
 
