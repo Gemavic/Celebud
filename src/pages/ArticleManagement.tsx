@@ -241,9 +241,6 @@ export function ArticleManagement() {
 
       if (error) throw error;
 
-      // Best-effort: mark as manually edited (won't block save if schema cache is stale)
-      await supabase.from('media_content').update({ is_manual: true, submitted_by: user?.id || null }).eq('id', editingArticle.id);
-
       setEditingArticle(null);
       fetchArticles();
     } catch (err: unknown) {

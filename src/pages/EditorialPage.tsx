@@ -233,7 +233,6 @@ export default function EditorialPage() {
           author_id: authorId,
           submitted_by: user?.id || null,
           media_type: 'article',
-          is_manual: true,
           is_featured: createFormData.is_featured,
           is_trending: createFormData.is_trending,
           seo_title: createFormData.seo_title || null,
