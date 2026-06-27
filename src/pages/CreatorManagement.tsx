@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import { Header } from '../components/Header';
 import {
   useCreators,
@@ -46,6 +47,7 @@ export function CreatorManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCreator, setSelectedCreator] = useState<CreatorApplication | null>(null);
   const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
 
   const { data: creators = [], isLoading: creatorsLoading } = useCreators(statusFilter);
   const { data: payouts = [], isLoading: payoutsLoading } = useCreatorPayouts();
@@ -105,13 +107,22 @@ export function CreatorManagement() {
                 <h1 className="text-3xl font-bold text-gray-900">Creator Management</h1>
                 <p className="mt-1 text-gray-500">Track, onboard, and manage content creators and their revenue sharing</p>
               </div>
-              <Link
-                to="/admin/metrics"
-                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
-              >
-                <TrendingUp className="w-4 h-4" />
-                View Metrics
-              </Link>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowRegisterModal(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors shadow-sm"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Register Creator
+                </button>
+                <Link
+                  to="/admin/metrics"
+                  className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  View Metrics
+                </Link>
+              </div>
             </div>
           </div>
 
@@ -181,6 +192,12 @@ export function CreatorManagement() {
           creator={selectedCreator}
           onClose={() => setShowPayoutModal(false)}
           onSubmit={createPayout}
+        />
+      )}
+
+      {showRegisterModal && (
+        <RegisterCreatorModal
+          onClose={() => setShowRegisterModal(false)}
         />
       )}
     </div>
@@ -916,6 +933,282 @@ function PayoutStatusBadge({ status }: { status: string }) {
     <span className={`px-2.5 py-1 text-xs font-semibold rounded-full capitalize ${styles[status] || 'bg-gray-100 text-gray-700'}`}>
       {status}
     </span>
+  );
+}
+
+function RegisterCreatorModal({ onClose }: { onClose: () => void }) {
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [bio, setBio] = useState('');
+  const [topics, setTopics] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [twitter, setTwitter] = useState('');
+  const [adminNotes, setAdminNotes] = useState('');
+  const [status, setStatus] = useState<'approved' | 'onboarded'>('approved');
+  const [step, setStep] = useState<'form' | 'submitting' | 'success' | 'error'>('form');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [createdId, setCreatedId] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStep('submitting');
+    setErrorMsg('');
+
+    const topicsArray = topics ? topics.split(',').map(t => t.trim()).filter(Boolean) : null;
+
+    const { data, error } = await supabase.rpc('admin_register_creator', {
+      p_display_name: displayName.trim(),
+      p_email: email.trim() || null,
+      p_phone_number: phone.trim() || null,
+      p_bio: bio.trim() || null,
+      p_topics: topicsArray,
+      p_instagram: instagram.replace(/^@/, '').trim() || null,
+      p_twitter: twitter.replace(/^@/, '').trim() || null,
+      p_status: status,
+      p_admin_notes: adminNotes.trim() || null,
+    } as any);
+
+    if (error) {
+      setStep('error');
+      setErrorMsg('Server error: ' + error.message);
+      return;
+    }
+
+    const result = data as { success: boolean; id?: string; error?: string } | null;
+
+    if (!result?.success) {
+      setStep('error');
+      if (result?.error === 'duplicate_email') {
+        setErrorMsg('A creator with this email already exists. Use a different email or search for the existing record.');
+      } else if (result?.error === 'Not authorized') {
+        setErrorMsg('Admin privileges required. Please refresh and try again.');
+      } else {
+        setErrorMsg(result?.error || 'Unknown error. Please try again.');
+      }
+      return;
+    }
+
+    setCreatedId(result.id || '');
+    setStep('success');
+  };
+
+  if (step === 'success') {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-9 h-9 text-white" />
+          </div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">Creator Registered!</h3>
+          <p className="text-gray-600 text-sm mb-1">
+            <span className="font-semibold">{displayName}</span> has been added with status{' '}
+            <span className="font-semibold capitalize">{status}</span>.
+          </p>
+          {email && (
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl text-left">
+              <p className="text-sm font-semibold text-blue-800 mb-1">Next step — Send this to the creator:</p>
+              <p className="text-xs text-blue-700 leading-relaxed">
+                "Hi {displayName}, you have been registered on CelebUD as a content creator!
+                Please go to celebud.com, create a free account using this email ({email}),
+                and our team will link your creator profile so you can start writing and earning."
+              </p>
+            </div>
+          )}
+          <div className="mt-6 flex gap-3">
+            <button
+              onClick={() => { setStep('form'); setDisplayName(''); setEmail(''); setPhone(''); setBio(''); setTopics(''); setInstagram(''); setTwitter(''); setAdminNotes(''); }}
+              className="flex-1 py-2.5 border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              Add Another
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 rounded-t-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">Register Creator</h3>
+              <p className="text-sm text-gray-500 mt-0.5">Admin onboarding — no account required yet</p>
+            </div>
+            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+              <XCircle className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {step === 'error' && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+              {errorMsg}
+            </div>
+          )}
+
+          {/* Required */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Full Name / Display Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={displayName}
+              onChange={e => setDisplayName(e.target.value)}
+              placeholder="e.g. Victoria Odunola"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="creator@email.com"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Phone Number</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="+234 xxx xxx xxxx"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Bio</label>
+            <textarea
+              value={bio}
+              onChange={e => setBio(e.target.value)}
+              rows={2}
+              placeholder="Short bio about the creator..."
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Topics (comma-separated)</label>
+            <input
+              type="text"
+              value={topics}
+              onChange={e => setTopics(e.target.value)}
+              placeholder="Celebrity, Sports, Entertainment"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Instagram</label>
+              <input
+                type="text"
+                value={instagram}
+                onChange={e => setInstagram(e.target.value)}
+                placeholder="@handle"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">X / Twitter</label>
+              <input
+                type="text"
+                value={twitter}
+                onChange={e => setTwitter(e.target.value)}
+                placeholder="@handle"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Initial Status</label>
+            <div className="flex gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="status"
+                  value="approved"
+                  checked={status === 'approved'}
+                  onChange={() => setStatus('approved')}
+                  className="accent-red-600"
+                />
+                <span className="text-sm text-gray-700">Approved <span className="text-xs text-gray-400">(needs onboarding)</span></span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="status"
+                  value="onboarded"
+                  checked={status === 'onboarded'}
+                  onChange={() => setStatus('onboarded')}
+                  className="accent-red-600"
+                />
+                <span className="text-sm text-gray-700">Onboarded <span className="text-xs text-gray-400">(fully active)</span></span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Admin Notes</label>
+            <input
+              type="text"
+              value={adminNotes}
+              onChange={e => setAdminNotes(e.target.value)}
+              placeholder="e.g. Referred by Gbenga, specialises in politics..."
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={step === 'submitting' || !displayName.trim()}
+              className="flex-1 py-3 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {step === 'submitting' ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Registering...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4" />
+                  Register Creator
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 

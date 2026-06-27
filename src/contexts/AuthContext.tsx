@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signUp(email: string, password: string, username: string) {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -122,6 +122,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) throw error;
+
+    // If identities array is empty, the email is already registered
+    if (data?.user && (!data.user.identities || data.user.identities.length === 0)) {
+      throw new Error('User already registered');
+    }
   }
 
   async function signIn(email: string, password: string) {

@@ -35,13 +35,18 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
   const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const getFriendlyError = (err: any): string => {
-    const msg = err?.message || '';
-    if (msg.includes('User already registered')) return 'An account with this email already exists. Please sign in instead.';
-    if (msg.includes('Invalid login credentials')) return 'Incorrect email or password. Please try again.';
-    if (msg.includes('Email not confirmed')) return 'Your email address has not been confirmed. Please contact the admin or use "Forgot password?" below.';
+    const msg = (err?.message || err?.error_description || '').toString();
+    if (msg.includes('User already registered') || msg.includes('already registered')) return 'An account with this email already exists. Please sign in instead.';
+    if (msg.includes('Invalid login credentials') || msg.includes('invalid_credentials')) return 'Incorrect email or password. Please try again.';
+    if (msg.includes('Email not confirmed') || msg.includes('email_not_confirmed')) return 'Your email is not yet confirmed. Please check your inbox or use "Forgot password?" to resend.';
     if (msg.includes('duplicate key') && msg.includes('username')) return 'This username is already taken. Please choose another.';
-    if (msg.includes('Password should be at least')) return 'Password must be at least 8 characters long.';
-    return 'Something went wrong. Please try again.';
+    if (msg.includes('Password should be at least') || msg.includes('password')) return 'Password must be at least 8 characters long.';
+    if (msg.includes('rate limit') || msg.includes('over_email_send_rate_limit') || msg.includes('too many')) return 'Too many attempts. Please wait a few minutes and try again.';
+    if (msg.includes('Database error') || msg.includes('database')) return 'A server error occurred. Please try again in a moment.';
+    if (msg.includes('signup_disabled') || msg.includes('Signups not allowed')) return 'Account registration is temporarily unavailable. Please contact the admin.';
+    if (msg.includes('email') && msg.includes('invalid')) return 'Please enter a valid email address.';
+    // Show the actual message if unknown, to help debug
+    return msg ? `Error: ${msg}` : 'Something went wrong. Please try again.';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
