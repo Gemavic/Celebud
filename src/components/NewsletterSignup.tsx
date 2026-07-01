@@ -33,7 +33,7 @@ export function NewsletterSignup() {
         setName('');
         // Fire Google Ads Contact conversion
         if (typeof window.gtag === 'function') {
-          window.gtag('event', 'conversion', { send_to: 'AW-7665832939' });
+          window.gtag('event', 'conversion', { send_to: 'AW-7665832939/q0OhCOunrcccEI6wy_ND' });
         }
       }
     } catch (error) {
