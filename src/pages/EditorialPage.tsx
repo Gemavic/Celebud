@@ -115,21 +115,10 @@ export default function EditorialPage() {
     try {
       const { data, error } = await supabase
         .from('authors')
-        .select('id, name, avatar_url, bio, user_id')
+        .select('id, name, avatar_url, bio')
         .order('name');
       if (error) throw error;
-      const list = data || [];
-      setAuthors(list);
-      // Auto-select the author record that belongs to the logged-in user
-      if (user) {
-        const mine = list.find((a: Author & { user_id?: string }) => a.user_id === user.id);
-        if (mine) {
-          setCreateFormData((prev: typeof createFormData) => ({
-            ...prev,
-            author_id: prev.author_id || mine.id,
-          }));
-        }
-      }
+      setAuthors(data || []);
     } catch (err) {
       console.error('Error loading authors:', err);
     }
