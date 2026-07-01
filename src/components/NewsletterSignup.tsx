@@ -31,6 +31,10 @@ export function NewsletterSignup() {
         setStatus('success');
         setEmail('');
         setName('');
+        // Fire Google Ads Contact conversion
+        if (typeof window.gtag === 'function') {
+          window.gtag('event', 'conversion', { send_to: 'AW-7665832939' });
+        }
       }
     } catch (error) {
       setMessage('Something went wrong. Please try again.');
