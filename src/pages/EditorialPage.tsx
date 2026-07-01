@@ -231,7 +231,6 @@ export default function EditorialPage() {
           category_id: createFormData.category_id || null,
           thumbnail_url: thumbnailUrl,
           author_id: authorId,
-          submitted_by: user?.id || null,
           media_type: 'article',
           is_featured: createFormData.is_featured,
           is_trending: createFormData.is_trending,
