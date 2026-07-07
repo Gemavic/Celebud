@@ -56,13 +56,13 @@ export function ContentStudio() {
 
   const contentType = CONTENT_TYPE_MAP[activeTab];
   const { data: contentItems = [], isLoading } = useCreatorContentList(
-    myCreator?.id,
+    myCreator?.id || (isAdmin ? undefined : 'none'),
     {
       contentType: contentType || undefined,
       status: statusFilter !== 'all' ? statusFilter as ContentStatus : undefined,
     }
   );
-  const { data: stats } = useContentStats(myCreator?.id);
+  const { data: stats } = useContentStats(myCreator?.id || (isAdmin ? undefined : 'none'));
   const { data: categories = [] } = useContentCategories();
 
   if (!user) {
@@ -83,7 +83,9 @@ export function ContentStudio() {
     );
   }
 
-  if (!myCreator || !['approved', 'onboarded'].includes(myCreator.status)) {
+  const isAdmin = profile?.is_admin;
+
+  if (!isAdmin && (!myCreator || !['approved', 'onboarded'].includes(myCreator.status))) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
@@ -205,9 +207,10 @@ export function ContentStudio() {
         </div>
       </div>
 
-      {showUploadModal && myCreator && (
+      {showUploadModal && (myCreator || isAdmin) && (
         <ContentUploadModal
-          creatorId={myCreator.id}
+          creatorId={myCreator?.id || ''}
+          isAdmin={!!isAdmin}
           contentType={uploadType}
           categories={categories}
           editingItem={editingItem}
@@ -556,12 +559,14 @@ function ContentPanel({
 
 function ContentUploadModal({
   creatorId,
+  isAdmin,
   contentType,
   categories,
   editingItem,
   onClose,
 }: {
   creatorId: string;
+  isAdmin: boolean;
   contentType: ContentType;
   categories: { id: string; name: string; slug: string; color: string | null }[];
   editingItem: CreatorContentItem | null;
@@ -580,13 +585,15 @@ function ContentUploadModal({
     platform: editingItem?.platform || (null as Platform),
     category: editingItem?.category || 'entertainment',
     tags: editingItem?.tags?.join(', ') || '',
-    status: editingItem?.status || 'draft' as ContentStatus,
+    status: editingItem?.status || 'published' as ContentStatus,
     scheduled_at: editingItem?.scheduled_at?.slice(0, 16) || '',
     duration_seconds: editingItem?.duration_seconds?.toString() || '',
     content_type: editingItem?.content_type || contentType,
   });
 
   const [error, setError] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const typeLabels: Record<ContentType, string> = {
     video: 'Video',
@@ -595,14 +602,15 @@ function ContentUploadModal({
     social_post: 'Social Post',
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (publishNow: boolean) => {
     setError('');
 
     if (!form.title.trim()) {
-      setError('Title is required');
+      setError('Please add a title');
       return;
     }
+
+    const finalStatus = publishNow ? 'published' : form.status;
 
     const payload = {
       creator_id: creatorId,
@@ -615,7 +623,7 @@ function ContentUploadModal({
       platform: form.platform || undefined,
       category: form.category,
       tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-      status: form.status,
+      status: finalStatus,
       scheduled_at: form.scheduled_at ? new Date(form.scheduled_at).toISOString() : undefined,
       duration_seconds: form.duration_seconds ? parseInt(form.duration_seconds) : undefined,
     };
@@ -626,38 +634,56 @@ function ContentUploadModal({
       } else {
         await createContent.mutateAsync(payload);
       }
-      onClose();
+      setSuccess(true);
+      setTimeout(onClose, 1200);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save content');
+      setError(err instanceof Error ? err.message : 'Failed to save. Please try again.');
     }
   };
 
+  if (success) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 text-emerald-600" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">
+            {isEditing ? 'Updated!' : 'Published!'}
+          </h3>
+          <p className="text-gray-500">Your {typeLabels[form.content_type].toLowerCase()} is now live.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-20 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-16 sm:pt-20 overflow-y-auto">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h3 className="text-xl font-bold text-gray-900">
-              {isEditing ? 'Edit' : 'New'} {typeLabels[form.content_type]}
+            <h3 className="text-lg font-bold text-gray-900">
+              {isEditing ? 'Edit' : 'Post'} {typeLabels[form.content_type]}
             </h3>
-            <p className="text-sm text-gray-500 mt-0.5">Fill in the details below</p>
+            <p className="text-xs text-gray-400 mt-0.5">Just fill in what you need</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5 text-gray-400" />
           </button>
         </div>
 
-        {/* Content Type Selector */}
-        <div className="px-6 pt-5">
-          <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
+        {/* Content Type Tabs */}
+        <div className="px-6 pt-4">
+          <div className="flex gap-1 p-1 bg-gray-100 rounded-xl overflow-x-auto scrollbar-hide">
             {(['video', 'livestream', 'clip', 'social_post'] as ContentType[]).map(type => (
               <button
                 key={type}
                 type="button"
                 onClick={() => setForm(f => ({ ...f, content_type: type }))}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                   form.content_type === type
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
@@ -671,7 +697,7 @@ function ContentUploadModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <div className="px-6 py-5 space-y-4">
           {error && (
             <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -679,182 +705,194 @@ function ContentUploadModal({
             </div>
           )}
 
-          {/* Title */}
+          {/* Title - Required */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Title</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Title *</label>
             <input
               type="text"
               value={form.title}
               onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-              placeholder="Enter a compelling title..."
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+              placeholder="What's this about?"
+              autoFocus
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
             />
           </div>
 
-          {/* Description */}
+          {/* Description - Optional */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Description</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
             <textarea
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="Describe your content..."
-              rows={3}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all resize-none"
+              placeholder="Brief description (optional)"
+              rows={2}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none resize-none"
             />
           </div>
 
-          {/* URLs Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
-                <Image className="w-3.5 h-3.5" /> Thumbnail URL
-              </label>
-              <input
-                type="url"
-                value={form.thumbnail_url}
-                onChange={e => setForm(f => ({ ...f, thumbnail_url: e.target.value }))}
-                placeholder="https://..."
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-              />
-            </div>
-            <div>
-              <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
-                <LinkIcon className="w-3.5 h-3.5" /> Media/Embed URL
-              </label>
-              <input
-                type="url"
-                value={form.media_url}
-                onChange={e => setForm(f => ({ ...f, media_url: e.target.value }))}
-                placeholder="https://..."
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-              />
-            </div>
-          </div>
-
-          {/* External URL & Platform */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
-                <Globe className="w-3.5 h-3.5" /> External Link
-              </label>
-              <input
-                type="url"
-                value={form.external_url}
-                onChange={e => setForm(f => ({ ...f, external_url: e.target.value }))}
-                placeholder="https://youtube.com/..."
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-              />
-            </div>
-            <div>
-              <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
-                <Share2 className="w-3.5 h-3.5" /> Platform
-              </label>
-              <select
-                value={form.platform || ''}
-                onChange={e => setForm(f => ({ ...f, platform: (e.target.value || null) as Platform }))}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none appearance-none"
-              >
-                <option value="">None</option>
-                {PLATFORM_OPTIONS.map(p => (
-                  <option key={p.value} value={p.value!}>{p.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Category & Duration */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Category</label>
-              <select
-                value={form.category}
-                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none appearance-none"
-              >
-                {categories.map(cat => (
-                  <option key={cat.slug} value={cat.slug}>{cat.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
-                <Clock className="w-3.5 h-3.5" /> Duration (seconds)
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={form.duration_seconds}
-                onChange={e => setForm(f => ({ ...f, duration_seconds: e.target.value }))}
-                placeholder="e.g. 120"
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Tags */}
+          {/* Media URL - The key field */}
           <div>
-            <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
-              <Hash className="w-3.5 h-3.5" /> Tags
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1">
+              <LinkIcon className="w-3.5 h-3.5" />
+              {form.content_type === 'livestream' ? 'Stream URL' : 'Media/Embed URL'}
             </label>
             <input
-              type="text"
-              value={form.tags}
-              onChange={e => setForm(f => ({ ...f, tags: e.target.value }))}
-              placeholder="Comma-separated: trending, music, viral"
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+              type="url"
+              value={form.media_url}
+              onChange={e => setForm(f => ({ ...f, media_url: e.target.value }))}
+              placeholder="Paste your YouTube, TikTok, or video link here"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
             />
+            <p className="text-xs text-gray-400 mt-1">YouTube, TikTok, Instagram, Facebook, or direct link</p>
           </div>
 
-          {/* Status & Schedule */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Status</label>
-              <select
-                value={form.status}
-                onChange={e => setForm(f => ({ ...f, status: e.target.value as ContentStatus }))}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none appearance-none"
-              >
-                <option value="draft">Draft</option>
-                <option value="published">Publish Now</option>
-                <option value="scheduled">Schedule</option>
-                {form.content_type === 'livestream' && <option value="live">Go Live</option>}
-              </select>
+          {/* Platform Quick Select */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Platform</label>
+            <div className="flex flex-wrap gap-2">
+              {PLATFORM_OPTIONS.map(p => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, platform: f.platform === p.value ? null : p.value }))}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    form.platform === p.value
+                      ? 'bg-red-600 text-white border-red-600'
+                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
-            {form.status === 'scheduled' && (
+          </div>
+
+          {/* Advanced Options Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors w-full"
+          >
+            <div className={`w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center transition-transform ${showAdvanced ? 'rotate-90' : ''}`}>
+              <span className="text-xs">+</span>
+            </div>
+            {showAdvanced ? 'Hide' : 'Show'} more options (thumbnail, tags, schedule)
+          </button>
+
+          {/* Advanced Options - Collapsible */}
+          {showAdvanced && (
+            <div className="space-y-4 pt-2 border-t border-gray-100">
+              {/* Thumbnail */}
               <div>
-                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
-                  <Calendar className="w-3.5 h-3.5" /> Schedule Date
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1">
+                  <Image className="w-3.5 h-3.5" /> Thumbnail URL
+                </label>
+                <input
+                  type="url"
+                  value={form.thumbnail_url}
+                  onChange={e => setForm(f => ({ ...f, thumbnail_url: e.target.value }))}
+                  placeholder="https://... (cover image)"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              {/* External URL */}
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1">
+                  <Globe className="w-3.5 h-3.5" /> External Link
+                </label>
+                <input
+                  type="url"
+                  value={form.external_url}
+                  onChange={e => setForm(f => ({ ...f, external_url: e.target.value }))}
+                  placeholder="Link to original source"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              {/* Category & Duration */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Category</label>
+                  <select
+                    value={form.category}
+                    onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none appearance-none"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat.slug} value={cat.slug}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Duration (sec)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.duration_seconds}
+                    onChange={e => setForm(f => ({ ...f, duration_seconds: e.target.value }))}
+                    placeholder="e.g. 120"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1">
+                  <Hash className="w-3.5 h-3.5" /> Tags
+                </label>
+                <input
+                  type="text"
+                  value={form.tags}
+                  onChange={e => setForm(f => ({ ...f, tags: e.target.value }))}
+                  placeholder="trending, music, viral"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              {/* Schedule */}
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1">
+                  <Calendar className="w-3.5 h-3.5" /> Schedule for later
                 </label>
                 <input
                   type="datetime-local"
                   value={form.scheduled_at}
-                  onChange={e => setForm(f => ({ ...f, scheduled_at: e.target.value }))}
+                  onChange={e => setForm(f => ({ ...f, scheduled_at: e.target.value, status: e.target.value ? 'scheduled' : 'draft' }))}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
                 />
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
 
-          {/* Submit Buttons */}
-          <div className="flex gap-3 pt-3 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={createContent.isPending || updateContent.isPending}
-              className="flex-1 py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 shadow-lg shadow-red-200"
-            >
-              {(createContent.isPending || updateContent.isPending)
-                ? 'Saving...'
-                : isEditing ? 'Update Content' : `Create ${typeLabels[form.content_type]}`}
-            </button>
-          </div>
-        </form>
+        {/* Action Buttons */}
+        <div className="px-6 pb-6 flex gap-3">
+          <button
+            type="button"
+            onClick={() => handleSubmit(false)}
+            disabled={createContent.isPending || updateContent.isPending}
+            className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            Save as Draft
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSubmit(true)}
+            disabled={createContent.isPending || updateContent.isPending}
+            className="flex-[2] py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 shadow-lg shadow-red-200 flex items-center justify-center gap-2"
+          >
+            {(createContent.isPending || updateContent.isPending) ? (
+              'Publishing...'
+            ) : (
+              <>
+                <Upload className="w-4 h-4" />
+                Publish Now
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

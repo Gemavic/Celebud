@@ -72,7 +72,7 @@ export function useCreatorContentList(creatorId?: string, filters?: {
       if (error) throw error;
       return data as CreatorContentItem[];
     },
-    enabled: !!creatorId,
+    enabled: creatorId !== 'none',
     staleTime: 1000 * 60 * 2,
   });
 }
@@ -181,12 +181,15 @@ export function useContentStats(creatorId?: string) {
   return useQuery({
     queryKey: ['creator-content-stats', creatorId],
     queryFn: async () => {
-      if (!creatorId) return null;
-
-      const { data, error } = await supabase
+      let query = supabase
         .from('creator_content')
-        .select('content_type, status, view_count, like_count, share_count')
-        .eq('creator_id', creatorId);
+        .select('content_type, status, view_count, like_count, share_count');
+
+      if (creatorId) {
+        query = query.eq('creator_id', creatorId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -205,7 +208,7 @@ export function useContentStats(creatorId?: string) {
         totalShares: items.reduce((sum, i) => sum + (i.share_count || 0), 0),
       };
     },
-    enabled: !!creatorId,
+    enabled: creatorId !== 'none',
     staleTime: 1000 * 60 * 5,
   });
 }
