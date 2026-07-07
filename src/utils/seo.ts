@@ -82,6 +82,7 @@ export function generateArticleStructuredData(article: {
   description: string;
   image?: string;
   author: string;
+  authorSlug?: string;
   publishedDate: string;
   modifiedDate?: string;
   url: string;
@@ -94,10 +95,13 @@ export function generateArticleStructuredData(article: {
     image: article.image ? [article.image] : [],
     datePublished: article.publishedDate,
     dateModified: article.modifiedDate || article.publishedDate,
-    author: {
+    author: [{
       '@type': 'Person',
       name: article.author,
-    },
+      url: article.authorSlug
+        ? `${window.location.origin}/author/${article.authorSlug}`
+        : undefined,
+    }],
     publisher: {
       '@type': 'Organization',
       name: 'CelebUD Magazine',

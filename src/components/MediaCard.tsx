@@ -42,11 +42,12 @@ export const MediaCard = memo(function MediaCard({ content }: MediaCardProps) {
       <div className="relative overflow-hidden h-56 bg-gray-200">
         <img
           src={content.thumbnail_url || fallbackImage}
-          alt={content.title}
+          alt={`${content.title}.`}
           loading="lazy"
           decoding="async"
           width={400}
           height={224}
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           onError={handleImageError}
           className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
         />

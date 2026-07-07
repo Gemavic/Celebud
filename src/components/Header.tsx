@@ -1,9 +1,10 @@
 import { Search, Menu, X, Star, User, LogOut, SquarePen as PenSquare, FolderOpen, Users, Video, LayoutDashboard } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { SocialLinks } from './SocialLinks';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
+import { supabase } from '../lib/supabase';
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -11,9 +12,51 @@ export function Header() {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<{ id: string; title: string }[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (searchQuery.trim().length < 3) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from('media_content')
+        .select('id, title')
+        .ilike('title', `%${searchQuery.trim()}%`)
+        .limit(5);
+      if (data && data.length > 0) {
+        setSuggestions(data);
+        setShowSuggestions(true);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 300);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchQuery]);
 
   const scrollToTop = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (location.pathname === '/') {
@@ -40,12 +83,20 @@ export function Header() {
     e.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`);
+      setShowSuggestions(false);
       setIsMenuOpen(false);
     }
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
+    <>
+      <a
+        href="#main-content"
+        className="skip-link sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 focus:z-[100] focus:bg-gray-900 focus:text-white focus:px-4 focus:py-3 focus:text-sm focus:font-medium"
+      >
+        Skip to main content
+      </a>
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
       <div className="bg-gray-800 py-2">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <SocialLinks />
@@ -182,16 +233,34 @@ export function Header() {
             </Link>
           </nav>
 
-          <form onSubmit={handleSearch} className="hidden md:flex items-center bg-gray-100 rounded-lg px-4 py-2 ml-4">
-            <Search className="w-4 h-4 text-gray-500 mr-2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search news..."
-              className="bg-transparent outline-none text-sm text-gray-700 placeholder-gray-500 w-48"
-            />
-          </form>
+          <div ref={searchRef} className="hidden md:block relative ml-4">
+            <form onSubmit={handleSearch} className="flex items-center bg-gray-100 rounded-lg px-4 py-2">
+              <Search className="w-4 h-4 text-gray-500 mr-2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                placeholder="Search news..."
+                aria-label="Search site"
+                className="bg-transparent outline-none text-sm text-gray-700 placeholder-gray-500 w-48"
+              />
+            </form>
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-50">
+                {suggestions.map((item) => (
+                  <Link
+                    key={item.id}
+                    to={`/article/${item.id}`}
+                    onClick={() => { setShowSuggestions(false); setSearchQuery(''); }}
+                    className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors border-b border-gray-100 last:border-0 line-clamp-1"
+                  >
+                    {item.title}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
 
           <button
             className="lg:hidden p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -339,5 +408,6 @@ export function Header() {
         mode={authMode}
       />
     </header>
+    </>
   );
 }

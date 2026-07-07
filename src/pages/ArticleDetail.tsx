@@ -73,6 +73,7 @@ export function ArticleDetail() {
       description: article.description || article.title,
       image: article.thumbnail_url || undefined,
       author: article.authors?.name || 'CelebUD',
+      authorSlug: article.authors?.name?.toLowerCase().replace(/\s+/g, '-'),
       publishedDate: article.published_at,
       modifiedDate: article.updated_at,
       url: `${window.location.origin}/article/${id}`,
@@ -186,7 +187,7 @@ export function ArticleDetail() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
       <Header />
 
-      <article className="pt-40 pb-16" itemScope itemType="https://schema.org/NewsArticle">
+      <article id="main-content" className="pt-40 pb-16" itemScope itemType="https://schema.org/NewsArticle">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <Link
             to="/"
@@ -241,8 +242,12 @@ export function ArticleDetail() {
             <div className="mb-8 rounded-xl overflow-hidden shadow-lg">
               <img
                 src={article.thumbnail_url}
-                alt={article.title}
+                alt={`${article.title}.`}
                 className="w-full h-auto object-cover"
+                loading="eager"
+                width={800}
+                height={450}
+                sizes="(max-width: 768px) 100vw, 800px"
                 itemProp="image"
               />
             </div>

@@ -1,4 +1,4 @@
-import { useMemo, useCallback, lazy, Suspense } from 'react';
+import { useMemo, useCallback, useState, lazy, Suspense } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Hero } from '../components/Hero';
@@ -11,8 +11,9 @@ import { GoogleAd } from '../components/GoogleAd';
 import { WhatsAppChannelBanner } from '../components/WhatsAppChannelBanner';
 import { WhatsAppFloatingButton } from '../components/WhatsAppFloatingButton';
 import { SocialMediaGrid } from '../components/SocialLinks';
-import { Loader2 } from 'lucide-react';
+import { Loader2, LayoutGrid, List, Clock } from 'lucide-react';
 import { useHomepageData } from '../hooks/useHomepageData';
+import { formatDistanceToNow } from '../utils/date';
 
 const EditorialSection = lazy(() => import('../components/EditorialSection').then(m => ({ default: m.EditorialSection })));
 const LiveNewsIndicator = lazy(() => import('../components/LiveNewsIndicator').then(m => ({ default: m.LiveNewsIndicator })));
@@ -24,6 +25,7 @@ const ContentLicensing = lazy(() => import('../components/ContentLicensing').the
 
 function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const categoryParam = searchParams.get('category');
   const searchParam = searchParams.get('search');
@@ -126,7 +128,7 @@ function HomePage() {
         <LiveNewsIndicator />
       </Suspense>
 
-      <main className="pt-44" role="main">
+      <main id="main-content" className="pt-44" role="main">
         <WhatsAppChannelBanner />
         <Hero featuredContent={featuredContent} />
 
@@ -164,6 +166,22 @@ function HomePage() {
                   : 'Fresh updates and trending news'}
               </p>
             </div>
+            <div className="hidden sm:flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white shadow-sm text-red-600' : 'text-gray-500 hover:text-gray-700'}`}
+                aria-label="Grid view"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm text-red-600' : 'text-gray-500 hover:text-gray-700'}`}
+                aria-label="List view"
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {isLoading ? (
@@ -172,11 +190,51 @@ function HomePage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                {displayContent.map((content: any) => (
-                  <MediaCard key={content.id} content={content} />
-                ))}
-              </div>
+              {viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {displayContent.map((content: any) => (
+                    <MediaCard key={content.id} content={content} />
+                  ))}
+                </div>
+              ) : (
+                <ul className="space-y-0 divide-y divide-gray-200">
+                  {displayContent.map((content: any) => (
+                    <li key={content.id}>
+                      <Link
+                        to={`/article/${content.id}`}
+                        className="flex items-start gap-4 py-4 hover:bg-gray-50 -mx-3 px-3 rounded-lg transition-colors group"
+                      >
+                        <img
+                          src={content.thumbnail_url || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&q=80'}
+                          alt={`${content.title}.`}
+                          loading="lazy"
+                          className="w-24 h-24 sm:w-32 sm:h-24 object-cover rounded-lg flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-base font-semibold text-gray-900 line-clamp-2 group-hover:text-red-600 transition-colors">
+                            {content.title}
+                          </h3>
+                          <p className="text-sm text-gray-500 line-clamp-2 mt-1">
+                            {content.description}
+                          </p>
+                          <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                            {content.authors && (
+                              <span>{content.authors.name}</span>
+                            )}
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {formatDistanceToNow(content.published_at)}
+                            </span>
+                            {content.content && (
+                              <span>{Math.max(1, Math.ceil(content.content.length / 1200))} min read</span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               {displayContent.length === 0 && (
                 <div className="text-center py-16">
