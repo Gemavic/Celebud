@@ -8,7 +8,24 @@ const corsHeaders = {
 
 interface Article {
   id: string;
+  slug: string | null;
+  title: string;
   updated_at: string;
+}
+
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+function articlePath(article: Article): string {
+  const slug = article.slug?.trim() || (article.title ? slugify(article.title) : '');
+  return slug ? `/article/${article.id}/${slug}` : `/article/${article.id}`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -26,7 +43,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: articles, error } = await supabase
       .from('media_content')
-      .select('id, updated_at')
+      .select('id, slug, title, updated_at')
       .order('updated_at', { ascending: false });
 
     if (error) throw error;
@@ -53,7 +70,7 @@ Deno.serve(async (req: Request) => {
 
     articles?.forEach((article: Article) => {
       sitemap += '  <url>\n';
-      sitemap += `    <loc>${baseUrl}/article/${article.id}</loc>\n`;
+      sitemap += `    <loc>${baseUrl}${articlePath(article)}</loc>\n`;
       sitemap += `    <lastmod>${article.updated_at}</lastmod>\n`;
       sitemap += '    <changefreq>weekly</changefreq>\n';
       sitemap += '    <priority>0.8</priority>\n';

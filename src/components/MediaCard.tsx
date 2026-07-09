@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { memo, useCallback, useMemo } from 'react';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { formatDistanceToNow } from '../utils/date';
+import { buildArticleUrl } from '../utils/articleUrl';
 
 interface MediaCardProps {
   content: MediaContentWithRelations;
@@ -37,7 +38,7 @@ export const MediaCard = memo(function MediaCard({ content }: MediaCardProps) {
   );
 
   return (
-    <Link to={`/article/${content.id}`} className="block">
+    <Link to={buildArticleUrl(content)} className="block">
       <article className="group cursor-pointer bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
       <div className="relative overflow-hidden h-56 bg-gray-200">
         <img

@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  NOTE: This static file is a FALLBACK only. Your real sitemap is generated
+  dynamically by supabase/functions/generate-sitemap and served at
+  /sitemap.xml via the rewrite rule in vercel.json - that version includes
+  every article automatically and stays current. This static file should
+  only ever be seen if that rewrite/function is broken, so verify in
+  Google Search Console ("Sitemaps" report) that the live /sitemap.xml
+  actually lists your articles, not just these 2 URLs.
+-->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://celebud.com</loc>

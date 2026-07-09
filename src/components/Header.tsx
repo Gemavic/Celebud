@@ -2,6 +2,7 @@ import { Search, Menu, X, Star, User, LogOut, SquarePen as PenSquare, FolderOpen
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { SocialLinks } from './SocialLinks';
+import { NotificationButton } from './NotificationButton';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
 import { supabase } from '../lib/supabase';
@@ -232,6 +233,8 @@ export function Header() {
               VIDEOS
             </Link>
           </nav>
+
+          <NotificationButton />
 
           <div ref={searchRef} className="hidden md:block relative ml-4">
             <form onSubmit={handleSearch} className="flex items-center bg-gray-100 rounded-lg px-4 py-2">

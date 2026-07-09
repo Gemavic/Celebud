@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { Header } from '../components/Header';
@@ -9,12 +9,14 @@ import { GoogleAd } from '../components/GoogleAd';
 import { formatDistanceToNow } from '../utils/date';
 import { updateMetaTags, generateArticleStructuredData, removeArticleStructuredData } from '../utils/seo';
 import { sanitizeArticleContent } from '../utils/contentSanitizer';
+import { buildArticleUrl } from '../utils/articleUrl';
 import { ArrowLeft, Clock, Share2, Facebook, Twitter, Linkedin } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useArticle } from '../hooks/useArticles';
 
 export function ArticleDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id, slug } = useParams<{ id: string; slug?: string }>();
+  const navigate = useNavigate();
   const { data: article, isLoading: loading, isError, refetch } = useArticle(id || '');
   const [relatedArticles, setRelatedArticles] = useState<MediaContentWithRelations[]>([]);
 
@@ -56,12 +58,28 @@ export function ArticleDetail() {
   useEffect(() => {
     if (!article) return;
 
+    // If someone lands on a bare /article/:id link (an old share, a
+    // bookmark, a backlink) or on a stale slug, quietly upgrade the URL
+    // to the canonical slugged version without a page reload. Google
+    // treats this as the same article throughout — the id never changes.
+    const canonicalPath = buildArticleUrl(article);
+    const currentSlugSegment = slug ? `/${slug}` : '';
+    if (canonicalPath !== `/article/${id}${currentSlugSegment}`) {
+      navigate(canonicalPath, { replace: true });
+    }
+  }, [article, id, slug, navigate]);
+
+  useEffect(() => {
+    if (!article) return;
+
+    const canonicalPath = buildArticleUrl(article);
+
     updateMetaTags({
       title: `${article.title} - CelebUD`,
       description: article.description || article.title,
       keywords: `${article.categories?.name || 'celebrity news'}, entertainment, celebrity, news`,
       image: article.thumbnail_url || undefined,
-      url: `/article/${id}`,
+      url: canonicalPath,
       type: 'article',
       author: article.authors?.name || 'CelebUD',
       publishedTime: article.published_at,
@@ -76,7 +94,7 @@ export function ArticleDetail() {
       authorSlug: article.authors?.name?.toLowerCase().replace(/\s+/g, '-'),
       publishedDate: article.published_at,
       modifiedDate: article.updated_at,
-      url: `${window.location.origin}/article/${id}`,
+      url: `${window.location.origin}${canonicalPath}`,
     });
 
     return () => {

@@ -2,6 +2,7 @@ import { Clock, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { formatDistanceToNow } from '../utils/date';
+import { buildArticleUrl } from '../utils/articleUrl';
 
 interface HeroProps {
   featuredContent: MediaContentWithRelations[];
@@ -19,7 +20,7 @@ export function Hero({ featuredContent }: HeroProps) {
   return (
     <section className="pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Link to={`/article/${mainFeatured.id}`} className="lg:col-span-2 relative group cursor-pointer overflow-hidden rounded-3xl shadow-2xl block">
+        <Link to={buildArticleUrl(mainFeatured)} className="lg:col-span-2 relative group cursor-pointer overflow-hidden rounded-3xl shadow-2xl block">
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10" />
 
           <img
@@ -68,7 +69,7 @@ export function Hero({ featuredContent }: HeroProps) {
           {sideFeatured.length > 0 && sideFeatured.map((content) => (
             <Link
               key={content.id}
-              to={`/article/${content.id}`}
+              to={buildArticleUrl(content)}
               className="relative group cursor-pointer overflow-hidden rounded-2xl shadow-xl h-[242px] block"
             >
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10" />

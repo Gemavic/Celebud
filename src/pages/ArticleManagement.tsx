@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { RecategorizeArticle } from '../components/RecategorizeArticle';
-import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle } from 'lucide-react';
+import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
 // Calls a PostgreSQL function via supabase.rpc() → /rest/v1/rpc/ (same path as DB queries, no CORS issue)
@@ -63,6 +63,8 @@ export function ArticleManagement() {
   });
   const [saving, setSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [notifyingId, setNotifyingId] = useState<string | null>(null);
+  const [notifyResult, setNotifyResult] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assignedId, setAssignedId] = useState<string | null>(null);
   const [shareArticle, setShareArticle] = useState<Article | null>(null);
@@ -311,6 +313,30 @@ export function ArticleManagement() {
     }
   };
 
+  const sendBreakingNewsPush = async (article: Article) => {
+    setNotifyingId(article.id);
+    setNotifyResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-push-notification', {
+        body: {
+          title: article.title,
+          body: article.description || 'Read the full story on CelebUD.',
+          url: `/article/${article.id}`,
+          image: article.thumbnail_url || undefined,
+          category_id: article.category_id || undefined,
+        },
+      });
+      if (error) throw error;
+      setNotifyResult(`Sent to ${data?.sent ?? 0} subscriber${data?.sent === 1 ? '' : 's'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setNotifyResult('Error: ' + msg);
+    } finally {
+      setNotifyingId(null);
+      setTimeout(() => setNotifyResult(null), 4000);
+    }
+  };
+
   const bulkPushToChannels = async () => {
     if (selectedArticles.size === 0) return;
     setBulkPosting(true);
@@ -351,6 +377,15 @@ export function ArticleManagement() {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
+      {notifyResult && (
+        <div
+          className={`fixed top-6 right-6 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium ${
+            notifyResult.startsWith('Error') ? 'bg-red-600 text-white' : 'bg-gray-900 text-white'
+          }`}
+        >
+          {notifyResult}
+        </div>
+      )}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Article Management</h1>
         <p className="text-gray-600">Manage, edit, and recategorize articles across your platform</p>
@@ -575,6 +610,15 @@ export function ArticleManagement() {
                     >
                       <Share2 className="w-4 h-4" />
                       Share
+                    </button>
+                    <button
+                      onClick={() => sendBreakingNewsPush(article)}
+                      disabled={notifyingId === article.id}
+                      title="Push a breaking-news alert to subscribers"
+                      className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-orange-700 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors disabled:opacity-50"
+                    >
+                      <Bell className="w-4 h-4" />
+                      {notifyingId === article.id ? 'Sending…' : 'Notify'}
                     </button>
                     <button
                       onClick={() => openEditor(article)}

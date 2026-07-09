@@ -1,6 +1,6 @@
-const CACHE_NAME = 'celebud-v4';
-const RUNTIME_CACHE = 'celebud-runtime-v4';
-const IMAGE_CACHE = 'celebud-images-v4';
+const CACHE_NAME = 'celebud-v5';
+const RUNTIME_CACHE = 'celebud-runtime-v5';
+const IMAGE_CACHE = 'celebud-images-v5';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -169,3 +169,48 @@ function fetchWithTimeout(request, timeout) {
       });
   });
 }
+
+// --- Push notifications ---
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = { title: 'CelebUD', body: event.data.text() };
+  }
+
+  const title = payload.title || 'CelebUD Breaking News';
+  const options = {
+    body: payload.body || '',
+    icon: payload.icon || '/icon-192.png',
+    badge: '/icon-192.png',
+    image: payload.image,
+    data: { url: payload.url || '/' },
+    tag: payload.tag || 'celebud-news',
+    renotify: true,
+    requireInteraction: false,
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(targetUrl) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
