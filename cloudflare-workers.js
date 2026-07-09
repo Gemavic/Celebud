@@ -19,7 +19,7 @@ const SECURITY_HEADERS = {
 
 // Supabase edge function that returns real, crawlable HTML for a given path.
 // See supabase/functions/prerender/index.ts
-const PRERENDER_ENDPOINT = 'https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender';
+const PRERENDER_ENDPOINT = 'https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Prerender';
 
 // Search engine crawlers AND social/chat link-preview scrapers ??? the latter
 // never execute JavaScript at all, so without this list every shared
