@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/sitemap.xml",
-      "destination": "https://ucsuyrhlhmqezubfoszx.supabase.co/functions/v1/generate-sitemap"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/generate-sitemap"
     },
     {
       "source": "/article/(.*)",
@@ -13,7 +13,7 @@
           "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
         }
       ],
-      "destination": "https://ucsuyrhlhmqezubfoszx.supabase.co/functions/v1/prerender?path=/article/$1"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/article/$1"
     },
     {
       "source": "/",
@@ -24,7 +24,7 @@
           "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
         }
       ],
-      "destination": "https://ucsuyrhlhmqezubfoszx.supabase.co/functions/v1/prerender?path=/"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/"
     },
     {
       "source": "/(.*)",

@@ -19,9 +19,9 @@ const SECURITY_HEADERS = {
 
 // Supabase edge function that returns real, crawlable HTML for a given path.
 // See supabase/functions/prerender/index.ts
-const PRERENDER_ENDPOINT = 'https://ucsuyrhlhmqezubfoszx.supabase.co/functions/v1/prerender';
+const PRERENDER_ENDPOINT = 'https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender';
 
-// Search engine crawlers AND social/chat link-preview scrapers — the latter
+// Search engine crawlers AND social/chat link-preview scrapers ??? the latter
 // never execute JavaScript at all, so without this list every shared
 // article link shows generic homepage text instead of the real headline.
 const BOT_USER_AGENT_PATTERNS = [
@@ -70,7 +70,7 @@ async function handlePrerenderRequest(url) {
 
 // Canonical host: pick ONE version of your domain and every other
 // variant 301-redirects to it. This must match the domain used in your
-// <link rel="canonical">, Open Graph "og:url", and sitemap.xml — right
+// <link rel="canonical">, Open Graph "og:url", and sitemap.xml ??? right
 // now those all say "celebud.com" (no www), so that's the canonical
 // host below. If you'd rather standardize on "www.celebud.com" instead,
 // swap this value AND update index.html / the sitemap generator to match.
