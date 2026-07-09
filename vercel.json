@@ -1,8 +1,38 @@
 {
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.celebud.com" }],
+      "destination": "https://celebud.com/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/sitemap.xml",
       "destination": "https://ucsuyrhlhmqezubfoszx.supabase.co/functions/v1/generate-sitemap"
+    },
+    {
+      "source": "/article/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+        }
+      ],
+      "destination": "https://ucsuyrhlhmqezubfoszx.supabase.co/functions/v1/prerender?path=/article/$1"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+        }
+      ],
+      "destination": "https://ucsuyrhlhmqezubfoszx.supabase.co/functions/v1/prerender?path=/"
     },
     {
       "source": "/(.*)",
