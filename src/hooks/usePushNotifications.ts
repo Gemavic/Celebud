@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+const VAPID_PUBLIC_KEY = (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) || 'BNd0KHRsiwE_NJFRu2tRAjnnc-sCUiqpxyUR1eA_s_gMxloRyGeX9bJ4PJBVRnjEdhFJEQUL6a0ZW7OvGK2sxow';
 
 export type PushPermissionState = 'unsupported' | 'default' | 'granted' | 'denied';
 
@@ -33,7 +33,7 @@ export function usePushNotifications() {
 
   const subscribe = useCallback(async () => {
     if (!VAPID_PUBLIC_KEY) {
-      console.error('VITE_VAPID_PUBLIC_KEY is not set — push notifications are disabled.');
+      console.error('VITE_VAPID_PUBLIC_KEY is not set ??? push notifications are disabled.');
       return false;
     }
     if (permission === 'unsupported') return false;
