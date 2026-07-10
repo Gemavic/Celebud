@@ -16,6 +16,7 @@ const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy').then(module => 
 const WritersDashboard = lazy(() => import('./pages/WritersDashboard').then(module => ({ default: module.WritersDashboard })));
 const ReporterSignup = lazy(() => import('./pages/ReporterSignup').then(module => ({ default: module.ReporterSignup })));
 const ReporterManagement = lazy(() => import('./pages/ReporterManagement').then(module => ({ default: module.ReporterManagement })));
+const FinAdvisor = lazy(() => import('./pages/FinAdvisor').then(module => ({ default: module.FinAdvisor })));
 
 function LoadingFallback() {
   return (
@@ -48,6 +49,7 @@ function App() {
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/admin/writers" element={<WritersDashboard />} />
             <Route path="/reporters/apply" element={<ReporterSignup />} />
+            <Route path="/fin-advisor" element={<FinAdvisor />} />
             <Route path="/admin/reporters" element={<ReporterManagement />} />
           </Routes>
         </Suspense>

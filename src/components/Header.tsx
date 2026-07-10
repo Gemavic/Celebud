@@ -220,7 +220,7 @@ export function Header() {
             <Link to="/?category=entertainment" className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 transition-colors uppercase text-sm">
               ENTERTAINMENT
             </Link>
-            <Link to="/?category=fin-advisor" className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 transition-colors uppercase text-sm">
+            <Link to="/fin-advisor" className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 transition-colors uppercase text-sm">
               FIN-ADVISOR
             </Link>
             <Link to="/?category=business" className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 transition-colors uppercase text-sm">
@@ -292,7 +292,7 @@ export function Header() {
             <Link to="/?category=entertainment" onClick={() => setIsMenuOpen(false)} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">
               ENTERTAINMENT
             </Link>
-            <Link to="/?category=fin-advisor" onClick={() => setIsMenuOpen(false)} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">
+            <Link to="/fin-advisor" onClick={() => setIsMenuOpen(false)} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">
               FIN-ADVISOR
             </Link>
             <Link to="/?category=business" onClick={() => setIsMenuOpen(false)} className="block text-white hover:bg-red-700 font-bold py-3 px-4 uppercase text-sm">
