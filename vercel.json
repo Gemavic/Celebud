@@ -5,6 +5,18 @@
       "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/generate-sitemap"
     },
     {
+      "source": "/news-sitemap.xml",
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/generate-sitemap?type=news"
+    },
+    {
+      "source": "/feed.xml",
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/generate-sitemap?type=rss"
+    },
+    {
+      "source": "/rss.xml",
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/generate-sitemap?type=rss"
+    },
+    {
       "source": "/article/(.*)",
       "has": [
         {

@@ -1,16 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /api/
 
 Sitemap: https://celebud.com/sitemap.xml
-
-User-agent: Googlebot
-Allow: /
-
-User-agent: Googlebot-Image
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-Disallow: /api/
-Disallow: /admin/
+Sitemap: https://celebud.com/news-sitemap.xml

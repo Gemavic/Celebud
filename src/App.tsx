@@ -17,6 +17,10 @@ const WritersDashboard = lazy(() => import('./pages/WritersDashboard').then(modu
 const ReporterSignup = lazy(() => import('./pages/ReporterSignup').then(module => ({ default: module.ReporterSignup })));
 const ReporterManagement = lazy(() => import('./pages/ReporterManagement').then(module => ({ default: module.ReporterManagement })));
 const FinAdvisor = lazy(() => import('./pages/FinAdvisor').then(module => ({ default: module.FinAdvisor })));
+const AuthorPage = lazy(() => import('./pages/AuthorPage').then(module => ({ default: module.AuthorPage })));
+const AboutPage = lazy(() => import('./pages/TrustPages').then(module => ({ default: module.AboutPage })));
+const ContactPage = lazy(() => import('./pages/TrustPages').then(module => ({ default: module.ContactPage })));
+const EditorialStandardsPage = lazy(() => import('./pages/TrustPages').then(module => ({ default: module.EditorialStandardsPage })));
 
 function LoadingFallback() {
   return (
@@ -50,6 +54,10 @@ function App() {
             <Route path="/admin/writers" element={<WritersDashboard />} />
             <Route path="/reporters/apply" element={<ReporterSignup />} />
             <Route path="/fin-advisor" element={<FinAdvisor />} />
+            <Route path="/author/:id" element={<AuthorPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/editorial-standards" element={<EditorialStandardsPage />} />
             <Route path="/admin/reporters" element={<ReporterManagement />} />
           </Routes>
         </Suspense>

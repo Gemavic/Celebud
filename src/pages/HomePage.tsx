@@ -330,19 +330,24 @@ function HomePage() {
               <h4 className="font-bold mb-4">Quick Links</h4>
               <ul className="space-y-2 text-gray-400">
                 <li>
-                  <a href="#" className="hover:text-white transition-colors">
+                  <Link to="/about" className="hover:text-white transition-colors">
                     About Us
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Advertise
-                  </a>
+                  <Link to="/contact" className="hover:text-white transition-colors">
+                    Contact Us
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white transition-colors">
-                    Careers
-                  </a>
+                  <Link to="/editorial-standards" className="hover:text-white transition-colors">
+                    Editorial Standards
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/reporters/apply" className="hover:text-white transition-colors">
+                    Become a Reporter
+                  </Link>
                 </li>
                 <li>
                   <Link to="/privacy" className="hover:text-white transition-colors">
@@ -368,9 +373,13 @@ function HomePage() {
 
           <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400 text-sm">
             <div className="flex items-center justify-center gap-4 flex-wrap mb-3">
+              <Link to="/about" className="hover:text-white transition-colors">About</Link>
+              <span className="text-gray-600">|</span>
+              <Link to="/editorial-standards" className="hover:text-white transition-colors">Editorial Standards</Link>
+              <span className="text-gray-600">|</span>
               <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
               <span className="text-gray-600">|</span>
-              <a href="mailto:privacy@celebud.com" className="hover:text-white transition-colors">Contact</a>
+              <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
             </div>
             <p>&copy; {new Date().getFullYear()} CelebUD. All rights reserved.</p>
           </div>

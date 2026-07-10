@@ -20,6 +20,16 @@ export function ArticleDetail() {
   const { data: article, isLoading: loading, isError, refetch } = useArticle(id || '');
   const [relatedArticles, setRelatedArticles] = useState<MediaContentWithRelations[]>([]);
 
+  // Curated stories from other outlets carry a "The post ... appeared
+  // first on X" footer. Detect it so the byline reads "Curator" and the
+  // original publisher is credited prominently (a Google News
+  // attribution requirement).
+  const syndicationSource = useMemo(() => {
+    const text = (article?.content || '') + ' ' + (article?.description || '');
+    const match = text.match(/appeared first on\s+(?:<a[^>]*>)?\s*([^<.\n]{2,60})/i);
+    return match ? match[1].trim() : null;
+  }, [article]);
+
   useEffect(() => {
     if (!id || !article) return;
 
@@ -239,8 +249,14 @@ export function ArticleDetail() {
                     itemProp="image"
                   />
                   <div itemProp="author" itemScope itemType="https://schema.org/Person">
-                    <p className="font-medium text-gray-900 text-sm" itemProp="name">{article.authors.name}</p>
-                    <p className="text-xs text-gray-500">Reporter</p>
+                    <Link
+                      to={`/author/${article.authors.id}`}
+                      className="font-medium text-gray-900 text-sm hover:text-red-600 transition-colors"
+                      itemProp="name"
+                    >
+                      {article.authors.name}
+                    </Link>
+                    <p className="text-xs text-gray-500">{syndicationSource ? 'Curator' : 'Reporter'}</p>
                   </div>
                 </>
               )}
@@ -255,6 +271,13 @@ export function ArticleDetail() {
               </div>
             </div>
           </div>
+
+          {syndicationSource && (
+            <div className="mb-6 -mt-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
+              Originally published by <strong className="text-gray-800">{syndicationSource}</strong> — curated
+              for CelebUD readers under our <Link to="/editorial-standards" className="text-red-600 hover:text-red-700 font-medium">editorial standards</Link>.
+            </div>
+          )}
 
           {article.thumbnail_url && (
             <div className="mb-8 rounded-xl overflow-hidden shadow-lg">
