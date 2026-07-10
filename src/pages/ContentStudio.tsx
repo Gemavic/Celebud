@@ -11,14 +11,16 @@ import {
 } from '../hooks/useCreatorContent';
 import type { ContentType, ContentStatus, Platform, CreatorContentItem } from '../hooks/useCreatorContent';
 import { useCreators } from '../hooks/useCreators';
-import { Video, Radio, Scissors, Share2, Plus, Eye, Heart, MessageSquare, TrendingUp, Calendar, Clock, Filter, Search, MoreVertical, CreditCard as Edit3, Trash2, ExternalLink, Upload, Play, Tv, ArrowLeft, CheckCircle, AlertCircle, X, Globe, Hash, Image, Link as LinkIcon } from 'lucide-react';
+import { Video, Radio, Scissors, Share2, Plus, Eye, Heart, MessageSquare, TrendingUp, Calendar, Clock, Filter, Search, MoreVertical, CreditCard as Edit3, Trash2, ExternalLink, Upload, Play, Tv, ArrowLeft, CheckCircle, AlertCircle, X, Globe, Hash, Image, Link as LinkIcon, Music, Copy } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
-type StudioTab = 'overview' | 'videos' | 'livestreams' | 'clips' | 'social';
+type StudioTab = 'overview' | 'videos' | 'audio' | 'livestreams' | 'clips' | 'social';
 
 const CONTENT_TYPE_MAP: Record<StudioTab, ContentType | null> = {
   overview: null,
   videos: 'video',
+  audio: 'audio',
   livestreams: 'livestream',
   clips: 'clip',
   social: 'social_post',
@@ -27,9 +29,32 @@ const CONTENT_TYPE_MAP: Record<StudioTab, ContentType | null> = {
 const TAB_CONFIG: { key: StudioTab; label: string; icon: typeof Video; color: string }[] = [
   { key: 'overview', label: 'Overview', icon: TrendingUp, color: 'text-gray-700' },
   { key: 'videos', label: 'Videos', icon: Video, color: 'text-blue-600' },
+  { key: 'audio', label: 'Audio', icon: Music, color: 'text-purple-600' },
   { key: 'livestreams', label: 'Live Streams', icon: Radio, color: 'text-red-600' },
   { key: 'clips', label: 'Short Clips', icon: Scissors, color: 'text-teal-600' },
   { key: 'social', label: 'Social Posts', icon: Share2, color: 'text-orange-600' },
+];
+
+// Recognize the platform straight from a pasted link so creators don't
+// have to pick it manually.
+function detectPlatform(url: string): Platform {
+  const u = url.toLowerCase();
+  if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
+  if (u.includes('tiktok.com')) return 'tiktok';
+  if (u.includes('instagram.com')) return 'instagram';
+  if (u.includes('twitter.com') || u.includes('x.com/')) return 'twitter';
+  if (u.includes('facebook.com') || u.includes('fb.watch')) return 'facebook';
+  if (u.includes('twitch.tv')) return 'twitch';
+  return null;
+}
+
+// One-click share targets; each takes the content URL + title and returns
+// the app's share intent URL.
+const SHARE_TARGETS: { key: string; label: string; bg: string; href: (url: string, title: string) => string }[] = [
+  { key: 'whatsapp', label: 'WhatsApp', bg: 'bg-green-500 hover:bg-green-600', href: (url, title) => `https://wa.me/?text=${encodeURIComponent(title + ' ' + url)}` },
+  { key: 'facebook', label: 'Facebook', bg: 'bg-blue-600 hover:bg-blue-700', href: (url) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}` },
+  { key: 'x', label: 'X', bg: 'bg-black hover:bg-gray-800', href: (url, title) => `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}` },
+  { key: 'telegram', label: 'Telegram', bg: 'bg-sky-500 hover:bg-sky-600', href: (url, title) => `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}` },
 ];
 
 const PLATFORM_OPTIONS: { value: Platform; label: string }[] = [
@@ -235,6 +260,7 @@ function OverviewPanel({
 }) {
   const quickActions = [
     { type: 'video' as ContentType, label: 'Upload Video', icon: Video, color: 'from-blue-500 to-blue-600', bgLight: 'bg-blue-50 border-blue-100' },
+    { type: 'audio' as ContentType, label: 'Upload Audio', icon: Music, color: 'from-purple-500 to-purple-600', bgLight: 'bg-purple-50 border-purple-100' },
     { type: 'livestream' as ContentType, label: 'Schedule Stream', icon: Radio, color: 'from-red-500 to-red-600', bgLight: 'bg-red-50 border-red-100' },
     { type: 'clip' as ContentType, label: 'Post Clip', icon: Scissors, color: 'from-teal-500 to-teal-600', bgLight: 'bg-teal-50 border-teal-100' },
     { type: 'social_post' as ContentType, label: 'Share Social Post', icon: Share2, color: 'from-orange-500 to-orange-600', bgLight: 'bg-orange-50 border-orange-100' },
@@ -289,6 +315,13 @@ function OverviewPanel({
               count={stats.videos}
               color="blue"
               onClick={() => onNavigate('videos')}
+            />
+            <ContentTypeCard
+              icon={Music}
+              label="Audio"
+              count={stats.audios}
+              color="purple"
+              onClick={() => onNavigate('audio')}
             />
             <ContentTypeCard
               icon={Radio}
@@ -355,6 +388,7 @@ function ContentPanel({
 
   const typeLabels: Record<ContentType, string> = {
     video: 'Videos',
+    audio: 'Audio',
     livestream: 'Live Streams',
     clip: 'Short Clips',
     social_post: 'Social Posts',
@@ -538,6 +572,32 @@ function ContentPanel({
                             <ExternalLink className="w-4 h-4" /> View Source
                           </a>
                         )}
+                        {(item.external_url || item.media_url) && (
+                          <div className="px-4 py-2 border-t border-gray-100">
+                            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Share with one click</p>
+                            <div className="flex items-center gap-1.5">
+                              {SHARE_TARGETS.map(t => (
+                                <a
+                                  key={t.key}
+                                  href={t.href((item.external_url || item.media_url)!, item.title)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title={`Share to ${t.label}`}
+                                  className={`flex-1 py-1.5 text-center text-[11px] font-bold text-white rounded-md ${t.bg}`}
+                                >
+                                  {t.label === 'WhatsApp' ? 'WA' : t.label === 'Telegram' ? 'TG' : t.label === 'Facebook' ? 'FB' : 'X'}
+                                </a>
+                              ))}
+                              <button
+                                title="Copy link"
+                                onClick={() => navigator.clipboard.writeText((item.external_url || item.media_url)!)}
+                                className="p-1.5 border border-gray-200 rounded-md text-gray-500 hover:bg-gray-50"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         <button
                           onClick={() => { deleteContent.mutate(item.id); setMenuOpenId(null); }}
                           className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-700 hover:bg-red-50"
@@ -594,12 +654,53 @@ function ContentUploadModal({
   const [error, setError] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedName, setUploadedName] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const typeLabels: Record<ContentType, string> = {
     video: 'Video',
+    audio: 'Audio',
     livestream: 'Live Stream',
     clip: 'Short Clip',
     social_post: 'Social Post',
+  };
+
+  // Video, audio, and clips can be uploaded straight from the device;
+  // livestreams and social posts are links by nature.
+  const canUploadFile = ['video', 'audio', 'clip'].includes(form.content_type);
+  const [mediaSource, setMediaSource] = useState<'upload' | 'link'>(
+    isEditing || !canUploadFile ? 'link' : 'upload'
+  );
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError('');
+    setUploading(true);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${creatorId}/${Date.now()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('creator-media')
+        .upload(path, file, { cacheControl: '3600', upsert: false });
+      if (uploadError) throw new Error(uploadError.message);
+      const { data } = supabase.storage.from('creator-media').getPublicUrl(path);
+      setForm(f => ({
+        ...f,
+        media_url: data.publicUrl,
+        platform: f.platform || 'custom',
+        title: f.title || file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' '),
+      }));
+      setUploadedName(file.name);
+    } catch (err) {
+      setError(
+        'Upload failed: ' + (err instanceof Error ? err.message : 'unknown error') +
+        '. If the file is very large, try a smaller file or paste a link instead.'
+      );
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async (publishNow: boolean) => {
@@ -635,16 +736,16 @@ function ContentUploadModal({
         await createContent.mutateAsync(payload);
       }
       setSuccess(true);
-      setTimeout(onClose, 1200);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save. Please try again.');
     }
   };
 
   if (success) {
+    const shareUrl = form.external_url.trim() || form.media_url.trim();
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
         <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
           <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-emerald-600" />
@@ -653,6 +754,45 @@ function ContentUploadModal({
             {isEditing ? 'Updated!' : 'Published!'}
           </h3>
           <p className="text-gray-500">Your {typeLabels[form.content_type].toLowerCase()} is now live.</p>
+
+          {shareUrl && (
+            <div className="mt-6">
+              <p className="text-sm font-semibold text-gray-700 mb-3">Share it now with one click:</p>
+              <div className="grid grid-cols-2 gap-2">
+                {SHARE_TARGETS.map(t => (
+                  <a
+                    key={t.key}
+                    href={t.href(shareUrl, form.title)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`py-2.5 text-white text-sm font-semibold rounded-xl transition-colors ${t.bg}`}
+                  >
+                    {t.label}
+                  </a>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(shareUrl);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                <Copy className="w-4 h-4" />
+                {copied ? 'Copied!' : 'Copy Link'}
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-5 w-full py-2.5 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-colors"
+          >
+            Done
+          </button>
         </div>
       </div>
     );
@@ -678,7 +818,7 @@ function ContentUploadModal({
         {/* Content Type Tabs */}
         <div className="px-6 pt-4">
           <div className="flex gap-1 p-1 bg-gray-100 rounded-xl overflow-x-auto scrollbar-hide">
-            {(['video', 'livestream', 'clip', 'social_post'] as ContentType[]).map(type => (
+            {(['video', 'audio', 'livestream', 'clip', 'social_post'] as ContentType[]).map(type => (
               <button
                 key={type}
                 type="button"
@@ -730,41 +870,93 @@ function ContentUploadModal({
             />
           </div>
 
-          {/* Media URL - The key field */}
+          {/* Media: upload from device or paste a link */}
           <div>
-            <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1">
-              <LinkIcon className="w-3.5 h-3.5" />
-              {form.content_type === 'livestream' ? 'Stream URL' : 'Media/Embed URL'}
-            </label>
-            <input
-              type="url"
-              value={form.media_url}
-              onChange={e => setForm(f => ({ ...f, media_url: e.target.value }))}
-              placeholder="Paste your YouTube, TikTok, or video link here"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-            />
-            <p className="text-xs text-gray-400 mt-1">YouTube, TikTok, Instagram, Facebook, or direct link</p>
-          </div>
-
-          {/* Platform Quick Select */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Platform</label>
-            <div className="flex flex-wrap gap-2">
-              {PLATFORM_OPTIONS.map(p => (
+            {canUploadFile && (
+              <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-3">
                 <button
-                  key={p.value}
                   type="button"
-                  onClick={() => setForm(f => ({ ...f, platform: f.platform === p.value ? null : p.value }))}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    form.platform === p.value
-                      ? 'bg-red-600 text-white border-red-600'
-                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-300'
+                  onClick={() => setMediaSource('upload')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                    mediaSource === 'upload' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  {p.label}
+                  <Upload className="w-3.5 h-3.5" /> Upload from device
                 </button>
-              ))}
-            </div>
+                <button
+                  type="button"
+                  onClick={() => setMediaSource('link')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                    mediaSource === 'link' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <LinkIcon className="w-3.5 h-3.5" /> Paste a link
+                </button>
+              </div>
+            )}
+
+            {canUploadFile && mediaSource === 'upload' ? (
+              <label
+                className={`flex flex-col items-center justify-center gap-2 w-full px-4 py-8 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+                  uploadedName
+                    ? 'border-emerald-300 bg-emerald-50'
+                    : 'border-gray-300 bg-gray-50 hover:border-red-300 hover:bg-red-50'
+                }`}
+              >
+                <input
+                  type="file"
+                  accept={form.content_type === 'audio' ? 'audio/*' : 'video/*'}
+                  onChange={handleFileChange}
+                  disabled={uploading}
+                  className="hidden"
+                />
+                {uploading ? (
+                  <>
+                    <div className="w-8 h-8 border-3 border-red-600 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm font-medium text-gray-600">Uploading… keep this window open</p>
+                  </>
+                ) : uploadedName ? (
+                  <>
+                    <CheckCircle className="w-8 h-8 text-emerald-600" />
+                    <p className="text-sm font-semibold text-emerald-700">{uploadedName}</p>
+                    <p className="text-xs text-gray-500">Uploaded — tap to replace</p>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-8 h-8 text-gray-400" />
+                    <p className="text-sm font-semibold text-gray-700">
+                      Tap to choose {form.content_type === 'audio' ? 'an audio file' : 'a video'} from your device
+                    </p>
+                    <p className="text-xs text-gray-400">It uploads and hosts automatically — no links needed</p>
+                  </>
+                )}
+              </label>
+            ) : (
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1">
+                  <LinkIcon className="w-3.5 h-3.5" />
+                  {form.content_type === 'livestream' ? 'Stream URL' : 'Media/Embed URL'}
+                </label>
+                <input
+                  type="url"
+                  value={form.media_url}
+                  onChange={e => {
+                    const value = e.target.value;
+                    setForm(f => ({ ...f, media_url: value, platform: detectPlatform(value) || f.platform }));
+                  }}
+                  placeholder="Paste your YouTube, TikTok, or video link here"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  YouTube, TikTok, Instagram, Facebook, or direct link — the platform is detected automatically
+                </p>
+                {form.platform && (
+                  <p className="text-xs font-medium text-emerald-600 mt-1 capitalize">
+                    ✓ Platform: {form.platform === 'twitter' ? 'X' : form.platform}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Advanced Options Toggle */}
@@ -782,6 +974,27 @@ function ContentUploadModal({
           {/* Advanced Options - Collapsible */}
           {showAdvanced && (
             <div className="space-y-4 pt-2 border-t border-gray-100">
+              {/* Platform override */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Platform</label>
+                <div className="flex flex-wrap gap-2">
+                  {PLATFORM_OPTIONS.map(p => (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, platform: f.platform === p.value ? null : p.value }))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                        form.platform === p.value
+                          ? 'bg-red-600 text-white border-red-600'
+                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Thumbnail */}
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1">
@@ -872,7 +1085,7 @@ function ContentUploadModal({
           <button
             type="button"
             onClick={() => handleSubmit(false)}
-            disabled={createContent.isPending || updateContent.isPending}
+            disabled={createContent.isPending || updateContent.isPending || uploading}
             className="flex-1 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             Save as Draft
@@ -880,7 +1093,7 @@ function ContentUploadModal({
           <button
             type="button"
             onClick={() => handleSubmit(true)}
-            disabled={createContent.isPending || updateContent.isPending}
+            disabled={createContent.isPending || updateContent.isPending || uploading}
             className="flex-[2] py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 shadow-lg shadow-red-200 flex items-center justify-center gap-2"
           >
             {(createContent.isPending || updateContent.isPending) ? (
@@ -913,6 +1126,7 @@ function ContentTypeCard({ icon: Icon, label, count, color, onClick }: {
 }) {
   const colorClasses: Record<string, string> = {
     blue: 'border-blue-200 bg-blue-50 hover:bg-blue-100',
+    purple: 'border-purple-200 bg-purple-50 hover:bg-purple-100',
     red: 'border-red-200 bg-red-50 hover:bg-red-100',
     teal: 'border-teal-200 bg-teal-50 hover:bg-teal-100',
     orange: 'border-orange-200 bg-orange-50 hover:bg-orange-100',
@@ -920,6 +1134,7 @@ function ContentTypeCard({ icon: Icon, label, count, color, onClick }: {
 
   const iconColors: Record<string, string> = {
     blue: 'text-blue-600',
+    purple: 'text-purple-600',
     red: 'text-red-600',
     teal: 'text-teal-600',
     orange: 'text-orange-600',
@@ -940,6 +1155,7 @@ function ContentTypeCard({ icon: Icon, label, count, color, onClick }: {
 function ContentTypeIcon({ type, className }: { type: ContentType; className?: string }) {
   switch (type) {
     case 'video': return <Video className={className} />;
+    case 'audio': return <Music className={className} />;
     case 'livestream': return <Radio className={className} />;
     case 'clip': return <Scissors className={className} />;
     case 'social_post': return <Share2 className={className} />;

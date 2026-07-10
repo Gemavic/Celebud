@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 
-export type ContentType = 'video' | 'livestream' | 'clip' | 'social_post';
+export type ContentType = 'video' | 'audio' | 'livestream' | 'clip' | 'social_post';
 export type ContentStatus = 'draft' | 'published' | 'scheduled' | 'archived' | 'live';
 export type Platform = 'youtube' | 'tiktok' | 'instagram' | 'twitter' | 'facebook' | 'twitch' | 'custom' | null;
 
@@ -197,6 +197,7 @@ export function useContentStats(creatorId?: string) {
       return {
         total: items.length,
         videos: items.filter(i => i.content_type === 'video').length,
+        audios: items.filter(i => i.content_type === 'audio').length,
         livestreams: items.filter(i => i.content_type === 'livestream').length,
         clips: items.filter(i => i.content_type === 'clip').length,
         socialPosts: items.filter(i => i.content_type === 'social_post').length,
