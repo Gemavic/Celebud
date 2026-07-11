@@ -6,11 +6,11 @@ import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, Chec
 import { formatDistanceToNow } from '../utils/date';
 
 // Posts to the CelebUD Facebook Page + Telegram channel via the
-// share-to-socials edge function (hosted on the companion Supabase
-// project, which holds the page/bot tokens). The full article payload is
-// sent along because that project's own database has no articles to look
-// up. Function has public invocation enabled and open CORS.
-const SHARE_ENDPOINT = 'https://ucsuyrhlhmqezubfoszx.supabase.co/functions/v1/share-to-socials';
+// share-to-socials edge function on the Celebud project (fully migrated
+// off the old Gemavic Academy project; the FACEBOOK_PAGE_ACCESS_TOKEN,
+// TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID secrets live here now).
+// Function must be deployed with JWT verification off; open CORS.
+const SHARE_ENDPOINT = 'https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/share-to-socials';
 
 async function queueShareRequest(article: Article): Promise<string> {
   const res = await fetch(SHARE_ENDPOINT, {

@@ -8,7 +8,7 @@ const corsHeaders = {
     "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const SITE_URL = "https://www.celebud.com";
+const SITE_URL = "https://celebud.com";
 const FACEBOOK_PAGE_ID = "61591656230605";
 
 interface ArticlePayload {
