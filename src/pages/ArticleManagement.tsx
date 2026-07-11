@@ -5,11 +5,36 @@ import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
-// Calls a PostgreSQL function via supabase.rpc() → /rest/v1/rpc/ (same path as DB queries, no CORS issue)
-// The PG function uses pg_net server-side to call the edge function — no browser network call involved
-async function queueShareRequest(articleId: string): Promise<void> {
-  const { error } = await supabase.rpc('share_article_to_socials', { article_id: articleId });
-  if (error) throw new Error(error.message);
+// Posts to the CelebUD Facebook Page + Telegram channel via the
+// share-to-socials edge function (hosted on the companion Supabase
+// project, which holds the page/bot tokens). The full article payload is
+// sent along because that project's own database has no articles to look
+// up. Function has public invocation enabled and open CORS.
+const SHARE_ENDPOINT = 'https://ucsuyrhlhmqezubfoszx.supabase.co/functions/v1/share-to-socials';
+
+async function queueShareRequest(article: Article): Promise<string> {
+  const res = await fetch(SHARE_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      article: {
+        id: article.id,
+        title: article.title,
+        description: article.description || undefined,
+        thumbnail_url: article.thumbnail_url || undefined,
+        category_name: article.categories?.name,
+      },
+    }),
+  });
+  if (!res.ok) throw new Error(`Share service error (${res.status})`);
+  const data = await res.json();
+  const result = data?.results?.[0];
+  const fb = result?.facebook;
+  const tg = result?.telegram;
+  if (fb && !fb.success) {
+    throw new Error('Facebook: ' + (fb.error || 'post failed') + (tg ? ' (Telegram posted OK)' : ''));
+  }
+  return `Posted to Facebook${fb?.post_id ? '' : ''}${tg ? ' & Telegram' : ' (Telegram failed)'}`;
 }
 
 interface Author {
@@ -299,12 +324,12 @@ export function ArticleManagement() {
     setTimeout(() => setCopiedId(null), 3000);
   };
 
-  const pushSingleArticle = async (articleId: string) => {
+  const pushSingleArticle = async (article: Article) => {
     setSharePosting(true);
     setShareResult(null);
     try {
-      await queueShareRequest(articleId);
-      setShareResult('Queued — posting to Facebook & Telegram now (takes ~5 seconds)');
+      const summary = await queueShareRequest(article);
+      setShareResult(summary);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setShareResult('Error: ' + msg);
@@ -348,11 +373,12 @@ export function ArticleManagement() {
       const article = articles.find(a => a.id === id);
       const title = article?.title.slice(0, 40) + (article && article.title.length > 40 ? '...' : '') || id;
       try {
-        await queueShareRequest(id);
+        if (!article) throw new Error('Article not loaded');
+        await queueShareRequest(article);
         setBulkProgress(prev => ({
           done: i + 1,
           total: ids.length,
-          results: [...(prev?.results || []), `${title}: Queued`],
+          results: [...(prev?.results || []), `${title}: Posted`],
         }));
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message.slice(0, 60) : 'Error';
@@ -839,7 +865,7 @@ export function ArticleManagement() {
                 <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">Auto-Post to Channels</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => pushSingleArticle(shareArticle.id)}
+                    onClick={() => pushSingleArticle(shareArticle)}
                     disabled={sharePosting}
                     className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
                   >
@@ -847,7 +873,7 @@ export function ArticleManagement() {
                     Facebook Page
                   </button>
                   <button
-                    onClick={() => pushSingleArticle(shareArticle.id)}
+                    onClick={() => pushSingleArticle(shareArticle)}
                     disabled={sharePosting}
                     className="flex items-center justify-center gap-2 px-3 py-2.5 bg-sky-500 text-white rounded-lg font-semibold text-sm hover:bg-sky-600 disabled:opacity-50 transition-colors"
                   >
