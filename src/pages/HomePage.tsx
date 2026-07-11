@@ -86,7 +86,7 @@ function HomePage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
         <Header />
-        <main className="pt-44">
+        <main className="pt-28">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="animate-pulse space-y-6">
               <div className="h-72 bg-gray-200 rounded-xl" />
@@ -106,7 +106,7 @@ function HomePage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
         <Header />
-        <main className="pt-44">
+        <main className="pt-28">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
             <p className="text-gray-600 text-lg mb-4">Unable to load content right now.</p>
             <button
@@ -128,7 +128,7 @@ function HomePage() {
         <LiveNewsIndicator />
       </Suspense>
 
-      <main id="main-content" className="pt-44" role="main">
+      <main id="main-content" className="pt-28" role="main">
         <WhatsAppChannelBanner />
         <Hero featuredContent={featuredContent} />
 

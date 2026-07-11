@@ -38,23 +38,20 @@ export function Hero({ featuredContent }: HeroProps) {
             className="w-full h-[500px] object-cover transform group-hover:scale-105 transition-transform duration-700"
           />
 
-          <div className="absolute top-6 left-6 z-20 flex items-center space-x-2">
-            <span className="bg-red-500 text-white px-2.5 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
+          <div className="absolute top-5 left-5 z-20 flex items-center gap-2">
+            <span className="bg-red-600 text-white px-2.5 py-1 rounded text-[11px] font-semibold uppercase tracking-wide flex items-center gap-1">
               <TrendingUp className="w-3 h-3" />
               <span>Featured</span>
             </span>
             {mainFeatured.categories && (
-              <span
-                className="px-2.5 py-1 rounded-full text-xs font-medium text-white"
-                style={{ backgroundColor: mainFeatured.categories.color }}
-              >
+              <span className="px-2.5 py-1 rounded text-[11px] font-semibold uppercase tracking-wide bg-white/95 text-gray-900">
                 {mainFeatured.categories.name}
               </span>
             )}
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 p-6 z-20">
-            <h2 className="text-2xl font-medium text-white mb-3 leading-tight line-clamp-2">
+          <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8 z-20">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white mb-3 leading-[1.15] line-clamp-3">
               {mainFeatured.title}
             </h2>
 
@@ -86,16 +83,13 @@ export function Hero({ featuredContent }: HeroProps) {
               />
 
               {content.categories && (
-                <span
-                  className="absolute top-4 left-4 z-20 px-2.5 py-1 rounded-full text-xs font-medium text-white"
-                  style={{ backgroundColor: content.categories.color }}
-                >
+                <span className="absolute top-4 left-4 z-20 px-2.5 py-1 rounded text-[11px] font-semibold uppercase tracking-wide bg-white/95 text-gray-900">
                   {content.categories.name}
                 </span>
               )}
 
               <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
-                <h3 className="text-base font-medium text-white line-clamp-2 leading-snug">
+                <h3 className="text-lg font-bold tracking-tight text-white line-clamp-2 leading-snug">
                   {content.title}
                 </h3>
               </div>

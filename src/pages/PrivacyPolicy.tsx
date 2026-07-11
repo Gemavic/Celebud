@@ -20,7 +20,7 @@ export function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <div className="pt-44 pb-16">
+      <div className="pt-28 pb-16">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
 
           {/* Back link */}

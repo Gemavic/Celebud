@@ -43,9 +43,9 @@ export function CategoryFilter({
       <div className="flex items-center space-x-3 overflow-x-auto pb-4 scrollbar-hide">
         <button
           onClick={() => onSelectCategory(null)}
-          className={`flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all whitespace-nowrap ${
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
             selectedCategory === null
-              ? 'bg-gradient-to-r from-rose-500 via-purple-500 to-blue-500 text-white shadow-lg scale-105'
+              ? 'bg-red-600 text-white shadow-[0_4px_10px_rgba(220,38,38,0.3)]'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -61,16 +61,11 @@ export function CategoryFilter({
             <button
               key={category.id}
               onClick={() => onSelectCategory(category.slug)}
-              className={`flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
                 isSelected
-                  ? 'text-white shadow-lg scale-105'
+                  ? 'bg-red-600 text-white shadow-[0_4px_10px_rgba(220,38,38,0.3)]'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
-              style={
-                isSelected
-                  ? { backgroundColor: category.color }
-                  : undefined
-              }
             >
               <Icon className="w-4 h-4" />
               <span>{category.name}</span>

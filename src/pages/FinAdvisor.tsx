@@ -70,7 +70,7 @@ export function FinAdvisor() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <div className="pt-44 pb-16">
+      <div className="pt-28 pb-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Hero */}
           <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-3xl p-8 sm:p-12 text-white mb-8">

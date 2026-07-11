@@ -84,7 +84,7 @@ export function ReporterManagement() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="pt-44 flex items-center justify-center">
+        <div className="pt-28 flex items-center justify-center">
           <div className="text-center p-8 bg-white rounded-xl shadow-sm max-w-md">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
@@ -191,7 +191,7 @@ export function ReporterManagement() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <div className="pt-44 pb-12">
+      <div className="pt-28 pb-12">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-8 flex items-center justify-between flex-wrap gap-3">
             <div>
