@@ -1,6 +1,6 @@
-const CACHE_NAME = 'celebud-v5';
-const RUNTIME_CACHE = 'celebud-runtime-v5';
-const IMAGE_CACHE = 'celebud-images-v5';
+const CACHE_NAME = 'celebud-v6';
+const RUNTIME_CACHE = 'celebud-runtime-v6';
+const IMAGE_CACHE = 'celebud-images-v6';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -45,7 +45,12 @@ self.addEventListener('fetch', (event) => {
 
   if (request.method !== 'GET') return;
 
-  if (url.hostname.includes('supabase') && url.pathname.includes('/auth/')) {
+  // Never intercept Supabase requests (data, auth, storage). The app has
+  // its own 15s timeout + retry for data queries; the service worker's
+  // shorter timeout was aborting slow-network requests at 6s and faking
+  // 408 responses, which surfaced as "Could not load article" on weak
+  // mobile connections.
+  if (url.hostname.includes('supabase')) {
     return;
   }
 
@@ -54,7 +59,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname.startsWith('/api/') || url.hostname.includes('supabase')) {
+  if (url.pathname.startsWith('/api/')) {
     event.respondWith(handleAPIRequest(request));
     return;
   }
