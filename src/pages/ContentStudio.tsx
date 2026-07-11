@@ -69,6 +69,9 @@ const PLATFORM_OPTIONS: { value: Platform; label: string }[] = [
 
 export function ContentStudio() {
   const { user, profile } = useAuth();
+  // Must be declared before the hooks below use it — referencing it
+  // earlier while declared later crashed the whole page (blank screen).
+  const isAdmin = profile?.is_admin;
   const [activeTab, setActiveTab] = useState<StudioTab>('overview');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadType, setUploadType] = useState<ContentType>('video');
@@ -107,8 +110,6 @@ export function ContentStudio() {
       </div>
     );
   }
-
-  const isAdmin = profile?.is_admin;
 
   if (!isAdmin && (!myCreator || !['approved', 'onboarded'].includes(myCreator.status))) {
     return (
@@ -680,7 +681,7 @@ function ContentUploadModal({
     setUploading(true);
     try {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const path = `${creatorId}/${Date.now()}-${safeName}`;
+      const path = `${creatorId || 'editorial'}/${Date.now()}-${safeName}`;
       const { error: uploadError } = await supabase.storage
         .from('creator-media')
         .upload(path, file, { cacheControl: '3600', upsert: false });
@@ -713,8 +714,48 @@ function ContentUploadModal({
 
     const finalStatus = publishNow ? 'published' : form.status;
 
+    // Admins (the CEO/editors) may not have a creator profile; create a
+    // linked one on the fly the first time they publish studio content.
+    let effectiveCreatorId = creatorId;
+    if (!effectiveCreatorId) {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) {
+        setError('Please sign in again.');
+        return;
+      }
+      const { data: mine } = await supabase
+        .from('creator_applications')
+        .select('id')
+        .eq('user_id', uid)
+        .maybeSingle();
+      if (mine) {
+        effectiveCreatorId = (mine as { id: string }).id;
+      } else {
+        const { data: created, error: createError } = await supabase
+          .from('creator_applications')
+          .insert({
+            user_id: uid,
+            display_name: 'CelebUD Editorial',
+            email: userData.user?.email || '',
+            status: 'onboarded',
+            revenue_share_pct: 0,
+            total_earnings: 0,
+            total_views: 0,
+            articles_count: 0,
+          })
+          .select('id')
+          .single();
+        if (createError || !created) {
+          setError('Could not set up your creator profile: ' + (createError?.message || 'unknown error') + '. Make sure SQL file 11 has been run.');
+          return;
+        }
+        effectiveCreatorId = (created as { id: string }).id;
+      }
+    }
+
     const payload = {
-      creator_id: creatorId,
+      creator_id: effectiveCreatorId,
       content_type: form.content_type,
       title: form.title.trim(),
       description: form.description.trim() || undefined,
