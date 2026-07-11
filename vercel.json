@@ -2,19 +2,19 @@
   "rewrites": [
     {
       "source": "/sitemap.xml",
-      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/generate-sitemap"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Generate-sitemap"
     },
     {
       "source": "/news-sitemap.xml",
-      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/generate-sitemap?type=news"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Generate-sitemap?type=news"
     },
     {
       "source": "/feed.xml",
-      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/generate-sitemap?type=rss"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Generate-sitemap?type=rss"
     },
     {
       "source": "/rss.xml",
-      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/generate-sitemap?type=rss"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Generate-sitemap?type=rss"
     },
     {
       "source": "/article/(.*)",
