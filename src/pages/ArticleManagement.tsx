@@ -10,7 +10,7 @@ import { formatDistanceToNow } from '../utils/date';
 // off the old Gemavic Academy project; the FACEBOOK_PAGE_ACCESS_TOKEN,
 // TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID secrets live here now).
 // Function must be deployed with JWT verification off; open CORS.
-const SHARE_ENDPOINT = 'https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/share-to-socials';
+const SHARE_ENDPOINT = 'https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/dynamic-worker';
 
 async function queueShareRequest(article: Article): Promise<string> {
   const res = await fetch(SHARE_ENDPOINT, {
