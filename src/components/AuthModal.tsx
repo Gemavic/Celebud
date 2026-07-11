@@ -231,31 +231,12 @@ export default function AuthModal({ isOpen, onClose, mode: initialMode }: AuthMo
 
           {/* Facebook login hidden until the Meta app is reactivated (Live mode
               at developers.facebook.com) — with the app inactive, Meta shows
-              users an "App not active" error instead of the login screen. */}
-
-          <button
-            type="button"
-            onClick={() => handleOAuthSignIn('twitter')}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/>
-            </svg>
-            Continue with X
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleOAuthSignIn('apple')}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-            </svg>
-            Continue with Apple
-          </button>
+              users an "App not active" error instead of the login screen.
+              X and Apple login removed because those providers are not
+              configured in Supabase Auth — clicking them returned
+              "Unsupported provider: provider is not enabled". Re-add the
+              buttons only after enabling the provider in
+              Supabase -> Authentication -> Providers. */}
         </div>
 
         <div className="relative mb-6">
