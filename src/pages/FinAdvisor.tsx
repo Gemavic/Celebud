@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import { Header } from '../components/Header';
 import { buildArticleUrl } from '../utils/articleUrl';
 import {
+  AlertTriangle,
   ArrowLeft,
   Banknote,
   BookOpen,
@@ -223,7 +224,7 @@ const TOPICS: Topic[] = [
           'Set one date each year to review every policy: new spouse, new child, new home, new business, new car - each changes what needs protecting. Shop competing quotes at renewal; loyalty is rarely rewarded in insurance pricing, and switching is easier than it looks.',
       },
     ],
-    calcNote: 'A strong emergency fund lets you choose higher deductibles and cheaper premiums - use the Savings Goal Calculator below to plan yours.',
+    calcNote: 'Compare Term, Whole Life, and Universal Life side by side in the Life Insurance Illustrator below - then take your real situation to a licensed advisor.',
   },
   {
     key: 'debt',
@@ -271,7 +272,7 @@ const TOPICS: Topic[] = [
         ],
       },
     ],
-    calcNote: 'Freeing yourself from high-interest debt is the best "investment" most people can make - a 24% card paid off is a guaranteed 24% return. Plan the payoff with the Savings Goal Calculator below.',
+    calcNote: 'See your own debt-free date - and what consolidating at a lower rate could save - in the Debt Payoff & Consolidation Illustrator below.',
   },
 ];
 
@@ -413,6 +414,10 @@ export function FinAdvisor() {
                       Open the calculators
                     </button>
                   </div>
+
+                  <div className="mt-6 max-w-3xl">
+                    <PageDisclaimer />
+                  </div>
                 </div>
               </div>
             </div>
@@ -444,6 +449,15 @@ export function FinAdvisor() {
               <SavingsGoalCalculator />
               <div className="lg:col-span-2">
                 <BudgetAnalyzer />
+              </div>
+              <div className="lg:col-span-2">
+                <InsuranceIllustrator />
+              </div>
+              <div className="lg:col-span-2">
+                <DebtPayoffCalculator />
+              </div>
+              <div className="lg:col-span-2">
+                <PageDisclaimer />
               </div>
             </div>
           )}
@@ -495,7 +509,12 @@ export function FinAdvisor() {
             </div>
           )}
 
-          {tab === 'tips' && <FinanceTips />}
+          {tab === 'tips' && (
+            <div className="space-y-6">
+              <FinanceTips />
+              <PageDisclaimer />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -686,6 +705,245 @@ function BudgetAnalyzer() {
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------------- Advisory disclaimers ---------------------------------- */
+
+function AdvisorDisclaimer({ text }: { text: string }) {
+  return (
+    <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+      <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+      <p className="text-xs text-amber-800 leading-relaxed">
+        <strong>Educational illustration only — not advice or a quote.</strong> {text} Always seek
+        the guidance of a licensed advisor in your province or country before making decisions.
+      </p>
+    </div>
+  );
+}
+
+function PageDisclaimer() {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl bg-gray-100 border border-gray-200 px-5 py-4">
+      <Shield className="w-5 h-5 text-gray-500 mt-0.5 shrink-0" />
+      <p className="text-xs text-gray-600 leading-relaxed">
+        <strong className="text-gray-800">FIN-ADVISOR disclaimer:</strong> everything on this page —
+        guides, calculators, and illustrations — is published for general financial education only.
+        It is not financial, insurance, investment, tax, or legal advice, and no calculator here
+        produces a real quote. Products, premiums, rates, and regulations vary by individual
+        circumstances and by jurisdiction. Before acting on anything you learn here, consult a
+        licensed financial or insurance advisor in your province or country — in Canada, for
+        example, advisors licensed under their provincial regulator (such as FSRA in Ontario).
+      </p>
+    </div>
+  );
+}
+
+/* ---------------- Insurance illustrator: Term vs Whole vs Universal ----- */
+
+function InsuranceIllustrator() {
+  const [coverage, setCoverage] = useState(500000);
+  const [age, setAge] = useState(35);
+
+  const r = useMemo(() => {
+    const safeAge = Math.min(70, Math.max(18, age));
+    // Illustrative pricing only: a simple per-$1,000 monthly rate that
+    // rises with age. Real premiums depend on health, smoking status,
+    // gender, insurer underwriting, and product design.
+    const ratePer1000 = 0.045 + Math.max(0, safeAge - 25) * 0.006;
+    const term = (coverage / 1000) * ratePer1000;
+    const whole = term * 9;
+    const universal = term * 6.5;
+    const years = 20;
+    const wholeCash = whole * 12 * years * 0.55;
+    const universalCash = universal * 12 * years * 0.45;
+    return { term, whole, universal, wholeCash, universalCash };
+  }, [coverage, age]);
+
+  const products = [
+    {
+      name: 'Term Life',
+      badge: 'Lowest cost',
+      badgeCls: 'bg-emerald-100 text-emerald-700',
+      premium: r.term,
+      duration: 'Covers a set period (e.g. 20 years), then ends or renews at a higher rate',
+      cash: 'None — pure protection',
+      cashValue: 0,
+      flexibility: 'Fixed premium for the term; simple and predictable',
+      bestFor: 'Income protection during your working and child-raising years — maximum coverage per dollar',
+    },
+    {
+      name: 'Whole Life',
+      badge: 'Permanent + guaranteed',
+      badgeCls: 'bg-blue-100 text-blue-700',
+      premium: r.whole,
+      duration: 'Covers your entire life as long as premiums are paid',
+      cash: 'Guaranteed cash value that grows on a fixed schedule',
+      cashValue: r.wholeCash,
+      flexibility: 'Fixed premium; least flexible, most guarantees',
+      bestFor: 'Lifelong needs: estate planning, final expenses, guaranteed legacy',
+    },
+    {
+      name: 'Universal Life',
+      badge: 'Permanent + flexible',
+      badgeCls: 'bg-purple-100 text-purple-700',
+      premium: r.universal,
+      duration: 'Covers your entire life, with adjustable coverage',
+      cash: 'Investment-linked cash value — grows (or shrinks) with market performance',
+      cashValue: r.universalCash,
+      flexibility: 'Premiums and coverage can be adjusted within limits',
+      bestFor: 'Those who want permanent cover plus investment control and have maxed other tax-advantaged room',
+    },
+  ];
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+          <Shield className="w-5 h-5 text-blue-600" />
+        </div>
+        <h3 className="text-lg font-bold text-gray-900">Life Insurance Illustrator</h3>
+      </div>
+      <p className="text-sm text-gray-500 mb-5">
+        Compare how the three main types of life insurance behave for the same coverage amount.
+      </p>
+
+      <div className="grid grid-cols-2 gap-4 mb-6 max-w-md">
+        <NumField label="Coverage Amount ($)" value={coverage} onChange={setCoverage} />
+        <NumField label="Your Age" value={age} onChange={setAge} min={18} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {products.map((p) => (
+          <div key={p.name} className="rounded-2xl border border-gray-200 p-5 flex flex-col">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h4 className="font-bold text-gray-900">{p.name}</h4>
+              <span className={`text-[10.5px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${p.badgeCls}`}>
+                {p.badge}
+              </span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">
+              {fmt(p.premium)}<span className="text-sm font-medium text-gray-400">/month*</span>
+            </p>
+            <dl className="mt-4 space-y-3 text-[13px] flex-1">
+              <div>
+                <dt className="font-semibold text-gray-700">How long it covers</dt>
+                <dd className="text-gray-500">{p.duration}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-gray-700">Cash value</dt>
+                <dd className="text-gray-500">{p.cash}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-gray-700">Illustrative cash value after 20 yrs*</dt>
+                <dd className="text-gray-900 font-semibold">{p.cashValue > 0 ? fmt(p.cashValue) : '$0'}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-gray-700">Flexibility</dt>
+                <dd className="text-gray-500">{p.flexibility}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-gray-700">Typically suits</dt>
+                <dd className="text-gray-500">{p.bestFor}</dd>
+              </div>
+            </dl>
+          </div>
+        ))}
+      </div>
+
+      <AdvisorDisclaimer text="*Premiums and cash values shown are simplified demonstrations of how these product types compare — they are not quotes. Real pricing depends on your health, smoking status, gender, insurer underwriting, and product design, and universal life cash values vary with market performance and policy charges." />
+    </div>
+  );
+}
+
+/* ---------------- Debt payoff & consolidation calculator ---------------- */
+
+function monthsToPayoff(principal: number, annualRate: number, payment: number): number | null {
+  const r = annualRate / 100 / 12;
+  if (principal <= 0 || payment <= 0) return null;
+  if (r === 0) return Math.ceil(principal / payment);
+  if (payment <= principal * r) return null; // payment doesn't cover interest
+  return Math.ceil(-Math.log(1 - (r * principal) / payment) / Math.log(1 + r));
+}
+
+function DebtPayoffCalculator() {
+  const [debt, setDebt] = useState(20000);
+  const [rate, setRate] = useState(19);
+  const [payment, setPayment] = useState(500);
+  const [consolidationRate, setConsolidationRate] = useState(9);
+
+  const r = useMemo(() => {
+    const current = monthsToPayoff(debt, rate, payment);
+    const consolidated = monthsToPayoff(debt, consolidationRate, payment);
+    const currentInterest = current !== null ? payment * current - debt : null;
+    const consolidatedInterest = consolidated !== null ? payment * consolidated - debt : null;
+    const interestSaved =
+      currentInterest !== null && consolidatedInterest !== null
+        ? currentInterest - consolidatedInterest
+        : null;
+    const monthsSaved = current !== null && consolidated !== null ? current - consolidated : null;
+    return { current, consolidated, currentInterest, consolidatedInterest, interestSaved, monthsSaved };
+  }, [debt, rate, payment, consolidationRate]);
+
+  const fmtMonths = (m: number | null) =>
+    m === null ? 'Never — payment too low' : m >= 12 ? `${Math.floor(m / 12)} yr ${m % 12} mo` : `${m} mo`;
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center">
+          <Landmark className="w-5 h-5 text-purple-600" />
+        </div>
+        <h3 className="text-lg font-bold text-gray-900">Debt Payoff &amp; Consolidation Illustrator</h3>
+      </div>
+      <p className="text-sm text-gray-500 mb-5">
+        See how long your current path takes — and what consolidating at a lower rate could change.
+      </p>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <NumField label="Total Debt ($)" value={debt} onChange={setDebt} />
+        <NumField label="Current Interest Rate (%)" value={rate} onChange={setRate} />
+        <NumField label="Monthly Payment ($)" value={payment} onChange={setPayment} />
+        <NumField label="Consolidation Rate (%)" value={consolidationRate} onChange={setConsolidationRate} />
+      </div>
+
+      {r.current === null && (
+        <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+          <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+          <p className="text-xs text-red-700 leading-relaxed">
+            <strong>The minimum-payment trap, live:</strong> at this rate, your monthly payment does not
+            even cover the interest — the balance would grow forever. Increase the payment or lower the
+            rate to see a payoff date.
+          </p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="rounded-2xl border border-gray-200 p-5">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-3">Current path ({rate}%)</p>
+          <div className="grid grid-cols-2 gap-3">
+            <ResultTile label="Debt-free in" value={fmtMonths(r.current)} />
+            <ResultTile label="Total interest paid" value={r.currentInterest !== null ? fmt(r.currentInterest) : '—'} />
+          </div>
+        </div>
+        <div className="rounded-2xl border-2 border-purple-200 bg-purple-50/40 p-5">
+          <p className="text-xs font-bold uppercase tracking-wide text-purple-500 mb-3">
+            Consolidated at {consolidationRate}% (same payment)
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <ResultTile label="Debt-free in" value={fmtMonths(r.consolidated)} accent />
+            <ResultTile label="Total interest paid" value={r.consolidatedInterest !== null ? fmt(r.consolidatedInterest) : '—'} />
+          </div>
+          {r.interestSaved !== null && r.interestSaved > 0 && r.monthsSaved !== null && (
+            <p className="mt-3 text-sm font-semibold text-purple-700">
+              Potential saving: {fmt(r.interestSaved)} in interest and {fmtMonths(r.monthsSaved)} sooner to freedom.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <AdvisorDisclaimer text="This simplified illustration assumes a single fixed rate and payment with no fees. Real consolidation loans carry arrangement fees, insurance options, and qualification requirements that change the outcome, and debt-relief programs have credit-score consequences. A licensed advisor or accredited credit counsellor can assess your complete situation." />
     </div>
   );
 }
