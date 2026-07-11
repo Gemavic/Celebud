@@ -515,9 +515,65 @@ export function FinAdvisor() {
               <PageDisclaimer />
             </div>
           )}
+
+          <AboutTheAuthor />
         </div>
       </div>
     </div>
+  );
+}
+
+/* ---------------- About the FIN-ADVISOR desk ---------------------------- */
+
+function AboutTheAuthor() {
+  return (
+    <section className="mt-14 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden" aria-label="About the author">
+      <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600" />
+      <div className="p-6 sm:p-10 flex flex-col sm:flex-row gap-6 sm:gap-8 items-start">
+        <img
+          src="/g.m3.jpeg"
+          alt="Matthew Ayandare, licensed financial advisor and insurance agent"
+          className="w-28 h-28 rounded-2xl object-cover border-2 border-emerald-100 shadow-sm flex-shrink-0"
+          loading="lazy"
+        />
+        <div className="min-w-0">
+          <p className="text-xs font-bold tracking-widest uppercase text-emerald-600 mb-1">
+            About the Author
+          </p>
+          <h2 className="text-2xl font-bold text-gray-900">Matthew Ayandare</h2>
+          <p className="text-sm font-semibold text-gray-500 mt-0.5 mb-4">
+            Licensed Financial Advisor &amp; Insurance Agent · Ontario, Canada
+          </p>
+          <p className="text-gray-600 leading-relaxed max-w-3xl">
+            Matthew Ayandare is a seasoned financial advisor and insurance agent licensed in
+            Ontario. He has extensive experience helping individuals and families assess financial
+            risks, understand insurance products, and choose solutions that are practical and
+            appropriate for their needs. His writing is focused on education, clarity, and informed
+            decision-making for everyday readers.
+          </p>
+          <div className="flex flex-wrap gap-3 mt-5">
+            <a
+              href="mailto:histogm@gmail.com?subject=FIN-ADVISOR%20consultation%20request"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors"
+            >
+              Request a consultation
+            </a>
+            <a
+              href="https://wa.me/14377888011?text=Hello%2C%20I%20read%20FIN-ADVISOR%20on%20CelebUD%20and%20would%20like%20to%20ask%20a%20question."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 border border-emerald-200 text-emerald-700 text-sm font-semibold rounded-xl hover:bg-emerald-50 transition-colors"
+            >
+              WhatsApp a question
+            </a>
+          </div>
+          <p className="text-xs text-gray-400 mt-4 max-w-3xl">
+            Consultations are provided in Matthew's professional capacity as a licensed advisor and
+            are separate from CelebUD's editorial content.
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 
