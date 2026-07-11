@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Save, ArrowLeft, Settings, TrendingUp, Upload, Image, User as UserIcon, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { Header } from '../components/Header';
 import { EditorialDashboard } from '../components/EditorialDashboard';
 import { EditorialSection } from '../components/EditorialSection';
@@ -23,6 +24,7 @@ interface Author {
 export default function EditorialPage() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const { canEditEditorial } = usePermissions();
   const [activeTab, setActiveTab] = useState<'featured' | 'create' | 'dashboard'>('featured');
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -312,19 +314,21 @@ export default function EditorialPage() {
                   </div>
                 </button>
 
-                <button
-                  onClick={() => setActiveTab('dashboard')}
-                  className={`flex-1 py-3 px-6 rounded-md font-medium transition-all ${
-                    activeTab === 'dashboard'
-                      ? 'bg-white text-red-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <div className="flex items-center justify-center space-x-2">
-                    <Settings className="w-5 h-5" />
-                    <span>Manage Features</span>
-                  </div>
-                </button>
+                {canEditEditorial && (
+                  <button
+                    onClick={() => setActiveTab('dashboard')}
+                    className={`flex-1 py-3 px-6 rounded-md font-medium transition-all ${
+                      activeTab === 'dashboard'
+                        ? 'bg-white text-red-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center space-x-2">
+                      <Settings className="w-5 h-5" />
+                      <span>Manage Features</span>
+                    </div>
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -691,7 +695,7 @@ export default function EditorialPage() {
             </div>
           )}
 
-          {activeTab === 'dashboard' && user && profile?.is_admin && (
+          {activeTab === 'dashboard' && user && profile?.is_admin && canEditEditorial && (
             <EditorialDashboard />
           )}
         </div>

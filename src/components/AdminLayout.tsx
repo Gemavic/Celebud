@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import {
   LayoutDashboard,
   Users,
@@ -41,6 +42,7 @@ const NAV_ITEMS = [
 
 export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
   const { user, profile, signOut } = useAuth();
+  const { roleLabel } = usePermissions();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -93,7 +95,7 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
           </div>
           <div className={`overflow-hidden transition-all ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
             <h1 className="text-base font-bold tracking-tight leading-none">CelebUD</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Admin Portal</p>
+            <p className="text-xs text-gray-400 mt-0.5">{roleLabel || 'Admin Portal'}</p>
           </div>
           {/* Mobile close button */}
           <button

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { supabase } from '../lib/supabase';
 import { Header } from '../components/Header';
 import {
@@ -42,6 +43,7 @@ type Tab = 'overview' | 'creators' | 'payouts';
 
 export function CreatorManagement() {
   const { user, profile } = useAuth();
+  const { canOnboard, canApprovePayments } = usePermissions();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -173,6 +175,7 @@ export function CreatorManagement() {
                     setSelectedCreator(creator);
                     setShowPayoutModal(true);
                   }}
+                  canOnboard={canOnboard}
                 />
               )}
               {activeTab === 'payouts' && (
@@ -180,6 +183,7 @@ export function CreatorManagement() {
                   payouts={payouts}
                   loading={payoutsLoading}
                   updatePayoutStatus={updatePayoutStatus}
+                  canApprovePayments={canApprovePayments}
                 />
               )}
             </div>
@@ -198,6 +202,7 @@ export function CreatorManagement() {
       {showRegisterModal && (
         <RegisterCreatorModal
           onClose={() => setShowRegisterModal(false)}
+          canOnboard={canOnboard}
         />
       )}
     </div>
@@ -308,6 +313,7 @@ function CreatorsTab({
   setSelectedCreator,
   updateStatus,
   onCreatePayout,
+  canOnboard,
 }: {
   creators: CreatorApplication[];
   loading: boolean;
@@ -319,6 +325,7 @@ function CreatorsTab({
   setSelectedCreator: (c: CreatorApplication | null) => void;
   updateStatus: ReturnType<typeof useUpdateCreatorStatus>;
   onCreatePayout: (c: CreatorApplication) => void;
+  canOnboard: boolean;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [noteInput, setNoteInput] = useState('');
@@ -547,7 +554,7 @@ function CreatorsTab({
                             </button>
                           </>
                         )}
-                        {creator.status === 'approved' && (
+                        {creator.status === 'approved' && canOnboard && (
                           <button
                             onClick={() => updateStatus.mutate({ id: creator.id, status: 'onboarded' })}
                             disabled={updateStatus.isPending}
@@ -646,10 +653,12 @@ function PayoutsTab({
   payouts,
   loading,
   updatePayoutStatus,
+  canApprovePayments,
 }: {
   payouts: { id: string; creator_id: string; amount: number; period_start: string; period_end: string; status: string; payment_method: string; notes: string | null; created_at: string; paid_at: string | null; creator: { id: string; display_name: string; email: string | null; revenue_share_pct: number } }[];
   loading: boolean;
   updatePayoutStatus: ReturnType<typeof useUpdatePayoutStatus>;
+  canApprovePayments: boolean;
 }) {
   if (loading) {
     return (
@@ -731,7 +740,7 @@ function PayoutsTab({
                 </td>
                 <td className="py-3 px-4 text-right">
                   <div className="flex items-center justify-end gap-1">
-                    {payout.status === 'pending' && (
+                    {payout.status === 'pending' && canApprovePayments && (
                       <button
                         onClick={() => updatePayoutStatus.mutate({ id: payout.id, status: 'processing' })}
                         disabled={updatePayoutStatus.isPending}
@@ -740,7 +749,7 @@ function PayoutsTab({
                         Process
                       </button>
                     )}
-                    {payout.status === 'processing' && (
+                    {payout.status === 'processing' && canApprovePayments && (
                       <button
                         onClick={() => updatePayoutStatus.mutate({ id: payout.id, status: 'paid' })}
                         disabled={updatePayoutStatus.isPending}
@@ -748,6 +757,9 @@ function PayoutsTab({
                       >
                         Mark Paid
                       </button>
+                    )}
+                    {(payout.status === 'pending' || payout.status === 'processing') && !canApprovePayments && (
+                      <span className="text-xs text-gray-400 italic">Approval required</span>
                     )}
                     {payout.status === 'paid' && payout.paid_at && (
                       <span className="text-xs text-gray-400">
@@ -936,7 +948,7 @@ function PayoutStatusBadge({ status }: { status: string }) {
   );
 }
 
-function RegisterCreatorModal({ onClose }: { onClose: () => void }) {
+function RegisterCreatorModal({ onClose, canOnboard }: { onClose: () => void; canOnboard: boolean }) {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -1170,16 +1182,17 @@ function RegisterCreatorModal({ onClose }: { onClose: () => void }) {
                 />
                 <span className="text-sm text-gray-700">Approved <span className="text-xs text-gray-400">(needs onboarding)</span></span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className={`flex items-center gap-2 ${canOnboard ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'}`}>
                 <input
                   type="radio"
                   name="status"
                   value="onboarded"
                   checked={status === 'onboarded'}
-                  onChange={() => setStatus('onboarded')}
+                  onChange={() => canOnboard && setStatus('onboarded')}
+                  disabled={!canOnboard}
                   className="accent-red-600"
                 />
-                <span className="text-sm text-gray-700">Onboarded <span className="text-xs text-gray-400">(fully active)</span></span>
+                <span className="text-sm text-gray-700">Onboarded <span className="text-xs text-gray-400">(fully active{!canOnboard ? ' — requires onboarding access' : ''})</span></span>
               </label>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { supabase } from '../lib/supabase';
 import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell } from 'lucide-react';
@@ -67,6 +68,7 @@ interface Article {
 
 export function ArticleManagement() {
   const { profile, user } = useAuth();
+  const { canApportionArticles } = usePermissions();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -608,21 +610,27 @@ export function ArticleManagement() {
                           <span className="text-sm font-semibold text-gray-800">
                             {authors.find(a => a.id === article.author_id)?.name ?? <span className="text-red-500 italic">Unassigned</span>}
                           </span>
-                          <span className="text-gray-300 text-xs mx-1">|</span>
-                          <span className="text-xs text-gray-400">Assign to:</span>
-                          {authors.map(author => {
-                            const isCurrent = article.author_id === author.id;
-                            return (
-                              <button
-                                key={author.id}
-                                onClick={() => !isCurrent && assignAuthor(article.id, author.id)}
-                                className={authorBtnClass(author.name, isCurrent)}
-                                title={isCurrent ? `Currently: ${author.name}` : `Assign to ${author.name}`}
-                              >
-                                {isCurrent ? `✓ ${author.name.split(' ')[0]}` : author.name.split(' ')[0]}
-                              </button>
-                            );
-                          })}
+                          {canApportionArticles ? (
+                            <>
+                              <span className="text-gray-300 text-xs mx-1">|</span>
+                              <span className="text-xs text-gray-400">Assign to:</span>
+                              {authors.map(author => {
+                                const isCurrent = article.author_id === author.id;
+                                return (
+                                  <button
+                                    key={author.id}
+                                    onClick={() => !isCurrent && assignAuthor(article.id, author.id)}
+                                    className={authorBtnClass(author.name, isCurrent)}
+                                    title={isCurrent ? `Currently: ${author.name}` : `Assign to ${author.name}`}
+                                  >
+                                    {isCurrent ? `✓ ${author.name.split(' ')[0]}` : author.name.split(' ')[0]}
+                                  </button>
+                                );
+                              })}
+                            </>
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">| Article assignment requires elevated access</span>
+                          )}
                         </>
                       )}
                     </div>

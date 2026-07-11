@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { DollarSign, TrendingUp, MousePointer, Eye } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
+import { Header } from './Header';
+import { DollarSign, TrendingUp, MousePointer, Eye, ArrowLeft } from 'lucide-react';
 import { calculateAdRevenue, calculateCTR, formatCurrency } from '../utils/adRevenue';
 
 interface AdMetrics {
@@ -15,13 +19,16 @@ interface AdMetrics {
 }
 
 export function AdRevenueReport() {
+  const { user, profile, loading: authLoading } = useAuth();
+  const { canExecutive, loaded: permsLoaded } = usePermissions();
   const [ads, setAds] = useState<AdMetrics[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!profile?.is_admin) return;
     loadAdMetrics();
-  }, []);
+  }, [profile]);
 
   async function loadAdMetrics() {
     try {
@@ -50,6 +57,61 @@ export function AdRevenueReport() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (authLoading) {
+    return <div className="text-center py-8">Loading...</div>;
+  }
+
+  if (!user || !profile?.is_admin) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="pt-32 flex items-center justify-center">
+          <div className="text-center max-w-sm">
+            <DollarSign className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">Admin Access Required</h2>
+            <p className="text-gray-500 text-sm mb-6">
+              {user
+                ? 'Your account does not have admin privileges to view ad revenue.'
+                : 'Please sign in with an admin account to access the ad revenue report.'}
+            </p>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (permsLoaded && !canExecutive) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="pt-32 flex items-center justify-center">
+          <div className="text-center max-w-sm">
+            <DollarSign className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">Executive Access Required</h2>
+            <p className="text-gray-500 text-sm mb-6">
+              Ad Revenue reporting is restricted to executive-level roles. Contact the CEO or an
+              Admin 1 for access.
+            </p>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
