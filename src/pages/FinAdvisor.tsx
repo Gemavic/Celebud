@@ -796,11 +796,32 @@ function PageDisclaimer() {
   );
 }
 
-/* ---------------- Insurance illustrator: Term vs Whole vs Universal ----- */
+/* ---------------- Insurance illustrator: Term vs Whole vs Universal -----
+   Structured the way licensed advisors actually present illustrations:
+   Universal Life shows a Primary Scenario against a Secondary (stress-
+   tested) Scenario, and Whole Life shows a Guaranteed value against an
+   Illustrated (non-guaranteed, dividend-inclusive) value - rather than a
+   single fabricated "cash value" number. The Secondary Scenario formula
+   (Primary rate minus 2%, floored at 0%, capped at 5.25%) mirrors the
+   sensitivity-testing method used in real Canadian UL illustrations. All
+   figures are simplified educational approximations, not insurer pricing
+   - see the disclaimer below. */
+
+const ILLUSTRATION_YEARS = [10, 20, 30];
+
+// Future value of a level annual contribution compounding annually - a
+// simplified stand-in for real policy crediting mechanics.
+function fvAnnuity(netAnnual: number, ratePct: number, years: number): number {
+  const rate = ratePct / 100;
+  if (rate <= 0) return netAnnual * years;
+  return netAnnual * ((Math.pow(1 + rate, years) - 1) / rate);
+}
 
 function InsuranceIllustrator() {
   const [coverage, setCoverage] = useState(500000);
   const [age, setAge] = useState(35);
+  const [primaryRate, setPrimaryRate] = useState(5.75); // UL: illustrated/current rate assumption
+  const [dividendRate, setDividendRate] = useState(4.25); // Whole Life: current dividend scale assumption
 
   const r = useMemo(() => {
     const safeAge = Math.min(70, Math.max(18, age));
@@ -808,50 +829,36 @@ function InsuranceIllustrator() {
     // rises with age. Real premiums depend on health, smoking status,
     // gender, insurer underwriting, and product design.
     const ratePer1000 = 0.045 + Math.max(0, safeAge - 25) * 0.006;
-    const term = (coverage / 1000) * ratePer1000;
-    const whole = term * 9;
-    const universal = term * 6.5;
-    const years = 20;
-    const wholeCash = whole * 12 * years * 0.55;
-    const universalCash = universal * 12 * years * 0.45;
-    return { term, whole, universal, wholeCash, universalCash };
-  }, [coverage, age]);
+    const termMonthly = (coverage / 1000) * ratePer1000;
+    const wholeMonthly = termMonthly * 8.5;
+    const ulMonthly = termMonthly * 6;
 
-  const products = [
-    {
-      name: 'Term Life',
-      badge: 'Lowest cost',
-      badgeCls: 'bg-emerald-100 text-emerald-700',
-      premium: r.term,
-      duration: 'Covers a set period (e.g. 20 years), then ends or renews at a higher rate',
-      cash: 'None — pure protection',
-      cashValue: 0,
-      flexibility: 'Fixed premium for the term; simple and predictable',
-      bestFor: 'Income protection during your working and child-raising years — maximum coverage per dollar',
-    },
-    {
-      name: 'Whole Life',
-      badge: 'Permanent + guaranteed',
-      badgeCls: 'bg-blue-100 text-blue-700',
-      premium: r.whole,
-      duration: 'Covers your entire life as long as premiums are paid',
-      cash: 'Guaranteed cash value that grows on a fixed schedule',
-      cashValue: r.wholeCash,
-      flexibility: 'Fixed premium; least flexible, most guarantees',
-      bestFor: 'Lifelong needs: estate planning, final expenses, guaranteed legacy',
-    },
-    {
-      name: 'Universal Life',
-      badge: 'Permanent + flexible',
-      badgeCls: 'bg-purple-100 text-purple-700',
-      premium: r.universal,
-      duration: 'Covers your entire life, with adjustable coverage',
-      cash: 'Investment-linked cash value — grows (or shrinks) with market performance',
-      cashValue: r.universalCash,
-      flexibility: 'Premiums and coverage can be adjusted within limits',
-      bestFor: 'Those who want permanent cover plus investment control and have maxed other tax-advantaged room',
-    },
-  ];
+    const wholeAnnual = wholeMonthly * 12;
+    const ulAnnual = ulMonthly * 12;
+
+    // Secondary Scenario methodology mirrors real UL illustrations: the
+    // stress-tested rate is 2 points below Primary, floored at 0% and
+    // capped at 5.25%.
+    const secondaryRate = Math.max(0, Math.min(5.25, primaryRate - 2));
+
+    const wholeGuaranteedNet = wholeAnnual * 0.5;   // guaranteed schedule funds a smaller share
+    const wholeIllustratedNet = wholeAnnual * 0.58; // dividends improve allocation efficiency
+    const ulNet = ulAnnual * 0.75;                  // UL typically routes more premium to accumulation
+
+    const wholeGuaranteedRate = 2.25; // contractual guaranteed growth - not user-adjustable
+
+    const table = ILLUSTRATION_YEARS.map((year) => ({
+      year,
+      wholeGuaranteed: fvAnnuity(wholeGuaranteedNet, wholeGuaranteedRate, year),
+      wholeIllustrated: fvAnnuity(wholeIllustratedNet, dividendRate, year),
+      ulPrimary: fvAnnuity(ulNet, primaryRate, year),
+      ulSecondary: fvAnnuity(ulNet, secondaryRate, year),
+    }));
+
+    return { termMonthly, wholeMonthly, ulMonthly, secondaryRate, table };
+  }, [coverage, age, primaryRate, dividendRate]);
+
+  const cellClass = 'py-1.5 text-right tabular-nums';
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
@@ -862,53 +869,119 @@ function InsuranceIllustrator() {
         <h3 className="text-lg font-bold text-gray-900">Life Insurance Illustrator</h3>
       </div>
       <p className="text-sm text-gray-500 mb-5">
-        Compare how the three main types of life insurance behave for the same coverage amount.
+        Modeled on how real illustrations are presented: Guaranteed vs Illustrated values for Whole
+        Life, and Primary vs Secondary (stress-tested) Scenario for Universal Life.
       </p>
 
-      <div className="grid grid-cols-2 gap-4 mb-6 max-w-md">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <NumField label="Coverage Amount ($)" value={coverage} onChange={setCoverage} />
         <NumField label="Your Age" value={age} onChange={setAge} min={18} />
+        <NumField label="UL Primary Rate of Return (%)" value={primaryRate} onChange={setPrimaryRate} />
+        <NumField label="WL Dividend Scale Rate (%)" value={dividendRate} onChange={setDividendRate} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {products.map((p) => (
-          <div key={p.name} className="rounded-2xl border border-gray-200 p-5 flex flex-col">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <h4 className="font-bold text-gray-900">{p.name}</h4>
-              <span className={`text-[10.5px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${p.badgeCls}`}>
-                {p.badge}
-              </span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">
-              {fmt(p.premium)}<span className="text-sm font-medium text-gray-400">/month*</span>
-            </p>
-            <dl className="mt-4 space-y-3 text-[13px] flex-1">
-              <div>
-                <dt className="font-semibold text-gray-700">How long it covers</dt>
-                <dd className="text-gray-500">{p.duration}</dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-gray-700">Cash value</dt>
-                <dd className="text-gray-500">{p.cash}</dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-gray-700">Illustrative cash value after 20 yrs*</dt>
-                <dd className="text-gray-900 font-semibold">{p.cashValue > 0 ? fmt(p.cashValue) : '$0'}</dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-gray-700">Flexibility</dt>
-                <dd className="text-gray-500">{p.flexibility}</dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-gray-700">Typically suits</dt>
-                <dd className="text-gray-500">{p.bestFor}</dd>
-              </div>
-            </dl>
+        {/* Term */}
+        <div className="rounded-2xl border border-gray-200 p-5 flex flex-col">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <h4 className="font-bold text-gray-900">Term Life</h4>
+            <span className="text-[10.5px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+              Lowest cost
+            </span>
           </div>
-        ))}
+          <p className="text-2xl font-bold text-gray-900">
+            {fmt(r.termMonthly)}<span className="text-sm font-medium text-gray-400">/month*</span>
+          </p>
+          <dl className="mt-4 space-y-3 text-[13px] flex-1">
+            <div>
+              <dt className="font-semibold text-gray-700">How long it covers</dt>
+              <dd className="text-gray-500">A fixed period (e.g. 10, 20 years), then ends or renews at a much higher rate</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-gray-700">Cash value</dt>
+              <dd className="text-gray-500">None — pure protection, no Guaranteed or Illustrated column applies</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-gray-700">Typically suits</dt>
+              <dd className="text-gray-500">Income protection during working and child-raising years — maximum coverage per dollar</dd>
+            </div>
+          </dl>
+        </div>
+
+        {/* Whole Life */}
+        <div className="rounded-2xl border border-gray-200 p-5 flex flex-col">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <h4 className="font-bold text-gray-900">Whole Life</h4>
+            <span className="text-[10.5px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+              Permanent + guaranteed
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">
+            {fmt(r.wholeMonthly)}<span className="text-sm font-medium text-gray-400">/month*</span>
+          </p>
+          <table className="mt-4 w-full text-[12.5px]">
+            <thead>
+              <tr className="text-gray-400 text-left">
+                <th className="font-semibold py-1">Year</th>
+                <th className="font-semibold py-1 text-right">Guaranteed</th>
+                <th className="font-semibold py-1 text-right">Illustrated†</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-700">
+              {r.table.map((row) => (
+                <tr key={row.year} className="border-t border-gray-100">
+                  <td className="py-1.5">{row.year}</td>
+                  <td className={cellClass}>{fmt(row.wholeGuaranteed)}</td>
+                  <td className={`${cellClass} font-semibold text-gray-900`}>{fmt(row.wholeIllustrated)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-[11.5px] text-gray-400 mt-3">
+            Guaranteed is contractual and locked in; Illustrated adds non-guaranteed dividends at the {dividendRate}% scale you set above.
+          </p>
+        </div>
+
+        {/* Universal Life */}
+        <div className="rounded-2xl border border-gray-200 p-5 flex flex-col">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <h4 className="font-bold text-gray-900">Universal Life</h4>
+            <span className="text-[10.5px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+              Permanent + flexible
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">
+            {fmt(r.ulMonthly)}<span className="text-sm font-medium text-gray-400">/month*</span>
+          </p>
+          <table className="mt-4 w-full text-[12.5px]">
+            <thead>
+              <tr className="text-gray-400 text-left">
+                <th className="font-semibold py-1">Year</th>
+                <th className="font-semibold py-1 text-right">Primary ({primaryRate}%)</th>
+                <th className="font-semibold py-1 text-right">Secondary ({r.secondaryRate}%)</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-700">
+              {r.table.map((row) => (
+                <tr key={row.year} className="border-t border-gray-100">
+                  <td className="py-1.5">{row.year}</td>
+                  <td className={`${cellClass} font-semibold text-gray-900`}>{fmt(row.ulPrimary)}</td>
+                  <td className={cellClass}>{fmt(row.ulSecondary)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-[11.5px] text-gray-400 mt-3">
+            Secondary Scenario stress-tests Primary minus 2 points (floored at 0%, capped at 5.25%) — none of these values are guaranteed except the policy's stated minimums.
+          </p>
+        </div>
       </div>
 
-      <AdvisorDisclaimer text="*Premiums and cash values shown are simplified demonstrations of how these product types compare — they are not quotes. Real pricing depends on your health, smoking status, gender, insurer underwriting, and product design, and universal life cash values vary with market performance and policy charges." />
+      <p className="text-[11.5px] text-gray-400 mt-4">
+        †Neither the Whole Life "Illustrated" column nor either Universal Life column is guaranteed — only the Whole Life "Guaranteed" column and each product's contractual minimums are locked in. Early-year cash values are typically reduced further by surrender charges not modeled here.
+      </p>
+
+      <AdvisorDisclaimer text="*Premiums and cash values shown are simplified educational approximations of how these product types compare — they are not quotes and do not use any real insurer's rate tables. Real pricing and projected values depend on your health, smoking status, gender, insurer underwriting, product design, and the insurer's actual guaranteed and non-guaranteed assumptions. Only a licensed advisor using insurer-approved illustration software can produce an actual illustration for you." />
     </div>
   );
 }
