@@ -10,7 +10,7 @@ import { formatDistanceToNow } from '../utils/date';
 import { updateMetaTags, generateArticleStructuredData, removeArticleStructuredData } from '../utils/seo';
 import { sanitizeArticleContent } from '../utils/contentSanitizer';
 import { buildArticleUrl } from '../utils/articleUrl';
-import { ArrowLeft, Clock, Share2, Facebook, Twitter, Linkedin } from 'lucide-react';
+import { ArrowLeft, Clock, Share2, Facebook, Twitter, Linkedin, Instagram, Check } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useArticle } from '../hooks/useArticles';
 
@@ -19,6 +19,7 @@ export function ArticleDetail() {
   const navigate = useNavigate();
   const { data: article, isLoading: loading, isError, refetch } = useArticle(id || '');
   const [relatedArticles, setRelatedArticles] = useState<MediaContentWithRelations[]>([]);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Curated stories from other outlets carry a "The post ... appeared
   // first on X" footer. Detect it so the byline reads "Curator" and the
@@ -139,7 +140,8 @@ export function ArticleDetail() {
   const handleCopyLink = useCallback(() => {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(window.location.href).then(() => {
-        alert('Link copied to clipboard!');
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2500);
       }).catch(() => {
         alert('Failed to copy link');
       });
@@ -147,6 +149,47 @@ export function ArticleDetail() {
       alert('Clipboard not supported in this browser');
     }
   }, []);
+
+  // Instagram has no public "share this link" mechanism (true for every
+  // website, not a CelebUD gap) - the only way a browser can hand a link
+  // and image to Instagram is the OS's native share sheet, which lists
+  // Instagram (Stories/Direct/Feed) alongside WhatsApp, Messages, etc.
+  // when the app is installed. On desktop / unsupported browsers, fall
+  // back to copying the link with an Instagram-specific instruction.
+  const handleInstagramShare = useCallback(async () => {
+    if (!article) return;
+    const shareUrl = window.location.href;
+    const shareData: ShareData = { title: article.title, text: article.title, url: shareUrl };
+
+    if (article.thumbnail_url && navigator.canShare) {
+      try {
+        const res = await fetch(article.thumbnail_url);
+        const blob = await res.blob();
+        const file = new File([blob], 'celebud-article.jpg', { type: blob.type || 'image/jpeg' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ ...shareData, files: [file] });
+          return;
+        }
+      } catch {
+        // Image fetch/share failed (CORS, unsupported type, user cancelled) - fall through
+      }
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch {
+        // User cancelled or share failed - fall through to copy
+      }
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert('Link copied! Instagram doesn\'t support direct links from browsers - paste this into your Story, bio, or a DM.');
+      });
+    }
+  }, [article]);
 
   const contentParagraphs = useMemo(() => {
     if (!article) return [];
@@ -407,11 +450,21 @@ export function ArticleDetail() {
                 </svg>
               </a>
               <button
-                onClick={handleCopyLink}
-                className="p-2.5 rounded-full bg-gray-700 text-white hover:bg-gray-800 transition-colors shadow-sm"
-                aria-label="Copy link"
+                onClick={handleInstagramShare}
+                className="p-2.5 rounded-full text-white transition-opacity hover:opacity-90 shadow-sm"
+                style={{ background: 'linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)' }}
+                aria-label="Share to Instagram or more apps"
+                title="Share to Instagram / more apps"
               >
-                <Share2 className="w-4 h-4" />
+                <Instagram className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleCopyLink}
+                className={`p-2.5 rounded-full text-white transition-colors shadow-sm ${linkCopied ? 'bg-emerald-600' : 'bg-gray-700 hover:bg-gray-800'}`}
+                aria-label="Copy link"
+                title={linkCopied ? 'Copied!' : 'Copy link'}
+              >
+                {linkCopied ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
               </button>
             </div>
           </div>
