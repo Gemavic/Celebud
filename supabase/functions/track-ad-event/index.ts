@@ -1,11 +1,46 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { checkRateLimit, getRateLimitHeaders } from '../_shared/rateLimiter.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
+
+// Inlined rather than imported from _shared/rateLimiter.ts: this project
+// deploys one function at a time by pasting into the Supabase dashboard
+// editor, which can't resolve a relative import to another file.
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+function checkRateLimit(
+  identifier: string,
+  config: { maxRequests: number; windowMs: number }
+): { allowed: boolean; remaining: number; resetTime: number } {
+  const now = Date.now();
+  const record = rateLimitMap.get(identifier);
+
+  if (!record || now > record.resetTime) {
+    const resetTime = now + config.windowMs;
+    rateLimitMap.set(identifier, { count: 1, resetTime });
+    return { allowed: true, remaining: config.maxRequests - 1, resetTime };
+  }
+
+  if (record.count >= config.maxRequests) {
+    return { allowed: false, remaining: 0, resetTime: record.resetTime };
+  }
+
+  record.count++;
+  rateLimitMap.set(identifier, record);
+  return { allowed: true, remaining: config.maxRequests - record.count, resetTime: record.resetTime };
+}
+
+function getRateLimitHeaders(allowed: boolean, remaining: number, resetTime: number): Record<string, string> {
+  return {
+    'X-RateLimit-Limit': '60',
+    'X-RateLimit-Remaining': remaining.toString(),
+    'X-RateLimit-Reset': new Date(resetTime).toISOString(),
+    ...(allowed ? {} : { 'Retry-After': Math.ceil((resetTime - Date.now()) / 1000).toString() }),
+  };
+}
 
 interface TrackRequest {
   ad_id: string;
