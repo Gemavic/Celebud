@@ -80,26 +80,16 @@ export function MetricsDashboard() {
   const [adClicks, setAdClicks] = useState({ total: 0, today: 0, week: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'content' | 'audience' | 'ads'>('overview');
 
   const fetchMetrics = async () => {
     setRefreshing(true);
+    setError(null);
 
-    const [
-      topRes,
-      recentRes,
-      totalViewsRes,
-      totalArticlesRes,
-      totalCommentsRes,
-      todayEventsRes,
-      weekEventsRes,
-      dailyRes,
-      categoryRes,
-      activityRes,
-      hourlyRes,
-      referrerRes,
-      adClickRes,
-    ] = await Promise.all([
+    let results;
+    try {
+      results = await Promise.all([
       supabase
         .from('media_content')
         .select('id, title, views_count, comments_count, published_at, thumbnail_url, categories(name, color)')
@@ -139,7 +129,37 @@ export function MetricsDashboard() {
       supabase.rpc('get_top_referrers', { ref_limit: 10 } as any),
 
       supabase.rpc('get_ad_click_stats', { days_back: 30 } as any),
-    ]);
+      ]);
+    } catch (err) {
+      console.error('Error fetching metrics:', err);
+      setError('Could not load analytics — check your connection and try refreshing.');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    const [
+      topRes,
+      recentRes,
+      totalViewsRes,
+      totalArticlesRes,
+      totalCommentsRes,
+      todayEventsRes,
+      weekEventsRes,
+      dailyRes,
+      categoryRes,
+      activityRes,
+      hourlyRes,
+      referrerRes,
+      adClickRes,
+    ] = results;
+
+    const failedQueries = results.filter((r: any) => r?.error).length;
+    if (failedQueries > 0) {
+      setError(
+        `${failedQueries} of ${results.length} analytics queries failed to load — the numbers below may be incomplete.`
+      );
+    }
 
     if (topRes.data) {
       setTopArticles(
@@ -300,6 +320,15 @@ export function MetricsDashboard() {
 
       <main className="pt-28 pb-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {error && (
+            <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <Activity className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Analytics data may be incomplete</p>
+                <p className="mt-0.5">{error}</p>
+              </div>
+            </div>
+          )}
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">

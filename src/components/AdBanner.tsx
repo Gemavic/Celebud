@@ -40,81 +40,37 @@ export function AdBanner({ placement, className = '' }: AdBannerProps) {
     }
   }
 
-  async function trackImpression(adId: string) {
+  async function trackAdEvent(adId: string, event: 'impression' | 'click') {
     try {
-      const userIp = await getUserIP();
-
-      const { data: currentAd } = await supabase
-        .from('advertisements')
-        .select('impression_count')
-        .eq('id', adId)
-        .maybeSingle();
-
-      if (currentAd) {
-        await supabase.from('advertisements').update({
-          impression_count: (currentAd.impression_count || 0) + 1,
-        }).eq('id', adId);
-
-        await supabase.from('ad_impressions').insert({
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-ad-event`;
+      await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           ad_id: adId,
-          clicked: false,
-          user_agent: navigator.userAgent,
-          user_ip: userIp,
-        });
-      }
+          event,
+          ad_position: placement,
+          ad_type: ad?.ad_type,
+          page_url: window.location.pathname,
+          referrer: document.referrer || null,
+        }),
+      });
     } catch (error) {
-      console.error('Error tracking impression:', error);
+      console.error(`Error tracking ad ${event}:`, error);
     }
+  }
+
+  async function trackImpression(adId: string) {
+    await trackAdEvent(adId, 'impression');
   }
 
   async function handleClick() {
     if (ad) {
-      try {
-        const userIp = await getUserIP();
-
-        const { data: currentAd } = await supabase
-          .from('advertisements')
-          .select('click_count')
-          .eq('id', ad.id)
-          .maybeSingle();
-
-        if (currentAd) {
-          await supabase.from('advertisements').update({
-            click_count: (currentAd.click_count || 0) + 1,
-          }).eq('id', ad.id);
-
-          await supabase.from('ad_impressions').insert({
-            ad_id: ad.id,
-            clicked: true,
-            user_agent: navigator.userAgent,
-            user_ip: userIp,
-          });
-        }
-
-        await supabase.from('ad_clicks').insert({
-          article_id: null,
-          ad_position: placement,
-          ad_type: ad.ad_type || 'banner',
-          referrer: document.referrer || null,
-          user_agent: navigator.userAgent,
-          page_url: window.location.pathname,
-        });
-
-        window.open(ad.link_url, '_blank', 'noopener,noreferrer');
-      } catch (error) {
-        console.error('Error tracking click:', error);
-      }
-    }
-  }
-
-  async function getUserIP(): Promise<string> {
-    try {
-      const response = await fetch('https://api.ipify.org?format=json');
-      const data = await response.json();
-      return data.ip;
-    } catch (error) {
-      console.error('Error getting IP:', error);
-      return 'unknown';
+      await trackAdEvent(ad.id, 'click');
+      window.open(ad.link_url, '_blank', 'noopener,noreferrer');
     }
   }
 

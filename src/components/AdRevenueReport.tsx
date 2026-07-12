@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { Header } from './Header';
-import { DollarSign, TrendingUp, MousePointer, Eye, ArrowLeft } from 'lucide-react';
+import { DollarSign, TrendingUp, MousePointer, Eye, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { calculateAdRevenue, calculateCTR, formatCurrency } from '../utils/adRevenue';
 
 interface AdMetrics {
@@ -24,6 +24,7 @@ export function AdRevenueReport() {
   const [ads, setAds] = useState<AdMetrics[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile?.is_admin) return;
@@ -31,11 +32,14 @@ export function AdRevenueReport() {
   }, [profile]);
 
   async function loadAdMetrics() {
+    setError(null);
     try {
-      const { data } = await supabase
+      const { data, error: queryError } = await supabase
         .from('advertisements')
         .select('id, title, advertiser_name, impression_count, click_count, cpm_rate')
         .order('impression_count', { ascending: false });
+
+      if (queryError) throw queryError;
 
       if (data) {
         const metricsWithRevenue = data.map(ad => ({
@@ -52,8 +56,9 @@ export function AdRevenueReport() {
         const total = metricsWithRevenue.reduce((sum, ad) => sum + ad.revenue, 0);
         setTotalRevenue(total);
       }
-    } catch (error) {
-      console.error('Error loading ad metrics:', error);
+    } catch (err) {
+      console.error('Error loading ad metrics:', err);
+      setError('Could not load ad revenue data — check your connection and try refreshing the page.');
     } finally {
       setLoading(false);
     }
@@ -121,6 +126,16 @@ export function AdRevenueReport() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Ad Revenue Dashboard</h1>
+
+      {error && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">Something went wrong</p>
+            <p className="mt-0.5">{error}</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
