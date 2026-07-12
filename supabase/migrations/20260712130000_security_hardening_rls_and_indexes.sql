@@ -46,8 +46,18 @@ create policy "ad_clicks_admin_read" on ad_clicks for select to authenticated us
 drop policy if exists "view_events_anyone_read" on view_events;
 create policy "view_events_admin_read" on view_events for select to authenticated using (public.is_admin());
 
-drop policy if exists "admin_read_routing_rules" on author_routing_rules;
-create policy "admin_read_routing_rules" on author_routing_rules for select to authenticated using (public.is_admin());
+do $$
+begin
+  if to_regclass('public.author_routing_rules') is not null then
+    execute 'drop policy if exists "admin_read_routing_rules" on author_routing_rules';
+    execute 'create policy "admin_read_routing_rules" on author_routing_rules for select to authenticated using (public.is_admin())';
+    execute 'create index if not exists idx_author_routing_rules_author_id on author_routing_rules(author_id)';
+  end if;
+end $$;
 
-create index if not exists idx_author_routing_rules_author_id on author_routing_rules(author_id);
-create index if not exists idx_reporter_applications_author_id on reporter_applications(author_id);
+do $$
+begin
+  if to_regclass('public.reporter_applications') is not null then
+    execute 'create index if not exists idx_reporter_applications_author_id on reporter_applications(author_id)';
+  end if;
+end $$;

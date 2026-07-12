@@ -29,8 +29,18 @@ $$;
 
 revoke all on function public.increment_ad_stat(uuid, text) from public, anon, authenticated;
 
-drop policy if exists "ad_impressions_public_insert" on ad_impressions;
-drop policy if exists "ad_clicks_anyone_insert" on ad_clicks;
+do $$
+begin
+  if to_regclass('public.ad_impressions') is not null then
+    execute 'drop policy if exists "ad_impressions_public_insert" on ad_impressions';
+    execute 'drop policy if exists "ad_impressions_public_read" on ad_impressions';
+    execute 'create policy "ad_impressions_admin_read" on ad_impressions for select to authenticated using (public.is_admin())';
+  end if;
+end $$;
 
-drop policy if exists "ad_impressions_public_read" on ad_impressions;
-create policy "ad_impressions_admin_read" on ad_impressions for select to authenticated using (public.is_admin());
+do $$
+begin
+  if to_regclass('public.ad_clicks') is not null then
+    execute 'drop policy if exists "ad_clicks_anyone_insert" on ad_clicks';
+  end if;
+end $$;
