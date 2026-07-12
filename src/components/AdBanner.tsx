@@ -42,7 +42,9 @@ export function AdBanner({ placement, className = '' }: AdBannerProps) {
 
   async function trackAdEvent(adId: string, event: 'impression' | 'click') {
     try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-ad-event`;
+      // Deployed on Supabase under the dashboard-assigned name "clever-function"
+      // (its URL slug is fixed regardless of the display "Name" field).
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/clever-function`;
       await fetch(apiUrl, {
         method: 'POST',
         headers: {
