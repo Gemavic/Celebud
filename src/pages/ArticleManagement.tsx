@@ -282,7 +282,9 @@ export function ArticleManagement() {
         return;
       }
 
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-article-draft`;
+      // Deployed on Supabase under the dashboard-assigned name "quick-task"
+      // (its URL slug is fixed regardless of the display "Name" field).
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quick-task`;
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
