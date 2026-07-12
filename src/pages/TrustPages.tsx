@@ -61,9 +61,9 @@ export function ContactPage() {
     <TrustShell title="Contact Us" subtitle="We read everything — questions, tips, corrections, and partnerships">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 not-prose">
         {[
-          { icon: Mail, title: 'Editorial & General', body: 'histogm@gmail.com', href: 'mailto:histogm@gmail.com' },
+          { icon: Mail, title: 'Editorial & General', body: 'info@celebud.com', href: 'mailto:info@celebud.com' },
           { icon: MessageCircle, title: 'SMS / WhatsApp', body: '+1 (437) 788-8011', href: 'tel:+14377888011' },
-          { icon: Newspaper, title: 'News tips & corrections', body: 'Send story tips or request a correction', href: 'mailto:histogm@gmail.com?subject=News%20tip%20or%20correction' },
+          { icon: Newspaper, title: 'News tips & corrections', body: 'Send story tips or request a correction', href: 'mailto:info@celebud.com?subject=News%20tip%20or%20correction' },
           { icon: MapPin, title: 'Location', body: 'Ontario, Canada', href: undefined },
         ].map((c) => (
           <div key={c.title} className="bg-gray-50 rounded-xl p-5 border border-gray-100">

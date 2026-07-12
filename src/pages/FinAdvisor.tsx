@@ -553,7 +553,7 @@ function AboutTheAuthor() {
           </p>
           <div className="flex flex-wrap gap-3 mt-5">
             <a
-              href="mailto:histogm@gmail.com?subject=FIN-ADVISOR%20consultation%20request"
+              href="mailto:info@celebud.com?subject=FIN-ADVISOR%20consultation%20request"
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors"
             >
               Request a consultation
