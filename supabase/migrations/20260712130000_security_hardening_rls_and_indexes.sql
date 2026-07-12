@@ -41,9 +41,11 @@ revoke all on function public.get_my_profile() from public;
 grant execute on function public.get_my_profile() to authenticated;
 
 drop policy if exists "ad_clicks_public_read" on ad_clicks;
+drop policy if exists "ad_clicks_admin_read" on ad_clicks;
 create policy "ad_clicks_admin_read" on ad_clicks for select to authenticated using (public.is_admin());
 
 drop policy if exists "view_events_anyone_read" on view_events;
+drop policy if exists "view_events_admin_read" on view_events;
 create policy "view_events_admin_read" on view_events for select to authenticated using (public.is_admin());
 
 do $$
