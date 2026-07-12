@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { supabase } from '../lib/supabase';
 import { RecategorizeArticle } from '../components/RecategorizeArticle';
-import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell } from 'lucide-react';
+import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
 // Posts to the CelebUD Facebook Page + Telegram channel via the
@@ -76,6 +76,7 @@ export function ArticleManagement() {
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -89,6 +90,11 @@ export function ArticleManagement() {
     seo_keywords: '',
   });
   const [saving, setSaving] = useState(false);
+  const [aiTopic, setAiTopic] = useState('');
+  const [aiNotes, setAiNotes] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiGenerated, setAiGenerated] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [notifyingId, setNotifyingId] = useState<string | null>(null);
   const [notifyResult, setNotifyResult] = useState<string | null>(null);
@@ -237,12 +243,87 @@ export function ArticleManagement() {
     });
   };
 
+  const openNewArticle = () => {
+    setIsCreatingNew(true);
+    setAiTopic('');
+    setAiNotes('');
+    setAiError(null);
+    setAiGenerated(false);
+    setEditForm({
+      title: '',
+      description: '',
+      content: '',
+      thumbnail_url: '',
+      category_id: '',
+      author_id: '',
+      is_featured: false,
+      is_trending: false,
+      seo_title: '',
+      seo_keywords: '',
+    });
+  };
+
   const closeEditor = () => {
     setEditingArticle(null);
+    setIsCreatingNew(false);
+  };
+
+  const generateDraft = async () => {
+    if (!aiTopic.trim()) {
+      setAiError('Enter a topic or brief first');
+      return;
+    }
+    setAiGenerating(true);
+    setAiError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setAiError('You must be signed in as an admin to do this');
+        return;
+      }
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-article-draft`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ topic: aiTopic, notes: aiNotes || undefined }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to generate draft');
+
+      const draft = data.draft;
+      const matchedCategory = categories.find(
+        (c) => c.name.toLowerCase() === (draft.suggested_category || '').toLowerCase()
+      );
+
+      setEditForm({
+        title: draft.title || '',
+        description: draft.description || '',
+        content: draft.content || '',
+        thumbnail_url: '',
+        category_id: matchedCategory?.id || '',
+        author_id: '',
+        is_featured: false,
+        is_trending: false,
+        seo_title: draft.seo_title || '',
+        seo_keywords: draft.seo_keywords || '',
+      });
+      setAiGenerated(true);
+    } catch (err: unknown) {
+      console.error('Error generating draft:', err);
+      const msg = err instanceof Error ? err.message : 'Failed to generate draft';
+      setAiError(msg);
+    } finally {
+      setAiGenerating(false);
+    }
   };
 
   const saveArticle = async () => {
-    if (!editingArticle) return;
+    if (!editingArticle && !isCreatingNew) return;
     setSaving(true);
     try {
       const slug = editForm.title
@@ -251,26 +332,28 @@ export function ArticleManagement() {
         .replace(/(^-|-$)/g, '')
         .slice(0, 180);
 
-      const { error } = await supabase
-        .from('media_content')
-        .update({
-          title: editForm.title,
-          slug,
-          description: editForm.description || null,
-          content: editForm.content || null,
-          thumbnail_url: editForm.thumbnail_url || null,
-          category_id: editForm.category_id || null,
-          author_id: editForm.author_id || null,
-          is_featured: editForm.is_featured,
-          is_trending: editForm.is_trending,
-          seo_title: editForm.seo_title || null,
-          seo_keywords: editForm.seo_keywords || null,
-        })
-        .eq('id', editingArticle.id);
+      const payload = {
+        title: editForm.title,
+        slug,
+        description: editForm.description || null,
+        content: editForm.content || null,
+        thumbnail_url: editForm.thumbnail_url || null,
+        category_id: editForm.category_id || null,
+        author_id: editForm.author_id || null,
+        is_featured: editForm.is_featured,
+        is_trending: editForm.is_trending,
+        seo_title: editForm.seo_title || null,
+        seo_keywords: editForm.seo_keywords || null,
+      };
+
+      const { error } = editingArticle
+        ? await supabase.from('media_content').update(payload).eq('id', editingArticle.id)
+        : await supabase.from('media_content').insert({ ...payload, media_type: 'article' });
 
       if (error) throw error;
 
       setEditingArticle(null);
+      setIsCreatingNew(false);
       fetchArticles();
     } catch (err: unknown) {
       console.error('Error saving article:', err);
@@ -414,9 +497,18 @@ export function ArticleManagement() {
           {notifyResult}
         </div>
       )}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Article Management</h1>
-        <p className="text-gray-600">Manage, edit, and recategorize articles across your platform</p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Article Management</h1>
+          <p className="text-gray-600">Manage, edit, and recategorize articles across your platform</p>
+        </div>
+        <button
+          onClick={openNewArticle}
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          New Article
+        </button>
       </div>
 
       {/* Stats Overview */}
@@ -694,11 +786,11 @@ export function ArticleManagement() {
       </div>
 
       {/* Edit Modal */}
-      {editingArticle && (
+      {(editingArticle || isCreatingNew) && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
-              <h2 className="text-xl font-bold text-gray-900">Edit Article</h2>
+              <h2 className="text-xl font-bold text-gray-900">{editingArticle ? 'Edit Article' : 'New Article'}</h2>
               <button
                 onClick={closeEditor}
                 className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
@@ -708,6 +800,50 @@ export function ArticleManagement() {
             </div>
 
             <div className="p-6 space-y-5">
+              {isCreatingNew && (
+                <div className="bg-gradient-to-br from-violet-50 to-blue-50 border border-violet-200 rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="w-5 h-5 text-violet-600" />
+                    <h3 className="font-semibold text-gray-900">Generate a draft with AI</h3>
+                  </div>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={aiTopic}
+                      onChange={(e) => setAiTopic(e.target.value)}
+                      placeholder="Topic or headline, e.g. 'Drake announces surprise Toronto pop-up show'"
+                      className="w-full px-4 py-2.5 border border-violet-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                    />
+                    <textarea
+                      value={aiNotes}
+                      onChange={(e) => setAiNotes(e.target.value)}
+                      placeholder="Optional: paste research notes, quotes, or specific facts to include"
+                      rows={3}
+                      className="w-full px-4 py-2.5 border border-violet-200 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-y text-sm"
+                    />
+                    <button
+                      onClick={generateDraft}
+                      disabled={aiGenerating || !aiTopic.trim()}
+                      className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      {aiGenerating ? 'Writing draft...' : 'Generate draft'}
+                    </button>
+                    {aiError && <p className="text-sm text-red-600">{aiError}</p>}
+                  </div>
+                </div>
+              )}
+
+              {aiGenerated && (
+                <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">AI-generated draft — review before publishing</p>
+                    <p className="mt-0.5">Check every fact, quote, and name below. Add a thumbnail and pick the right author before saving.</p>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Title</label>
                 <input
@@ -846,7 +982,7 @@ export function ArticleManagement() {
                 className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Save className="w-4 h-4" />
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? 'Saving...' : editingArticle ? 'Save Changes' : 'Create Article'}
               </button>
             </div>
           </div>
