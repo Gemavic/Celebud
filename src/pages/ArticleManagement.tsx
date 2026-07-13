@@ -304,8 +304,16 @@ export function ArticleManagement() {
         body: JSON.stringify({ topic: aiTopic, notes: aiNotes || undefined }),
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to generate draft');
+      let data: { error?: string; draft?: Record<string, string> };
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (status ${response.status}). Check the function's logs in Supabase.`);
+      }
+
+      if (!response.ok || !data.draft) {
+        throw new Error(data.error || `Failed to generate draft (status ${response.status}, no error detail returned).`);
+      }
 
       const draft = data.draft;
       const matchedCategory = categories.find(

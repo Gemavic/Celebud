@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import Anthropic from 'npm:@anthropic-ai/sdk';
+import Anthropic from 'npm:@anthropic-ai/sdk@0.68.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -106,39 +106,64 @@ Format for the "content" field: plain text only, paragraphs separated by a singl
 
     const userPrompt = `Write a draft article on: ${topic}${notes ? `\n\nAdditional notes/research from the editor:\n${notes}` : ''}`;
 
-    const response = await anthropic.messages.create({
-      model: 'claude-opus-4-8',
-      max_tokens: 4000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-      tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 5 } as Anthropic.Tool],
-      output_config: {
-        format: {
-          type: 'json_schema',
-          schema: {
-            type: 'object',
-            properties: {
-              title: { type: 'string', description: 'Headline, under 100 characters' },
-              seo_title: { type: 'string', description: 'SEO-friendly title, under 70 characters' },
-              description: { type: 'string', description: 'Short excerpt/meta description, 1-2 sentences, under 200 characters' },
-              content: { type: 'string', description: 'Full article body, plain text, paragraphs separated by a single newline, ending with a proper concluding paragraph and an optional Sources paragraph' },
-              seo_keywords: { type: 'string', description: 'Comma-separated SEO keywords, 5-8 terms' },
-              suggested_category: { type: 'string', enum: categoryNames },
+    let response: Anthropic.Message;
+    try {
+      response = await anthropic.messages.create({
+        model: 'claude-opus-4-8',
+        max_tokens: 6000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+        tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 } as Anthropic.Tool],
+        output_config: {
+          format: {
+            type: 'json_schema',
+            schema: {
+              type: 'object',
+              properties: {
+                title: { type: 'string', description: 'Headline, under 100 characters' },
+                seo_title: { type: 'string', description: 'SEO-friendly title, under 70 characters' },
+                description: { type: 'string', description: 'Short excerpt/meta description, 1-2 sentences, under 200 characters' },
+                content: { type: 'string', description: 'Full article body, plain text, paragraphs separated by a single newline, ending with a proper concluding paragraph and an optional Sources paragraph' },
+                seo_keywords: { type: 'string', description: 'Comma-separated SEO keywords, 5-8 terms' },
+                suggested_category: { type: 'string', enum: categoryNames },
+              },
+              required: ['title', 'seo_title', 'description', 'content', 'seo_keywords', 'suggested_category'],
+              additionalProperties: false,
             },
-            required: ['title', 'seo_title', 'description', 'content', 'seo_keywords', 'suggested_category'],
-            additionalProperties: false,
           },
         },
-      },
-    } as Anthropic.MessageCreateParams);
+      } as Anthropic.MessageCreateParams);
+    } catch (apiError: unknown) {
+      // Surface the real Anthropic API error (billing, rate limit, invalid
+      // request, etc.) instead of a generic message.
+      console.error('Anthropic API call failed:', apiError);
+      const e = apiError as { status?: number; message?: string; error?: { message?: string; type?: string } };
+      const detail = e?.error?.message || e?.message || 'Unknown error calling Claude API';
+      throw new Error(`AI generation failed (${e?.status ?? 'no status'}): ${detail}`);
+    }
+
+    if (response.stop_reason === 'refusal') {
+      throw new Error('Claude declined to write this draft (safety filter). Try rephrasing the topic.');
+    }
+
+    if (response.stop_reason === 'max_tokens') {
+      throw new Error('The draft was cut off before it finished — try a shorter topic/notes, or generate again.');
+    }
 
     const textBlocks = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text');
     const textBlock = textBlocks[textBlocks.length - 1];
     if (!textBlock) {
-      throw new Error('No draft content returned');
+      console.error('No text block in response. Full content:', JSON.stringify(response.content));
+      throw new Error(`No draft text returned (stop_reason: ${response.stop_reason})`);
     }
 
-    const draft = JSON.parse(textBlock.text);
+    let draft: unknown;
+    try {
+      draft = JSON.parse(textBlock.text);
+    } catch {
+      console.error('Failed to parse draft JSON. Raw text:', textBlock.text);
+      throw new Error('AI returned malformed output — please try generating again.');
+    }
 
     return new Response(JSON.stringify({ success: true, draft }), {
       status: 200,
