@@ -9,7 +9,9 @@ import { GoogleAd } from '../components/GoogleAd';
 import { formatDistanceToNow } from '../utils/date';
 import { updateMetaTags, generateArticleStructuredData, removeArticleStructuredData } from '../utils/seo';
 import { sanitizeArticleContent } from '../utils/contentSanitizer';
+import { isHtmlContent } from '../utils/articleContent';
 import { buildArticleUrl } from '../utils/articleUrl';
+import DOMPurify from 'dompurify';
 import { ArrowLeft, Clock, Share2, Facebook, Twitter, Linkedin, Instagram, Check } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useArticle } from '../hooks/useArticles';
@@ -191,13 +193,32 @@ export function ArticleDetail() {
     }
   }, [article]);
 
+  // Content is stored in two formats: legacy plain text (paragraphs split
+  // on newline, `[IMAGE:url]` markers for inline images) from before the
+  // rich text editor existed, and real HTML from the current editor. Detect
+  // which one this article has and render through the matching path so old
+  // articles keep working exactly as before.
+  const rawContent = article ? (article.content || article.description || '') : '';
+  const useHtmlContent = isHtmlContent(rawContent);
+
+  const sanitizedHtml = useMemo(() => {
+    if (!article || !useHtmlContent) return '';
+    return DOMPurify.sanitize(rawContent, {
+      ALLOWED_TAGS: [
+        'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'a',
+        'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'blockquote', 'hr',
+        'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+      ],
+      ALLOWED_ATTR: ['href', 'src', 'alt', 'target', 'rel', 'class'],
+    });
+  }, [article, useHtmlContent, rawContent]);
+
   const contentParagraphs = useMemo(() => {
-    if (!article) return [];
-    const raw = article.content || article.description || '';
-    return sanitizeArticleContent(raw)
+    if (!article || useHtmlContent) return [];
+    return sanitizeArticleContent(rawContent)
       .split('\n')
       .filter(para => para.trim());
-  }, [article]);
+  }, [article, useHtmlContent, rawContent]);
 
   if (loading) {
     return (
@@ -338,7 +359,15 @@ export function ArticleDetail() {
           )}
 
           <div className="prose prose-lg max-w-none mb-12" itemProp="articleBody">
-            {contentParagraphs.length > 0 ? (
+            {useHtmlContent && sanitizedHtml ? (
+              <>
+                <div
+                  className="article-rich-content text-gray-700 text-base leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+                />
+                <GoogleAd slot="MID_ARTICLE_AD_SLOT" format="rectangle" className="my-6" />
+              </>
+            ) : contentParagraphs.length > 0 ? (
               <div className="text-gray-700 text-base leading-relaxed space-y-5">
                 {contentParagraphs.map((paragraph, index) => {
                   if (paragraph.startsWith('[IMAGE:') && paragraph.endsWith(']')) {

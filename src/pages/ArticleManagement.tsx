@@ -3,6 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { supabase } from '../lib/supabase';
 import { RecategorizeArticle } from '../components/RecategorizeArticle';
+import { RichTextEditor } from '../components/RichTextEditor';
+import { toEditableHtml, legacyPlainTextToHtml } from '../utils/articleContent';
 import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
@@ -240,7 +242,7 @@ export function ArticleManagement() {
     setEditForm({
       title: article.title || '',
       description: article.description || '',
-      content: article.content || '',
+      content: toEditableHtml(article.content || ''),
       thumbnail_url: article.thumbnail_url || '',
       category_id: article.category_id || '',
       author_id: article.author_id || '',
@@ -323,7 +325,7 @@ export function ArticleManagement() {
       setEditForm({
         title: draft.title || '',
         description: draft.description || '',
-        content: draft.content || '',
+        content: legacyPlainTextToHtml(draft.content || ''),
         thumbnail_url: '',
         category_id: matchedCategory?.id || '',
         author_id: '',
@@ -940,11 +942,10 @@ export function ArticleManagement() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Content</label>
-                <textarea
+                <RichTextEditor
                   value={editForm.content}
-                  onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
-                  rows={12}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y font-mono text-sm leading-relaxed"
+                  onChange={(html) => setEditForm((f) => ({ ...f, content: html }))}
+                  placeholder="Write or paste your article here..."
                 />
               </div>
 
