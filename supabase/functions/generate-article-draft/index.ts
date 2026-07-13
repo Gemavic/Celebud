@@ -94,19 +94,24 @@ Deno.serve(async (req: Request) => {
 
 Voice: clear, engaging, professionally journalistic. Not tabloid-breathless, not academic. Short paragraphs, active voice, a strong opening line that hooks the reader.
 
-Critical accuracy rule: you are writing about real, named public figures. Do not invent specific facts you were not given — no fabricated quotes, dates, numbers, or events. If the brief is light on specifics, write a shorter, more general piece rather than inventing details to fill space. Where something is genuinely unverified or developing, say so in the text rather than stating it as settled fact.
+Research: use web search to check current, real information on the topic before writing. Prefer what search turns up over prior knowledge, especially for anything recent. If search finds little or nothing solid, say so — write a shorter, more general piece rather than inventing details to fill space. Never fabricate quotes, dates, numbers, or events.
+
+Structure: every article needs a real ending — a closing paragraph that wraps up the piece (context, what happens next, or why it matters), not a sentence that just trails off mid-thought.
+
+Do NOT write an "About the Author" section or any legal/editorial disclaimer — those are added automatically based on the author selected in the admin panel, not by you.
 
 Length: 400-700 words for the article body, unless the brief clearly calls for something shorter.
 
-Format for the "content" field: plain text only. Separate paragraphs with a single newline character. No markdown, no headers, no bullet lists, no HTML tags.`;
+Format for the "content" field: plain text only, paragraphs separated by a single newline, no markdown/headers/bullets/HTML. If your web search turned up real sources, end "content" with one final paragraph starting exactly with "Sources: " followed by the source names and their URLs, comma-separated. Omit that paragraph entirely if search found nothing usable.`;
 
     const userPrompt = `Write a draft article on: ${topic}${notes ? `\n\nAdditional notes/research from the editor:\n${notes}` : ''}`;
 
     const response = await anthropic.messages.create({
       model: 'claude-opus-4-8',
-      max_tokens: 2000,
+      max_tokens: 4000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
+      tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 5 } as Anthropic.Tool],
       output_config: {
         format: {
           type: 'json_schema',
@@ -116,7 +121,7 @@ Format for the "content" field: plain text only. Separate paragraphs with a sing
               title: { type: 'string', description: 'Headline, under 100 characters' },
               seo_title: { type: 'string', description: 'SEO-friendly title, under 70 characters' },
               description: { type: 'string', description: 'Short excerpt/meta description, 1-2 sentences, under 200 characters' },
-              content: { type: 'string', description: 'Full article body, plain text, paragraphs separated by a single newline' },
+              content: { type: 'string', description: 'Full article body, plain text, paragraphs separated by a single newline, ending with a proper concluding paragraph and an optional Sources paragraph' },
               seo_keywords: { type: 'string', description: 'Comma-separated SEO keywords, 5-8 terms' },
               suggested_category: { type: 'string', enum: categoryNames },
             },
@@ -127,7 +132,8 @@ Format for the "content" field: plain text only. Separate paragraphs with a sing
       },
     } as Anthropic.MessageCreateParams);
 
-    const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === 'text');
+    const textBlocks = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text');
+    const textBlock = textBlocks[textBlocks.length - 1];
     if (!textBlock) {
       throw new Error('No draft content returned');
     }

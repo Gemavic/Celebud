@@ -397,6 +397,32 @@ export function ArticleDetail() {
             )}
           </div>
 
+          {article.authors?.bio && (
+            <div className="mb-8 p-5 bg-gray-50 border border-gray-200 rounded-xl flex gap-4">
+              <img
+                src={article.authors.avatar_url || ''}
+                alt={article.authors.name}
+                className="w-14 h-14 rounded-full border border-gray-200 flex-shrink-0"
+              />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">About the Author</p>
+                <Link
+                  to={`/author/${article.authors.id}`}
+                  className="font-semibold text-gray-900 hover:text-red-600 transition-colors"
+                >
+                  {article.authors.name}
+                </Link>
+                <p className="text-sm text-gray-600 mt-1 leading-relaxed">{article.authors.bio}</p>
+              </div>
+            </div>
+          )}
+
+          {article.authors?.disclaimer && (
+            <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <p className="text-xs text-amber-800 leading-relaxed">{article.authors.disclaimer}</p>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-6 border-y border-gray-200 mb-12 bg-gray-50 px-5 rounded-lg">
             <p className="text-gray-700 font-medium text-base mb-4 sm:mb-0">Share this article</p>
             <div className="flex items-center space-x-2">

@@ -41,6 +41,8 @@ async function queueShareRequest(article: Article): Promise<string> {
 interface Author {
   id: string;
   name: string;
+  bio: string | null;
+  disclaimer: string | null;
 }
 
 interface Article {
@@ -97,6 +99,9 @@ export function ArticleManagement() {
   const [aiGenerated, setAiGenerated] = useState(false);
   const [thumbnailUploading, setThumbnailUploading] = useState(false);
   const [thumbnailUploadError, setThumbnailUploadError] = useState<string | null>(null);
+  const [editingAuthorBio, setEditingAuthorBio] = useState(false);
+  const [authorBioForm, setAuthorBioForm] = useState({ bio: '', disclaimer: '' });
+  const [savingAuthorBio, setSavingAuthorBio] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [notifyingId, setNotifyingId] = useState<string | null>(null);
   const [notifyResult, setNotifyResult] = useState<string | null>(null);
@@ -122,7 +127,7 @@ export function ArticleManagement() {
     try {
       const { data, error } = await supabase
         .from('authors')
-        .select('id, name')
+        .select('id, name, bio, disclaimer')
         .order('name');
       if (error) throw error;
       setAuthors(data || []);
@@ -231,6 +236,7 @@ export function ArticleManagement() {
 
   const openEditor = (article: Article) => {
     setEditingArticle(article);
+    setEditingAuthorBio(false);
     setEditForm({
       title: article.title || '',
       description: article.description || '',
@@ -247,6 +253,7 @@ export function ArticleManagement() {
 
   const openNewArticle = () => {
     setIsCreatingNew(true);
+    setEditingAuthorBio(false);
     setAiTopic('');
     setAiNotes('');
     setAiError(null);
@@ -268,6 +275,7 @@ export function ArticleManagement() {
   const closeEditor = () => {
     setEditingArticle(null);
     setIsCreatingNew(false);
+    setEditingAuthorBio(false);
   };
 
   const generateDraft = async () => {
@@ -346,6 +354,37 @@ export function ArticleManagement() {
       setThumbnailUploadError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setThumbnailUploading(false);
+    }
+  };
+
+  const openAuthorBioEditor = () => {
+    const author = authors.find((a) => a.id === editForm.author_id);
+    setAuthorBioForm({ bio: author?.bio || '', disclaimer: author?.disclaimer || '' });
+    setEditingAuthorBio(true);
+  };
+
+  const saveAuthorBio = async () => {
+    if (!editForm.author_id) return;
+    setSavingAuthorBio(true);
+    try {
+      const { error } = await supabase
+        .from('authors')
+        .update({ bio: authorBioForm.bio || null, disclaimer: authorBioForm.disclaimer || null })
+        .eq('id', editForm.author_id);
+
+      if (error) throw error;
+
+      setAuthors((prev) =>
+        prev.map((a) =>
+          a.id === editForm.author_id ? { ...a, bio: authorBioForm.bio, disclaimer: authorBioForm.disclaimer } : a
+        )
+      );
+      setEditingAuthorBio(false);
+    } catch (err: unknown) {
+      console.error('Error saving author bio:', err);
+      alert(err instanceof Error ? err.message : 'Failed to save author bio');
+    } finally {
+      setSavingAuthorBio(false);
     }
   };
 
@@ -954,10 +993,21 @@ export function ArticleManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Author / Writer</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-semibold text-gray-700">Author / Writer</label>
+                  {editForm.author_id && (
+                    <button
+                      type="button"
+                      onClick={openAuthorBioEditor}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                    >
+                      Edit bio &amp; disclaimer
+                    </button>
+                  )}
+                </div>
                 <select
                   value={editForm.author_id}
-                  onChange={(e) => setEditForm({ ...editForm, author_id: e.target.value })}
+                  onChange={(e) => { setEditForm({ ...editForm, author_id: e.target.value }); setEditingAuthorBio(false); }}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">— Unassigned —</option>
@@ -965,6 +1015,52 @@ export function ArticleManagement() {
                     <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
                 </select>
+                <p className="mt-1.5 text-xs text-gray-500">
+                  This author's bio and disclaimer show automatically at the bottom of every article they're
+                  credited on — write it once here.
+                </p>
+
+                {editingAuthorBio && (
+                  <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">About the Author</label>
+                      <textarea
+                        value={authorBioForm.bio}
+                        onChange={(e) => setAuthorBioForm({ ...authorBioForm, bio: e.target.value })}
+                        rows={3}
+                        placeholder="e.g. Matthew Ayandare is a licensed financial advisor..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-y"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Disclaimer (optional)</label>
+                      <textarea
+                        value={authorBioForm.disclaimer}
+                        onChange={(e) => setAuthorBioForm({ ...authorBioForm, disclaimer: e.target.value })}
+                        rows={2}
+                        placeholder="e.g. This article is for educational purposes only and is not financial advice..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-y"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={saveAuthorBio}
+                        disabled={savingAuthorBio}
+                        className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {savingAuthorBio ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingAuthorBio(false)}
+                        className="px-4 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-800"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

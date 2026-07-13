@@ -19,6 +19,7 @@ export interface Database {
           name: string;
           avatar_url: string | null;
           bio: string;
+          disclaimer: string | null;
           created_at: string;
         };
         Insert: Omit<Database['public']['Tables']['authors']['Row'], 'id' | 'created_at'>;
