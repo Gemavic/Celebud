@@ -386,6 +386,19 @@ function ContentPanel({
   const deleteContent = useDeleteContent();
   const updateContent = useUpdateContent();
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<CreatorContentItem | null>(null);
+
+  const playableTypes: ContentType[] = ['video', 'audio', 'clip'];
+
+  const handlePlay = (item: CreatorContentItem) => {
+    if (playableTypes.includes(item.content_type) && item.media_url) {
+      setPreviewItem(item);
+    } else if (item.external_url) {
+      window.open(item.external_url, '_blank', 'noopener,noreferrer');
+    } else if (item.media_url) {
+      window.open(item.media_url, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   const typeLabels: Record<ContentType, string> = {
     video: 'Videos',
@@ -462,7 +475,10 @@ function ContentPanel({
               className="group bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-gray-300 transition-all"
             >
               {/* Thumbnail */}
-              <div className="relative aspect-video bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
+              <div
+                onClick={() => handlePlay(item)}
+                className="relative aspect-video bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden cursor-pointer"
+              >
                 {item.thumbnail_url ? (
                   <img src={item.thumbnail_url} alt={item.title} className="w-full h-full object-cover" />
                 ) : (
@@ -614,6 +630,29 @@ function ContentPanel({
           ))}
         </div>
       )}
+
+      {previewItem && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setPreviewItem(null)} />
+          <div className="relative bg-black rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden">
+            <button
+              onClick={() => setPreviewItem(null)}
+              className="absolute top-3 right-3 z-10 p-2 bg-black/60 text-white rounded-full hover:bg-black/80 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            {previewItem.content_type === 'audio' ? (
+              <div className="p-10 flex flex-col items-center gap-4">
+                <Music className="w-16 h-16 text-gray-400" />
+                <p className="text-white font-semibold text-center">{previewItem.title}</p>
+                <audio controls autoPlay src={previewItem.media_url!} className="w-full" />
+              </div>
+            ) : (
+              <video controls autoPlay src={previewItem.media_url!} className="w-full max-h-[80vh]" />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -656,6 +695,7 @@ function ContentUploadModal({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [success, setSuccess] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [thumbnailUploading, setThumbnailUploading] = useState(false);
   const [uploadedName, setUploadedName] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -674,6 +714,43 @@ function ContentUploadModal({
     isEditing || !canUploadFile ? 'link' : 'upload'
   );
 
+  const captureVideoFrame = (file: File): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      const objectUrl = URL.createObjectURL(file);
+      video.src = objectUrl;
+
+      const cleanup = () => URL.revokeObjectURL(objectUrl);
+
+      video.onloadedmetadata = () => {
+        video.currentTime = Math.min(1, (video.duration || 2) / 2);
+      };
+      video.onseeked = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx || canvas.width === 0) {
+          cleanup();
+          resolve(null);
+          return;
+        }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          cleanup();
+          resolve(blob);
+        }, 'image/jpeg', 0.8);
+      };
+      video.onerror = () => {
+        cleanup();
+        resolve(null);
+      };
+    });
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -687,9 +764,29 @@ function ContentUploadModal({
         .upload(path, file, { cacheControl: '3600', upsert: false });
       if (uploadError) throw new Error(uploadError.message);
       const { data } = supabase.storage.from('creator-media').getPublicUrl(path);
+
+      let thumbnailUrl = '';
+      if (form.content_type === 'video' || form.content_type === 'clip') {
+        try {
+          const frameBlob = await captureVideoFrame(file);
+          if (frameBlob) {
+            const thumbPath = `${creatorId || 'editorial'}/${Date.now()}-thumb.jpg`;
+            const { error: thumbError } = await supabase.storage
+              .from('creator-media')
+              .upload(thumbPath, frameBlob, { cacheControl: '3600', upsert: false, contentType: 'image/jpeg' });
+            if (!thumbError) {
+              thumbnailUrl = supabase.storage.from('creator-media').getPublicUrl(thumbPath).data.publicUrl;
+            }
+          }
+        } catch {
+          // Frame capture failed (unsupported codec, browser quirk, etc.) — non-fatal, just skip the thumbnail.
+        }
+      }
+
       setForm(f => ({
         ...f,
         media_url: data.publicUrl,
+        thumbnail_url: thumbnailUrl || f.thumbnail_url,
         platform: f.platform || 'custom',
         title: f.title || file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' '),
       }));
@@ -1039,15 +1136,58 @@ function ContentUploadModal({
               {/* Thumbnail */}
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1">
-                  <Image className="w-3.5 h-3.5" /> Thumbnail URL
+                  <Image className="w-3.5 h-3.5" /> Thumbnail
                 </label>
-                <input
-                  type="url"
-                  value={form.thumbnail_url}
-                  onChange={e => setForm(f => ({ ...f, thumbnail_url: e.target.value }))}
-                  placeholder="https://... (cover image)"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                />
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors flex-shrink-0">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={thumbnailUploading}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        setThumbnailUploading(true);
+                        try {
+                          const path = `${creatorId || 'editorial'}/${Date.now()}-cover.jpg`;
+                          const { error: upErr } = await supabase.storage
+                            .from('creator-media')
+                            .upload(path, file, { cacheControl: '3600', upsert: false });
+                          if (upErr) throw new Error(upErr.message);
+                          const url = supabase.storage.from('creator-media').getPublicUrl(path).data.publicUrl;
+                          setForm(f => ({ ...f, thumbnail_url: url }));
+                        } catch (err) {
+                          setError('Thumbnail upload failed: ' + (err instanceof Error ? err.message : 'unknown error'));
+                        } finally {
+                          setThumbnailUploading(false);
+                        }
+                      }}
+                    />
+                    {thumbnailUploading ? 'Uploading...' : 'Upload from device'}
+                  </label>
+                  <input
+                    type="url"
+                    value={form.thumbnail_url}
+                    onChange={e => setForm(f => ({ ...f, thumbnail_url: e.target.value }))}
+                    placeholder="or paste an image URL"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                  />
+                </div>
+                {form.content_type === 'video' && form.thumbnail_url && (
+                  <p className="mt-1.5 text-xs text-emerald-600">
+                    ✓ Auto-captured from your video — upload a different image above to replace it.
+                  </p>
+                )}
+                {form.thumbnail_url && (
+                  <img
+                    src={form.thumbnail_url}
+                    alt="Thumbnail preview"
+                    className="mt-2 h-20 w-32 object-cover rounded-lg border"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                )}
               </div>
 
               {/* External URL */}
