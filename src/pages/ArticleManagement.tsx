@@ -95,6 +95,8 @@ export function ArticleManagement() {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiGenerated, setAiGenerated] = useState(false);
+  const [thumbnailUploading, setThumbnailUploading] = useState(false);
+  const [thumbnailUploadError, setThumbnailUploadError] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [notifyingId, setNotifyingId] = useState<string | null>(null);
   const [notifyResult, setNotifyResult] = useState<string | null>(null);
@@ -321,6 +323,29 @@ export function ArticleManagement() {
       setAiError(msg);
     } finally {
       setAiGenerating(false);
+    }
+  };
+
+  const uploadThumbnail = async (file: File) => {
+    setThumbnailUploading(true);
+    setThumbnailUploadError(null);
+    try {
+      const ext = file.name.split('.').pop();
+      const fileName = `article-thumbnails/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+      const { error } = await supabase.storage
+        .from('media')
+        .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+      if (error) throw new Error(error.message);
+
+      const { data: urlData } = supabase.storage.from('media').getPublicUrl(fileName);
+      setEditForm((prev) => ({ ...prev, thumbnail_url: urlData.publicUrl }));
+    } catch (err: unknown) {
+      console.error('Error uploading thumbnail:', err);
+      setThumbnailUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setThumbnailUploading(false);
     }
   };
 
@@ -878,14 +903,31 @@ export function ArticleManagement() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Thumbnail URL</label>
-                  <input
-                    type="text"
-                    value={editForm.thumbnail_url}
-                    onChange={(e) => setEditForm({ ...editForm, thumbnail_url: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="https://..."
-                  />
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Thumbnail</label>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors flex-shrink-0">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) uploadThumbnail(file);
+                          e.target.value = '';
+                        }}
+                        disabled={thumbnailUploading}
+                      />
+                      {thumbnailUploading ? 'Uploading...' : 'Upload from device'}
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.thumbnail_url}
+                      onChange={(e) => setEditForm({ ...editForm, thumbnail_url: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      placeholder="or paste an image URL"
+                    />
+                  </div>
+                  {thumbnailUploadError && <p className="mt-1.5 text-sm text-red-600">{thumbnailUploadError}</p>}
                   {editForm.thumbnail_url && (
                     <img
                       src={editForm.thumbnail_url}
