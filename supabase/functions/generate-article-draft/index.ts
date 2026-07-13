@@ -88,7 +88,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const anthropic = new Anthropic({ apiKey: anthropicApiKey });
+    const anthropic = new Anthropic({ apiKey: anthropicApiKey, maxRetries: 5 });
 
     const systemPrompt = `You are a staff writer for CelebUD, a celebrity and entertainment news site read across Canada and Africa. You draft articles for a human editor to fact-check and approve before publication — you are never the final word on accuracy.
 
@@ -134,10 +134,22 @@ Format for the "content" field: plain text only, paragraphs separated by a singl
         },
       } as Anthropic.MessageCreateParams);
     } catch (apiError: unknown) {
-      // Surface the real Anthropic API error (billing, rate limit, invalid
-      // request, etc.) instead of a generic message.
       console.error('Anthropic API call failed:', apiError);
       const e = apiError as { status?: number; message?: string; error?: { message?: string; type?: string } };
+      const errorType = e?.error?.type;
+
+      if (e?.status === 529 || errorType === 'overloaded_error') {
+        throw new Error("Claude's servers are temporarily at capacity. This isn't a problem with your site — please wait a minute and try again.");
+      }
+      if (e?.status === 429 || errorType === 'rate_limit_error') {
+        throw new Error('Rate limited by the Claude API — you\'ve generated a few drafts in quick succession. Wait about a minute and try again.');
+      }
+      if (e?.status === 401 || errorType === 'authentication_error') {
+        throw new Error('The Claude API key on the server looks invalid. Double-check the ANTHROPIC_API_KEY secret in Supabase.');
+      }
+
+      // Surface the real Anthropic API error (billing, invalid request,
+      // etc.) instead of a generic message, for anything else.
       const detail = e?.error?.message || e?.message || 'Unknown error calling Claude API';
       throw new Error(`AI generation failed (${e?.status ?? 'no status'}): ${detail}`);
     }
