@@ -11,7 +11,7 @@ import { updateMetaTags, generateArticleStructuredData, removeArticleStructuredD
 import { sanitizeArticleContent } from '../utils/contentSanitizer';
 import { isHtmlContent } from '../utils/articleContent';
 import { buildArticleUrl } from '../utils/articleUrl';
-import DOMPurify from 'dompurify';
+import { sanitizeHtml } from '../utils/htmlSanitizer';
 import { ArrowLeft, Clock, Share2, Facebook, Twitter, Linkedin, Instagram, Check } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useArticle } from '../hooks/useArticles';
@@ -203,14 +203,7 @@ export function ArticleDetail() {
 
   const sanitizedHtml = useMemo(() => {
     if (!article || !useHtmlContent) return '';
-    return DOMPurify.sanitize(rawContent, {
-      ALLOWED_TAGS: [
-        'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'a',
-        'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'blockquote', 'hr',
-        'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
-      ],
-      ALLOWED_ATTR: ['href', 'src', 'alt', 'target', 'rel', 'class'],
-    });
+    return sanitizeHtml(rawContent);
   }, [article, useHtmlContent, rawContent]);
 
   const contentParagraphs = useMemo(() => {
