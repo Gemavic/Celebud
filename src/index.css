@@ -120,12 +120,9 @@
   background-color: #fafafa;
 }
 
-/* TipTap placeholder text inside the editor (not shown on the public page,
-   since ArticleDetail never renders an empty content field). */
-.article-rich-content p.is-editor-empty:first-child::before {
+/* Placeholder text for the empty contentEditable editor */
+.article-rich-content[contenteditable]:empty::before {
   content: attr(data-placeholder);
-  float: left;
   color: #9ca3af;
   pointer-events: none;
-  height: 0;
 }
