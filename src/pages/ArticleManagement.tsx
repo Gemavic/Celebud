@@ -54,7 +54,7 @@ interface Article {
   description: string | null;
   content: string | null;
   thumbnail_url: string | null;
-  category_id: string;
+  category_id: string | null;
   author_id: string | null;
   published_at: string;
   views_count: number;
@@ -71,7 +71,7 @@ interface Article {
 }
 
 export function ArticleManagement() {
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
   const { canApportionArticles } = usePermissions();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);

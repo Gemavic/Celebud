@@ -11,7 +11,7 @@ import {
 } from '../hooks/useCreatorContent';
 import type { ContentType, ContentStatus, Platform, CreatorContentItem } from '../hooks/useCreatorContent';
 import { useCreators } from '../hooks/useCreators';
-import { Video, Radio, Scissors, Share2, Plus, Eye, Heart, MessageSquare, TrendingUp, Calendar, Clock, Filter, Search, MoreVertical, CreditCard as Edit3, Trash2, ExternalLink, Upload, Play, Tv, ArrowLeft, CheckCircle, AlertCircle, X, Globe, Hash, Image, Link as LinkIcon, Music, Copy } from 'lucide-react';
+import { Video, Radio, Scissors, Share2, Plus, Eye, Heart, MessageSquare, TrendingUp, Calendar, Filter, Search, MoreVertical, CreditCard as Edit3, Trash2, ExternalLink, Upload, Play, Tv, ArrowLeft, CheckCircle, AlertCircle, X, Globe, Hash, Image, Link as LinkIcon, Music, Copy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
@@ -659,7 +659,6 @@ function ContentPanel({
 
 function ContentUploadModal({
   creatorId,
-  isAdmin,
   contentType,
   categories,
   editingItem,

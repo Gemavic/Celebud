@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import type { Json } from '../lib/database.types';
 
 export type ContentType = 'video' | 'audio' | 'livestream' | 'clip' | 'social_post';
 export type ContentStatus = 'draft' | 'published' | 'scheduled' | 'archived' | 'live';
@@ -27,7 +28,7 @@ export interface CreatorContentItem {
   share_count: number;
   is_featured: boolean;
   is_pinned: boolean;
-  metadata: Record<string, unknown>;
+  metadata: Json;
   created_at: string;
   updated_at: string;
 }
@@ -112,7 +113,7 @@ export function useCreateContent() {
       status?: ContentStatus;
       scheduled_at?: string;
       duration_seconds?: number;
-      metadata?: Record<string, unknown>;
+      metadata?: Json;
     }) => {
       const insertData = {
         ...content,

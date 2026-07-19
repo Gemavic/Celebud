@@ -8,17 +8,6 @@ interface Category {
   slug: string;
 }
 
-interface Article {
-  id: string;
-  title: string;
-  category_id: string;
-  categories: {
-    id: string;
-    name: string;
-    slug: string;
-  } | null;
-}
-
 interface RecategorizeArticleProps {
   articleId: string;
   currentCategoryId: string;
@@ -94,7 +83,6 @@ export function RecategorizeArticle({
         throw new Error(errorData.error || 'Failed to recategorize article');
       }
 
-      const result = await response.json();
       setSuccess(true);
       setIsEditing(false);
 

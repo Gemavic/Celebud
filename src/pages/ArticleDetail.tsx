@@ -285,7 +285,7 @@ export function ArticleDetail() {
           {article.categories && (
             <span
               className="inline-block px-4 py-1.5 rounded-full text-sm font-semibold text-white mb-6 shadow-md"
-              style={{ backgroundColor: article.categories.color }}
+              style={{ backgroundColor: article.categories.color || '#DC2626' }}
             >
               {article.categories.name}
             </span>

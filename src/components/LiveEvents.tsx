@@ -5,7 +5,7 @@ import { Calendar, Users, Video, MapPin, Ticket, Clock } from 'lucide-react';
 interface LiveEvent {
   id: string;
   title: string;
-  description: string;
+  description: string | null;
   event_type: string;
   cover_image_url: string | null;
   start_time: string;

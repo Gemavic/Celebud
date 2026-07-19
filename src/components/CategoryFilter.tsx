@@ -54,7 +54,7 @@ export function CategoryFilter({
         </button>
 
         {categories.map((category) => {
-          const Icon = iconMap[category.icon] || Star;
+          const Icon = (category.icon && iconMap[category.icon]) || Star;
           const isSelected = selectedCategory === category.slug;
 
           return (

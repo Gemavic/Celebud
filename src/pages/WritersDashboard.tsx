@@ -7,7 +7,6 @@ import {
   FileText,
   Eye,
   MessageSquare,
-  TrendingUp,
   RefreshCw,
   User,
   Calendar,

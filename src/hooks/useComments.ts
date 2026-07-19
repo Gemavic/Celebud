@@ -20,7 +20,7 @@ export function useComments(contentId: string) {
           ),
           comment_reactions (
             id,
-            reaction_type,
+            emoji,
             user_id
           )
         `)
@@ -121,7 +121,6 @@ export function useToggleReaction() {
     mutationFn: async ({
       commentId,
       reactionType,
-      contentId,
     }: {
       commentId: string;
       reactionType: string;
@@ -137,7 +136,7 @@ export function useToggleReaction() {
         .select('id')
         .eq('comment_id', commentId)
         .eq('user_id', user.id)
-        .eq('reaction_type', reactionType)
+        .eq('emoji', reactionType)
         .maybeSingle();
 
       if (existing) {
@@ -151,7 +150,7 @@ export function useToggleReaction() {
         const { error } = await supabase.from('comment_reactions').insert({
           comment_id: commentId,
           user_id: user.id,
-          reaction_type: reactionType,
+          emoji: reactionType,
         });
         if (error) throw error;
         return { action: 'added' };

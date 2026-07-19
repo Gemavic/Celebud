@@ -2,12 +2,19 @@
 //   - legacy: plain text, paragraphs separated by a single newline, with
 //     `[IMAGE:url]` marker lines for inline images (everything published
 //     before the rich text editor existed)
-//   - current: real HTML produced by the TipTap-based RichTextEditor
-// A value is treated as HTML if it starts with a tag — real HTML content
-// always does (`<p>`, `<h2>`, etc.), and legacy plain text essentially
-// never does (a stray `[IMAGE:...]` marker starts with `[`, not `<`).
+//   - current: real HTML produced by the RichTextEditor
+// A value is treated as HTML if it contains any of the editor's own tags
+// anywhere in the string — not just at the very start. The editor's
+// contentEditable div can emit a leading bare text node before a table or
+// image is inserted mid-article (e.g. the writer types a sentence, then
+// inserts a table), so `content` doesn't always start with `<`; checking
+// only the start previously caused that HTML to be misdetected as legacy
+// plain text and stripped by sanitizeArticleContent's tag-removal, which is
+// why inserted tables/images silently disappeared on the article page.
+const HTML_TAG_PATTERN = /<(p|br|strong|b|em|i|u|s|a|h[2-4]|ul|ol|li|blockquote|hr|img|table|thead|tbody|tr|th|td)\b/i;
+
 export function isHtmlContent(content: string): boolean {
-  return /^\s*</.test(content || '');
+  return HTML_TAG_PATTERN.test(content || '');
 }
 
 function escapeHtml(s: string): string {

@@ -20,7 +20,7 @@ export async function fetchLatestNews() {
     try {
       const data = JSON.parse(text);
       return data;
-    } catch (parseError) {
+    } catch {
       console.error('Failed to parse JSON response:', text);
       throw new Error('Invalid JSON response from server');
     }

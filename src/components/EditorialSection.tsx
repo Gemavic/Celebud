@@ -5,15 +5,14 @@ import { formatDistanceToNow } from '../utils/date';
 import { 
   MessageSquare, 
   TrendingUp, 
-  AlertCircle, 
-  Clock,
+  AlertCircle,
   Users,
   ArrowRight
 } from 'lucide-react';
 
 interface EditorialFeature {
   id: string;
-  content_id: string;
+  content_id: string | null;
   title: string | null;
   editorial_description: string | null;
   feature_type: string;
@@ -27,7 +26,7 @@ interface EditorialFeature {
     title: string;
     slug: string;
     thumbnail_url: string | null;
-    description: string;
+    description: string | null;
     published_at: string;
     authors: {
       name: string;
@@ -35,9 +34,9 @@ interface EditorialFeature {
     } | null;
     categories: {
       name: string;
-      color: string;
+      color: string | null;
     } | null;
-  };
+  } | null;
 }
 
 export function EditorialSection() {
@@ -150,14 +149,14 @@ export function EditorialSection() {
 
               <Link to={`/article/${features[0].content_id}`} className="block">
                 <img
-                  src={features[0].media_content.thumbnail_url || ''}
-                  alt={features[0].title || features[0].media_content.title}
+                  src={features[0].media_content?.thumbnail_url || ''}
+                  alt={features[0].title || features[0].media_content?.title || ''}
                   className="w-full h-64 lg:h-80 object-cover"
                 />
                 
                 <div className="p-6">
                   <h3 className="text-2xl font-bold text-gray-900 mb-3 line-clamp-2">
-                    {features[0].title || features[0].media_content.title}
+                    {features[0].title || features[0].media_content?.title}
                   </h3>
                   
                   {features[0].editorial_description && (
@@ -176,10 +175,12 @@ export function EditorialSection() {
 
                   <div className="flex items-center justify-between text-sm text-gray-600">
                     <div className="flex items-center space-x-4">
-                      {features[0].media_content.authors && (
+                      {features[0].media_content?.authors && (
                         <span>{features[0].media_content.authors.name}</span>
                       )}
-                      <span>{formatDistanceToNow(features[0].media_content.published_at)}</span>
+                      {features[0].media_content?.published_at && (
+                        <span>{formatDistanceToNow(features[0].media_content.published_at)}</span>
+                      )}
                     </div>
                     
                     {features[0].discussion_enabled && (
@@ -214,8 +215,8 @@ export function EditorialSection() {
               <Link to={`/article/${feature.content_id}`} className="block">
                 <div className="relative h-32">
                   <img
-                    src={feature.media_content.thumbnail_url || ''}
-                    alt={feature.title || feature.media_content.title}
+                    src={feature.media_content?.thumbnail_url || ''}
+                    alt={feature.title || feature.media_content?.title || ''}
                     className="w-full h-full object-cover"
                   />
                   
@@ -236,7 +237,7 @@ export function EditorialSection() {
                   </span>
                   
                   <h4 className="text-lg font-bold text-gray-900 mt-1 mb-2 line-clamp-2">
-                    {feature.title || feature.media_content.title}
+                    {feature.title || feature.media_content?.title}
                   </h4>
 
                   {feature.editorial_description && (
@@ -246,8 +247,10 @@ export function EditorialSection() {
                   )}
 
                   <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>{formatDistanceToNow(feature.media_content.published_at)}</span>
-                    
+                    {feature.media_content?.published_at && (
+                      <span>{formatDistanceToNow(feature.media_content.published_at)}</span>
+                    )}
+
                     {feature.discussion_enabled && (
                       <div className="flex items-center space-x-1">
                         <MessageSquare className="w-3 h-3" />

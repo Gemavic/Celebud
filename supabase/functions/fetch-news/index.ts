@@ -679,11 +679,11 @@ function sanitizeContactInfo(text: string): string {
     return match.replace(/[\w\s.''-]+?(?:\s*(?:on|at|via|:))?\s*\+?\d[\d\s.()-]{7,}/i, `${reporter} on ${celebudWhatsApp}`);
   });
 
-  result = result.replace(nameBeforeNumberPattern, (_match, _name, _num) => {
+  result = result.replace(nameBeforeNumberPattern, () => {
     return `${reporter} - ${celebudWhatsApp}`;
   });
 
-  result = result.replace(numberWithNamePattern, (_match, _num, _name) => {
+  result = result.replace(numberWithNamePattern, () => {
     return `${celebudWhatsApp} - ${reporter}`;
   });
 

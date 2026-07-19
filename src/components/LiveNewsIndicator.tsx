@@ -5,7 +5,6 @@ import { useQueryClient } from '@tanstack/react-query';
 
 export function LiveNewsIndicator() {
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const queryClient = useQueryClient();
 
@@ -13,7 +12,6 @@ export function LiveNewsIndicator() {
     setIsRefreshing(true);
     try {
       await fetchLatestNews();
-      setLastUpdate(new Date());
       queryClient.invalidateQueries({ queryKey: ['articles'] });
     } catch (error) {
       console.error('Failed to refresh news:', error);

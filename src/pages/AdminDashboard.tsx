@@ -121,9 +121,6 @@ export function AdminDashboard() {
     }
   };
 
-  const authorName = (id: string | null) =>
-    id ? (authors.find(a => a.id === id)?.name ?? 'Unknown') : 'Unassigned';
-
   const authorColor = (name: string) => {
     if (name.includes('Matthew')) return 'bg-blue-100 text-blue-700';
     if (name.includes('Gbenga')) return 'bg-green-100 text-green-700';

@@ -168,8 +168,6 @@ export function CreatorManagement() {
                   setStatusFilter={setStatusFilter}
                   searchTerm={searchTerm}
                   setSearchTerm={setSearchTerm}
-                  selectedCreator={selectedCreator}
-                  setSelectedCreator={setSelectedCreator}
                   updateStatus={updateStatus}
                   onCreatePayout={(creator) => {
                     setSelectedCreator(creator);
@@ -309,8 +307,6 @@ function CreatorsTab({
   setStatusFilter,
   searchTerm,
   setSearchTerm,
-  selectedCreator,
-  setSelectedCreator,
   updateStatus,
   onCreatePayout,
   canOnboard,
@@ -321,8 +317,6 @@ function CreatorsTab({
   setStatusFilter: (v: string) => void;
   searchTerm: string;
   setSearchTerm: (v: string) => void;
-  selectedCreator: CreatorApplication | null;
-  setSelectedCreator: (c: CreatorApplication | null) => void;
   updateStatus: ReturnType<typeof useUpdateCreatorStatus>;
   onCreatePayout: (c: CreatorApplication) => void;
   canOnboard: boolean;
@@ -960,7 +954,6 @@ function RegisterCreatorModal({ onClose, canOnboard }: { onClose: () => void; ca
   const [status, setStatus] = useState<'approved' | 'onboarded'>('approved');
   const [step, setStep] = useState<'form' | 'submitting' | 'success' | 'error'>('form');
   const [errorMsg, setErrorMsg] = useState('');
-  const [createdId, setCreatedId] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -987,7 +980,7 @@ function RegisterCreatorModal({ onClose, canOnboard }: { onClose: () => void; ca
     }
 
     // Direct insert — uses admin INSERT RLS policy, no RPC schema cache needed
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('creator_applications')
       .insert({
         display_name: displayName.trim(),
@@ -1016,7 +1009,6 @@ function RegisterCreatorModal({ onClose, canOnboard }: { onClose: () => void; ca
       return;
     }
 
-    setCreatedId(data?.id || '');
     setStep('success');
   };
 

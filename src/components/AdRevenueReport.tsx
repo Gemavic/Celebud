@@ -10,7 +10,7 @@ import { calculateAdRevenue, calculateCTR, formatCurrency } from '../utils/adRev
 interface AdMetrics {
   id: string;
   title: string;
-  advertiser_name: string;
+  advertiser_name: string | null;
   impression_count: number;
   click_count: number;
   cpm_rate: number;

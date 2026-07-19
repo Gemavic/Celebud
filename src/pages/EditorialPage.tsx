@@ -6,6 +6,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { Header } from '../components/Header';
 import { EditorialDashboard } from '../components/EditorialDashboard';
 import { EditorialSection } from '../components/EditorialSection';
+import { RichTextEditor } from '../components/RichTextEditor';
 import { supabase } from '../lib/supabase';
 
 interface Category {
@@ -45,7 +46,9 @@ export default function EditorialPage() {
     try {
       const saved = localStorage.getItem(DRAFT_KEY);
       if (saved) return JSON.parse(saved);
-    } catch {}
+    } catch {
+      // Corrupted draft JSON — fall through to the default state below.
+    }
     return {
       title: '',
       description: '',
@@ -64,7 +67,9 @@ export default function EditorialPage() {
     try {
       const saved = localStorage.getItem(DRAFT_KEY + '_author');
       if (saved) return JSON.parse(saved);
-    } catch {}
+    } catch {
+      // Corrupted draft JSON — fall through to the default state below.
+    }
     return { name: '', bio: '' };
   });
 
@@ -526,13 +531,10 @@ export default function EditorialPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Content *
                   </label>
-                  <textarea
+                  <RichTextEditor
                     value={createFormData.content}
-                    onChange={(e) => setCreateFormData({ ...createFormData, content: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent font-mono text-sm"
-                    rows={15}
-                    placeholder="Write your article content here..."
-                    required
+                    onChange={(html) => setCreateFormData({ ...createFormData, content: html })}
+                    placeholder="Write or paste your article here..."
                   />
                 </div>
 

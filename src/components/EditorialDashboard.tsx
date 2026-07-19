@@ -18,7 +18,7 @@ import {
 
 interface EditorialFeature {
   id: string;
-  content_id: string;
+  content_id: string | null;
   title: string | null;
   editorial_description: string | null;
   feature_type: string;
@@ -35,7 +35,7 @@ interface EditorialFeature {
     title: string;
     thumbnail_url: string | null;
     slug: string;
-  };
+  } | null;
 }
 
 export function EditorialDashboard() {
@@ -377,6 +377,7 @@ interface CreateEditorialFeatureModalProps {
 }
 
 function CreateEditorialFeatureModal({ onClose, onCreated, availableContent }: CreateEditorialFeatureModalProps) {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     content_id: '',
     title: '',
@@ -389,10 +390,12 @@ function CreateEditorialFeatureModal({ onClose, onCreated, availableContent }: C
     engagement_goal: '',
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     try {
       const endDate = new Date();
@@ -417,8 +420,9 @@ function CreateEditorialFeatureModal({ onClose, onCreated, availableContent }: C
 
       onCreated();
       onClose();
-    } catch (error) {
-      console.error('Error creating editorial feature:', error);
+    } catch (err) {
+      console.error('Error creating editorial feature:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create editorial feature');
     } finally {
       setLoading(false);
     }
@@ -540,6 +544,12 @@ function CreateEditorialFeatureModal({ onClose, onCreated, availableContent }: C
             />
             <label className="text-sm font-medium">Enable discussions</label>
           </div>
+
+          {error && (
+            <div className="text-red-600 bg-red-50 p-3 rounded-lg border border-red-200 text-sm">
+              {error}
+            </div>
+          )}
 
           <div className="flex justify-end space-x-4 pt-4">
             <button
