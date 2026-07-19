@@ -953,52 +953,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Archive RSS-fetched articles older than 7 days
-    // NEVER touch manually posted articles (is_manual = true OR source_id IS NULL)
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    const { data: staleArticles } = await supabase
-      .from('media_content')
-      .select('*')
-      .lt('published_at', sevenDaysAgo)
-      .eq('is_manual', false)
-      .not('source_id', 'is', null);
-
-    if (staleArticles && staleArticles.length > 0) {
-      const archiveRows = staleArticles.map((a: any) => ({
-        id: a.id,
-        title: a.title,
-        slug: a.slug,
-        description: a.description,
-        content: a.content,
-        category_id: a.category_id,
-        author_id: a.author_id,
-        media_type: a.media_type,
-        media_url: a.media_url,
-        thumbnail_url: a.thumbnail_url,
-        duration: a.duration,
-        is_featured: a.is_featured,
-        is_trending: a.is_trending,
-        views_count: a.views_count,
-        published_at: a.published_at,
-        created_at: a.created_at,
-        updated_at: a.updated_at,
-        source_id: a.source_id,
-        external_url: a.external_url,
-        source_published_at: a.source_published_at,
-        is_premium: a.is_premium,
-        min_tier_required: a.min_tier_required,
-        editorial_notes: a.editorial_notes,
-        last_featured_at: a.last_featured_at,
-        comments_count: a.comments_count,
-        archived_at: new Date().toISOString(),
-      }));
-
-      await supabase.from('media_content_archive').upsert(archiveRows, { onConflict: 'id' });
-
-      const staleIds = staleArticles.map((a: any) => a.id);
-      await supabase.from('media_content').delete().in('id', staleIds);
-    }
+    // Articles are never auto-archived or auto-deleted by age here — they
+    // stay live indefinitely until an admin/editor removes them from
+    // Article Management. (This function used to sweep RSS-fetched
+    // articles older than 7 days into media_content_archive on every run,
+    // which silently dropped their accumulated view counts from the
+    // site-wide total every time this function fired — removed.)
 
     // Priority order: Nigeria 15%, Canada 15%, USA 15%, UK 10%, Sports 10%, remaining 35% to Global/others
     const priorityCountries = ['Nigeria', 'Canada', 'USA', 'UK', 'Sports'];
