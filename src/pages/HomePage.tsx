@@ -296,11 +296,12 @@ function HomePage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-rose-500 via-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
-                  <span className="text-white font-bold text-xl">C</span>
-                </div>
-                <h3 className="text-2xl font-bold">CelebUD</h3>
+              <div className="mb-4">
+                <img
+                  src="/logo.jpg"
+                  alt="CelebUD Media"
+                  className="h-20 w-auto rounded-lg object-contain"
+                />
               </div>
               <p className="text-gray-400 mb-4 text-sm">
                 Your premier destination for entertainment news, celebrity interviews, and exclusive content.
