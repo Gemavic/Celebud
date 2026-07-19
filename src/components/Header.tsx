@@ -1,4 +1,4 @@
-import { Search, Menu, X, Star, User, LogOut, SquarePen as PenSquare, FolderOpen, Users, Video, LayoutDashboard } from 'lucide-react';
+import { Search, Menu, X, User, LogOut, SquarePen as PenSquare, FolderOpen, Users, Video, LayoutDashboard } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { SocialLinks } from './SocialLinks';
@@ -205,9 +205,7 @@ export function Header() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="h-16 flex items-center gap-6">
             <Link to="/" onClick={scrollToTop} className="flex items-center gap-2.5 flex-shrink-0">
-              <span className="w-9 h-9 bg-red-600 rounded-lg flex items-center justify-center shadow-sm">
-                <Star className="w-5 h-5 text-white fill-white" />
-              </span>
+              <img src="/logo-badge.png" alt="CelebUD" className="w-9 h-9 flex-shrink-0" />
               <span>
                 <span className="block text-2xl font-black leading-none tracking-tight text-gray-900">
                   Celeb<em className="not-italic text-red-600">UD</em>
