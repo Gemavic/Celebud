@@ -1049,24 +1049,32 @@ Deno.serve(async (req: Request) => {
           return financialKeywords.some(kw => text.includes(kw));
         }
 
-        // Resolve author by matching source country against routing rules
-        function resolveAuthorByCountry(country: string): any {
+        // Resolve author by matching source country against routing rules.
+        // Also reports whether a SPECIFIC region matched (vs. falling
+        // through to the Global/International catch-all) — a specific
+        // match means a reporter's actual assigned coverage area, which
+        // takes precedence over Victoria's entertainment/celebrity/
+        // lifestyle override below, so each reporter gets full credit for
+        // their region even when a given article happens to be
+        // entertainment-flavored.
+        function resolveAuthorByCountry(country: string): { author: any; specificMatch: boolean } {
           const lowerCountry = country.toLowerCase();
-          if (!routingRules) return authors?.[0];
+          if (!routingRules || routingRules.length === 0) return { author: authors?.[0], specificMatch: false };
           for (const rule of routingRules) {
             const matches = (rule.country_values as string[]).some(
               (cv: string) => cv.toLowerCase() === lowerCountry
             );
             if (matches) {
-              return authors?.find((a: any) => a.id === rule.author_id);
+              return { author: authors?.find((a: any) => a.id === rule.author_id), specificMatch: true };
             }
           }
           // Fallback: last rule (Global / International) or first author
           const fallbackRule = routingRules[routingRules.length - 1];
-          return authors?.find((a: any) => a.id === fallbackRule?.author_id) || authors?.[0];
+          return { author: authors?.find((a: any) => a.id === fallbackRule?.author_id) || authors?.[0], specificMatch: false };
         }
 
-        const defaultAuthorForSource = resolveAuthorByCountry(source.country || 'Global');
+        const { author: defaultAuthorForSource, specificMatch: sourceHasSpecificRegion } =
+          resolveAuthorByCountry(source.country || 'Global');
 
         const categoryMap = source.category_mapping as Record<string, string>;
         const sourceCategorySlug = categoryMap?.default || 'news';
@@ -1135,8 +1143,14 @@ Deno.serve(async (req: Request) => {
 
             // Assign author with priority overrides:
             // 1. Financial/insurance/business from Canada -> Matthew
-            // 2. Entertainment/celebrity/lifestyle -> Victoria
-            // 3. Default: routing rules by source country
+            // 2. A reporter's specifically assigned region (Nigeria, Canada,
+            //    USA, Europe, Middle East, Asia, Africa, Sports) -> that
+            //    reporter, even for entertainment/celebrity/lifestyle
+            //    content, so regional coverage isn't siphoned away from
+            //    Matthew, Gbenga, and the others by category alone.
+            // 3. Entertainment/celebrity/lifestyle from a source with no
+            //    specific regional owner -> Victoria
+            // 4. Default: routing rules by source country (Global/International)
             let assignedAuthor: any;
             const isFinancialCategory = financialCategorySlugs.includes(finalCategorySlug);
             const isCanadianSource = sourceCountry === 'canada';
@@ -1144,6 +1158,8 @@ Deno.serve(async (req: Request) => {
 
             if (isFinancialCanadian) {
               assignedAuthor = matthewAuthor;
+            } else if (sourceHasSpecificRegion) {
+              assignedAuthor = defaultAuthorForSource;
             } else if (victoriaAuthor && victoriaCategorySlugs.includes(finalCategorySlug)) {
               assignedAuthor = victoriaAuthor;
             } else {
