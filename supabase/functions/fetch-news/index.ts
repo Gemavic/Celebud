@@ -1059,13 +1059,23 @@ Deno.serve(async (req: Request) => {
         // entertainment-flavored.
         function resolveAuthorByCountry(country: string): { author: any; specificMatch: boolean } {
           const lowerCountry = country.toLowerCase();
+          // "Global"/"International" means no specific regional owner — the
+          // rule still supplies the default author (Matthew) for news/
+          // politics/business, but it does NOT count as a specific region,
+          // so Victoria's entertainment/celebrity/lifestyle claim below
+          // still applies to these sources. Without this, the Global
+          // catch-all (138 of ~354 sources) would swallow her entire beat.
+          const genericCountries = ['global', 'international'];
           if (!routingRules || routingRules.length === 0) return { author: authors?.[0], specificMatch: false };
           for (const rule of routingRules) {
             const matches = (rule.country_values as string[]).some(
               (cv: string) => cv.toLowerCase() === lowerCountry
             );
             if (matches) {
-              return { author: authors?.find((a: any) => a.id === rule.author_id), specificMatch: true };
+              return {
+                author: authors?.find((a: any) => a.id === rule.author_id),
+                specificMatch: !genericCountries.includes(lowerCountry),
+              };
             }
           }
           // Fallback: last rule (Global / International) or first author
