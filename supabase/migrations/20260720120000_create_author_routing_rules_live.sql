@@ -1,5 +1,6 @@
--- Creates author_routing_rules live (never existed despite 2026-06 migration files)
--- and rebalances auto-fetched article attribution. Mirrors deploy file 28.
+-- Creates author_routing_rules AND the is_manual column live (neither ever
+-- existed despite 2026-06/07 migration files) and rebalances auto-fetched
+-- article attribution. Mirrors deploy file 28 v3.
 
 -- ===== 1. Create the routing table (never existed live until now) =====
 create table if not exists author_routing_rules (
@@ -82,7 +83,19 @@ left join authors a on a.id = r.author_id
 order by r.priority;
 
 -- ===== 3. Retroactive rebalance of AUTO-FETCHED articles only =====
--- Manual articles (is_manual = true or no source) are never touched.
+-- First, create the is_manual protection flag (it was supposed to mark
+-- manually-written articles as permanent, but - like the routing table -
+-- it never actually existed in the live database until now), and mark
+-- every article with no news source as manual.
+alter table media_content add column if not exists is_manual boolean default false;
+
+update media_content
+set is_manual = true
+where source_id is null
+  and coalesce(is_manual, false) = false;
+
+-- Now reassign. Manual articles (is_manual = true or no source) are
+-- never touched - they keep their chosen bylines.
 update media_content mc
 set author_id = r.author_id
 from news_sources ns
