@@ -3,6 +3,7 @@ import { AdminLayout } from '../components/AdminLayout';
 import { useCreators } from '../hooks/useCreators';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { Link } from 'react-router-dom';
 import {
   Users,
@@ -37,6 +38,7 @@ interface AssignableArticle {
 
 export function AdminDashboard() {
   const { user } = useAuth();
+  const { canApportionArticles } = usePermissions();
   const { data: creators = [], isLoading: creatorsLoading } = useCreators();
   const [authors, setAuthors] = useState<Author[]>([]);
   const [recentArticles, setRecentArticles] = useState<AssignableArticle[]>([]);
@@ -102,6 +104,7 @@ export function AdminDashboard() {
   };
 
   const assignArticle = async (articleId: string, authorId: string) => {
+    if (!canApportionArticles) return;
     setAssigningId(articleId);
     try {
       const { error } = await supabase
@@ -154,7 +157,10 @@ export function AdminDashboard() {
 
         {/* ============================================================
             ARTICLE ASSIGNMENT CENTER — Main Feature
+            Only shown to admins whose user_roles row grants
+            can_apportion_articles (e.g. hidden for Admin 2 / Victoria).
         ============================================================ */}
+        {canApportionArticles && (
         <div className="bg-white rounded-2xl border-2 border-red-100 overflow-hidden shadow-sm">
           <div className="px-6 py-4 bg-gradient-to-r from-red-600 to-orange-500 flex items-center justify-between">
             <div>
@@ -305,6 +311,7 @@ export function AdminDashboard() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Two Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
