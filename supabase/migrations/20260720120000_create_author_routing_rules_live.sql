@@ -1,3 +1,8 @@
+-- Creates author_routing_rules live (never existed despite 2026-06 migration files)
+-- and rebalances auto-fetched article attribution. Mirrors deploy file 28.
+
+-- ===== 1. Create the routing table (never existed live until now) =====
+create table if not exists author_routing_rules (
   id uuid primary key default gen_random_uuid(),
   region_label text not null,
   country_values text[] not null,
