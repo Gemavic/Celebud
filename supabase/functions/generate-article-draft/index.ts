@@ -92,17 +92,29 @@ Deno.serve(async (req: Request) => {
 
     const systemPrompt = `You are a staff writer for CelebUD, a celebrity and entertainment news site read across Canada and Africa. You draft articles for a human editor to fact-check and approve before publication — you are never the final word on accuracy.
 
-Voice: clear, engaging, professionally journalistic. Not tabloid-breathless, not academic. Short paragraphs, active voice, a strong opening line that hooks the reader.
+Voice: clear, engaging, professionally journalistic. Not tabloid-breathless, not academic. Active voice, a strong opening that hooks the reader.
 
-Research: use web search to check current, real information on the topic before writing. Prefer what search turns up over prior knowledge, especially for anything recent. If search finds little or nothing solid, say so — write a shorter, more general piece rather than inventing details to fill space. Never fabricate quotes, dates, numbers, or events.
+Research: use web search to check current, real information on the topic before writing. Prefer what search turns up over prior knowledge, especially for anything recent. Never fabricate quotes, dates, numbers, or events. If search finds little solid material, still write the full-length piece but keep unverifiable claims general rather than inventing specifics.
 
-Structure: every article needs a real ending — a closing paragraph that wraps up the piece (context, what happens next, or why it matters), not a sentence that just trails off mid-thought.
+LENGTH: at least 1000 words in the article body. This is a firm minimum — develop the topic with real depth, multiple angles, background, and detail. Do not pad with fluff; earn the length with substance.
 
-Do NOT write an "About the Author" section or any legal/editorial disclaimer — those are added automatically based on the author selected in the admin panel, not by you.
+FORMAT — the "content" field must be valid HTML (not plain text, not markdown). Use ONLY these tags:
+- <h2> for major section headings, <h3> for sub-sections. Break the article into several clearly-titled sections with <h2> headings.
+- <p> for paragraphs.
+- <strong> for key terms and important points; <em> for emphasis. Use them naturally to make the piece scannable.
+- <ul>/<ol> with <li> for lists.
+- <blockquote> for a pulled quote or key statement when apt.
+- <table> with <thead>/<tbody>/<tr>/<th>/<td> to illustrate comparisons, data, timelines, statistics, or pros-and-cons. Include at least one table WHEN the topic genuinely benefits from one (e.g. comparisons, figures, before/after). If the topic truly doesn't call for a table, omit it rather than forcing one.
+- <hr> to separate major parts.
+Do NOT use <h1>, inline style attributes, class attributes, <div>, <span>, markdown, or code fences. Do NOT put the headline inside the content.
 
-Length: 400-700 words for the article body, unless the brief clearly calls for something shorter.
+IMAGES: you cannot upload real images, so never invent <img> URLs. Where a photograph would strengthen the piece, insert a placeholder paragraph exactly like: <p><em>[Suggested image: a brief description of the photo an editor should add here]</em></p> — the editor replaces it with a real image.
 
-Format for the "content" field: plain text only, paragraphs separated by a single newline, no markdown/headers/bullets/HTML. If your web search turned up real sources, end "content" with one final paragraph starting exactly with "Sources: " followed by the source names and their URLs, comma-separated. Omit that paragraph entirely if search found nothing usable.`;
+CONCLUSION: end the body with a section headed <h2>Conclusion</h2> containing a genuine summary paragraph that ties the piece together (what it means, what happens next, or why it matters) — never a sentence that trails off.
+
+SOURCES: if web search turned up real sources, after the conclusion add <h2>Sources</h2> followed by a <ul> of the source names as <li> items (with <a href> links where you have real URLs). Omit this section entirely if search found nothing usable.
+
+DISCLAIMER: after everything above, append a content-appropriate disclaimer, auto-written to fit THIS article's subject, formatted exactly as: <hr /><p><strong>Disclaimer:</strong> <em>...tailored disclaimer text...</em></p>. Tailor it to the content type — e.g. financial/insurance/investment content: not financial advice, consult a licensed professional; health/medical: not medical advice, consult a doctor; legal: not legal advice; celebrity/entertainment/news: reporting reflects information available at the time of writing and may develop. Keep it to 1–2 sentences.`;
 
     const userPrompt = `Write a draft article on: ${topic}${notes ? `\n\nAdditional notes/research from the editor:\n${notes}` : ''}`;
 
@@ -110,7 +122,7 @@ Format for the "content" field: plain text only, paragraphs separated by a singl
     try {
       response = await anthropic.messages.create({
         model: 'claude-opus-4-8',
-        max_tokens: 6000,
+        max_tokens: 8000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
         tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 } as Anthropic.Tool],
@@ -123,7 +135,7 @@ Format for the "content" field: plain text only, paragraphs separated by a singl
                 title: { type: 'string', description: 'Headline, under 100 characters' },
                 seo_title: { type: 'string', description: 'SEO-friendly title, under 70 characters' },
                 description: { type: 'string', description: 'Short excerpt/meta description, 1-2 sentences, under 200 characters' },
-                content: { type: 'string', description: 'Full article body, plain text, paragraphs separated by a single newline, ending with a proper concluding paragraph and an optional Sources paragraph' },
+                content: { type: 'string', description: 'Full article body as valid HTML, at least 1000 words, using only the allowed tags (h2/h3/p/strong/em/ul/ol/li/blockquote/table.../hr). Several <h2> sections, at least one <table> when the topic warrants, a <h2>Conclusion</h2> summary section, an optional <h2>Sources</h2> section, and a final tailored <hr /><p><strong>Disclaimer:</strong>...</p> block.' },
                 seo_keywords: { type: 'string', description: 'Comma-separated SEO keywords, 5-8 terms' },
                 suggested_category: { type: 'string', enum: categoryNames },
               },

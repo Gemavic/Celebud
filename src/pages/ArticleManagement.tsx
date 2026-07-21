@@ -4,7 +4,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { supabase } from '../lib/supabase';
 import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { RichTextEditor } from '../components/RichTextEditor';
-import { toEditableHtml, legacyPlainTextToHtml } from '../utils/articleContent';
+import { toEditableHtml } from '../utils/articleContent';
 import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
@@ -325,7 +325,7 @@ export function ArticleManagement() {
       setEditForm({
         title: draft.title || '',
         description: draft.description || '',
-        content: legacyPlainTextToHtml(draft.content || ''),
+        content: toEditableHtml(draft.content || ''),
         thumbnail_url: '',
         category_id: matchedCategory?.id || '',
         author_id: '',
