@@ -14,6 +14,7 @@ const ContentStudio = lazy(() => import('./pages/ContentStudio').then(module => 
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy').then(module => ({ default: module.PrivacyPolicy })));
 const WritersDashboard = lazy(() => import('./pages/WritersDashboard').then(module => ({ default: module.WritersDashboard })));
+const ArticleRecovery = lazy(() => import('./pages/ArticleRecovery').then(module => ({ default: module.ArticleRecovery })));
 const ReporterSignup = lazy(() => import('./pages/ReporterSignup').then(module => ({ default: module.ReporterSignup })));
 const ReporterManagement = lazy(() => import('./pages/ReporterManagement').then(module => ({ default: module.ReporterManagement })));
 const FinAdvisor = lazy(() => import('./pages/FinAdvisor').then(module => ({ default: module.FinAdvisor })));
@@ -47,6 +48,7 @@ function App() {
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/ad-revenue" element={<AdRevenueReport />} />
             <Route path="/admin/articles" element={<ArticleManagement />} />
+            <Route path="/admin/recovery" element={<ArticleRecovery />} />
             <Route path="/admin/metrics" element={<MetricsDashboard />} />
             <Route path="/admin/creators" element={<CreatorManagement />} />
             <Route path="/studio" element={<ContentStudio />} />

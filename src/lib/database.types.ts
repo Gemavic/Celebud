@@ -125,6 +125,35 @@ export interface Database {
           },
         ];
       };
+      media_content_archive: {
+        Row: {
+          id: string;
+          title: string;
+          slug: string;
+          description: string | null;
+          content: string | null;
+          category_id: string | null;
+          author_id: string | null;
+          media_type: string | null;
+          media_url: string | null;
+          thumbnail_url: string | null;
+          external_url: string | null;
+          source_id: string | null;
+          source_published_at: string | null;
+          duration: number | null;
+          is_featured: boolean | null;
+          is_trending: boolean | null;
+          views_count: number | null;
+          comments_count: number | null;
+          published_at: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+          archived_at: string | null;
+        };
+        Insert: Partial<Database['public']['Tables']['media_content_archive']['Row']> & { id: string };
+        Update: Partial<Database['public']['Tables']['media_content_archive']['Row']>;
+        Relationships: [];
+      };
       tags: {
         Row: {
           id: string;
@@ -1057,6 +1086,10 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      restore_archived_article: {
+        Args: { p_id: string };
+        Returns: Json;
+      };
       get_total_views: {
         Args: Record<string, never>;
         Returns: number;

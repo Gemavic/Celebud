@@ -20,6 +20,7 @@ import {
   ChevronRight,
   PenLine,
   UserCheck,
+  Archive,
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -31,6 +32,7 @@ interface AdminLayoutProps {
 const NAV_ITEMS = [
   { path: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { path: '/admin/articles', label: 'Articles', icon: FileText },
+  { path: '/admin/recovery', label: 'Recovery', icon: Archive },
   { path: '/admin/writers', label: "Writer's Production", icon: PenLine },
   { path: '/admin/creators', label: 'Creators', icon: Users },
   { path: '/admin/reporters', label: 'Reporters', icon: UserCheck },
