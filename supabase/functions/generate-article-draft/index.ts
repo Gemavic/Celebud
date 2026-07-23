@@ -88,7 +88,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const anthropic = new Anthropic({ apiKey: anthropicApiKey, maxRetries: 5 });
+    // maxRetries kept low: each retry re-runs the whole long generation,
+    // which can push total time past Supabase's gateway timeout (504).
+    const anthropic = new Anthropic({ apiKey: anthropicApiKey, maxRetries: 2 });
 
     const systemPrompt = `You are a staff writer for CelebUD, a celebrity and entertainment news site read across Canada and Africa. You draft articles for a human editor to fact-check and approve before publication — you are never the final word on accuracy.
 
@@ -120,12 +122,16 @@ DISCLAIMER: after everything above, append a content-appropriate disclaimer, aut
 
     let response: Anthropic.Message;
     try {
+      // Sonnet 5 (not Opus) so a 1000+ word researched article generates
+      // fast enough to finish inside Supabase's edge-function time limit —
+      // Opus was slow enough that the platform returned 504 before it
+      // completed. Sonnet produces the same rich, structured output.
       response = await anthropic.messages.create({
-        model: 'claude-opus-4-8',
+        model: 'claude-sonnet-5',
         max_tokens: 8000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
-        tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 } as Anthropic.Tool],
+        tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 2 } as Anthropic.Tool],
         output_config: {
           format: {
             type: 'json_schema',
