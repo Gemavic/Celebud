@@ -52,3 +52,6 @@ jobs:
 
       - name: Deploy quick-task (AI drafting, JWT on)
         run: supabase functions deploy quick-task --project-ref "$PROJECT_REF"
+
+      - name: Deploy generate-thumbnail (AI thumbnails, JWT on)
+        run: supabase functions deploy generate-thumbnail --project-ref "$PROJECT_REF"

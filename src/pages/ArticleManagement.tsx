@@ -101,6 +101,7 @@ export function ArticleManagement() {
   const [aiGenerated, setAiGenerated] = useState(false);
   const [thumbnailUploading, setThumbnailUploading] = useState(false);
   const [thumbnailUploadError, setThumbnailUploadError] = useState<string | null>(null);
+  const [thumbnailGenerating, setThumbnailGenerating] = useState(false);
   const [editingAuthorBio, setEditingAuthorBio] = useState(false);
   const [authorBioForm, setAuthorBioForm] = useState({ bio: '', disclaimer: '' });
   const [savingAuthorBio, setSavingAuthorBio] = useState(false);
@@ -364,6 +365,42 @@ export function ArticleManagement() {
       setThumbnailUploadError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setThumbnailUploading(false);
+    }
+  };
+
+  const generateThumbnail = async () => {
+    if (!editForm.title.trim()) {
+      setThumbnailUploadError('Add a title first so the AI knows what to illustrate.');
+      return;
+    }
+    setThumbnailGenerating(true);
+    setThumbnailUploadError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setThumbnailUploadError('You must be signed in as an admin to do this.');
+        return;
+      }
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-thumbnail`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: editForm.title, description: editForm.description || undefined }),
+      });
+      let data: { url?: string; error?: string };
+      try {
+        data = await resp.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (status ${resp.status}).`);
+      }
+      if (!resp.ok || !data.url) {
+        throw new Error(data.error || `Failed to generate thumbnail (status ${resp.status}).`);
+      }
+      setEditForm((prev) => ({ ...prev, thumbnail_url: data.url as string }));
+    } catch (err: unknown) {
+      console.error('Error generating thumbnail:', err);
+      setThumbnailUploadError(err instanceof Error ? err.message : 'Thumbnail generation failed');
+    } finally {
+      setThumbnailGenerating(false);
     }
   };
 
@@ -952,7 +989,7 @@ export function ArticleManagement() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">Thumbnail</label>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <label className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors flex-shrink-0">
                       <input
                         type="file"
@@ -967,11 +1004,21 @@ export function ArticleManagement() {
                       />
                       {thumbnailUploading ? 'Uploading...' : 'Upload from device'}
                     </label>
+                    <button
+                      type="button"
+                      onClick={generateThumbnail}
+                      disabled={thumbnailGenerating}
+                      title="Create a conceptual thumbnail from the title & description (no real people)"
+                      className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors flex-shrink-0"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      {thumbnailGenerating ? 'Generating…' : 'Generate with AI'}
+                    </button>
                     <input
                       type="text"
                       value={editForm.thumbnail_url}
                       onChange={(e) => setEditForm({ ...editForm, thumbnail_url: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      className="flex-1 min-w-[10rem] px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                       placeholder="or paste an image URL"
                     />
                   </div>
