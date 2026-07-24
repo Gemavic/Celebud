@@ -5,7 +5,8 @@ import { supabase } from '../lib/supabase';
 import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { toEditableHtml } from '../utils/articleContent';
-import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle, Image as ImageIcon } from 'lucide-react';
+import { getVideoEmbedUrl, getVideoThumbnail, isEmbeddableVideoUrl } from '../utils/videoEmbed';
+import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle, Image as ImageIcon, Video, FileText } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
 // Posts to the CelebUD Facebook Page + Telegram channel via the
@@ -381,6 +382,25 @@ export function ArticleManagement() {
     } finally {
       setThumbnailUploading(false);
     }
+  };
+
+  // Pasting a YouTube/Vimeo/TikTok link auto-fills the thumbnail (YouTube
+  // only, where a predictable thumbnail URL exists) and defaults the
+  // category to "Video" — both only when not already set, so it never
+  // overwrites something the editor already chose.
+  const handleVideoUrlChange = (url: string) => {
+    setEditForm((prev) => {
+      const next = { ...prev, external_url: url };
+      if (!prev.thumbnail_url) {
+        const auto = getVideoThumbnail(url);
+        if (auto) next.thumbnail_url = auto;
+      }
+      if (!prev.category_id) {
+        const videoCategory = categories.find((c) => c.slug === 'video');
+        if (videoCategory) next.category_id = videoCategory.id;
+      }
+      return next;
+    });
   };
 
   const generateThumbnail = async () => {
@@ -853,8 +873,13 @@ export function ArticleManagement() {
                       className="w-4 h-4 text-blue-600 rounded border-gray-300 cursor-pointer mt-1 shrink-0"
                     />
                     <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">
-                      {article.title}
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate flex items-center gap-2">
+                      {article.media_type === 'video' && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-blue-700 bg-blue-50 rounded-full flex-shrink-0">
+                          <Video className="w-3 h-3" /> Video
+                        </span>
+                      )}
+                      <span className="truncate">{article.title}</span>
                     </h3>
 
                     <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-3">
@@ -1034,6 +1059,64 @@ export function ArticleManagement() {
                     <p className="font-semibold">AI-generated draft — review before publishing</p>
                     <p className="mt-0.5">Check every fact, quote, and name below. Add a thumbnail and pick the right author before saving.</p>
                   </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Content Type</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditForm((f) => ({ ...f, media_type: 'article' }))}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                      editForm.media_type === 'article'
+                        ? 'bg-blue-50 text-blue-700 border-blue-300'
+                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <FileText className="w-4 h-4" /> Article
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditForm((f) => ({ ...f, media_type: 'video' }))}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                      editForm.media_type === 'video'
+                        ? 'bg-blue-50 text-blue-700 border-blue-300'
+                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Video className="w-4 h-4" /> Video
+                  </button>
+                </div>
+              </div>
+
+              {editForm.media_type === 'video' && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Video URL</label>
+                  <input
+                    type="url"
+                    value={editForm.external_url}
+                    onChange={(e) => handleVideoUrlChange(e.target.value)}
+                    placeholder="Paste a YouTube, Vimeo, or TikTok link"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  {editForm.external_url && !isEmbeddableVideoUrl(editForm.external_url) && (
+                    <p className="mt-1.5 text-xs text-amber-600">
+                      This link doesn't look like a YouTube, Vimeo, or TikTok video — it will show readers a
+                      "Watch Video" button linking out, instead of playing inline.
+                    </p>
+                  )}
+                  {editForm.external_url && getVideoEmbedUrl(editForm.external_url) && (
+                    <div className="relative w-full mt-3 rounded-lg overflow-hidden bg-black" style={{ paddingTop: '56.25%' }}>
+                      <iframe
+                        src={getVideoEmbedUrl(editForm.external_url) || ''}
+                        title="Video preview"
+                        className="absolute inset-0 w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 

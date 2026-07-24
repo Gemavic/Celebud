@@ -16,7 +16,7 @@ const NAV_LINKS: { label: string; to: string }[] = [
   { label: 'Fin-Advisor', to: '/fin-advisor' },
   { label: 'Business', to: '/?category=business' },
   { label: 'Lifestyle', to: '/?category=lifestyle' },
-  { label: 'Videos', to: '/?category=videos' },
+  { label: 'Videos', to: '/?category=video' },
 ];
 
 export function Header() {
