@@ -1,9 +1,13 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-// Generates an article thumbnail with Google's Gemini image model
-// (gemini-2.5-flash-image, "Nano Banana") from the article title +
-// description, uploads it to the `media` storage bucket, and returns the
-// public URL. Uses the same GEMINI_API_KEY secret as the text drafter.
+// Generates an article image with Google's Gemini image model
+// (gemini-2.5-flash-image, "Nano Banana"), uploads it to the `media`
+// storage bucket, and returns the public URL. Uses the same GEMINI_API_KEY
+// secret as the text drafter. Two modes:
+//   - { title, description } -> a 16:9 article thumbnail
+//   - { imagePrompt } -> an inline content illustration for one specific
+//     caption (used to fill in the drafter's "[Suggested image: ...]"
+//     placeholders)
 //
 // For a news brand, the prompt deliberately produces CONCEPTUAL imagery and
 // forbids depicting real, identifiable people — so an AI can never fabricate
@@ -18,8 +22,13 @@ const corsHeaders = {
 const IMAGE_MODEL = 'gemini-2.5-flash-image';
 
 interface ThumbRequest {
-  title: string;
+  title?: string;
   description?: string;
+  // When set, generates an inline content illustration from this exact
+  // description instead of a headline-based thumbnail — used to fill in
+  // the "[Suggested image: ...]" placeholders the article drafter leaves
+  // in the body when it can't invent a real photo.
+  imagePrompt?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -60,9 +69,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { title, description }: ThumbRequest = await req.json();
-    if (!title || !title.trim()) {
-      return new Response(JSON.stringify({ error: 'A title is required to generate a thumbnail' }), {
+    const { title, description, imagePrompt }: ThumbRequest = await req.json();
+    if (!imagePrompt?.trim() && !title?.trim()) {
+      return new Response(JSON.stringify({ error: 'A title (or an image prompt) is required to generate an image' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -74,8 +83,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const prompt = `Create a clean, modern, professional editorial thumbnail image for a news and magazine website article.
-Article title: "${title.trim()}".
+    const prompt = imagePrompt?.trim()
+      ? `Create a clean, professional editorial illustration for this exact caption, to be placed inline inside a news/magazine article: "${imagePrompt.trim()}".
+Style: high-quality, visually engaging conceptual illustration or symbolic photography that clearly depicts this scene/subject.
+STRICT RULES: Do NOT depict any real, identifiable public figure, celebrity, or named person. Use only generic, symbolic, or conceptual imagery — e.g. an unnamed model or object stands in for any person mentioned. No text, letters, words, logos, or watermarks anywhere in the image.`
+      : `Create a clean, modern, professional editorial thumbnail image for a news and magazine website article.
+Article title: "${(title as string).trim()}".
 ${description ? `Context: ${description.trim()}.` : ''}
 Style: high-quality, visually engaging conceptual illustration or symbolic photography suitable as a 16:9 website article thumbnail.
 STRICT RULES: Do NOT depict any real, identifiable public figure, celebrity, or named person. Use only generic, symbolic, or conceptual imagery. No text, letters, words, logos, or watermarks anywhere in the image.`;
@@ -116,7 +129,8 @@ STRICT RULES: Do NOT depict any real, identifiable public figure, celebrity, or 
     const ext = mimeType.includes('jpeg') ? 'jpg' : mimeType.includes('webp') ? 'webp' : 'png';
     const bytes = Uint8Array.from(atob(imgPart.inlineData.data), (c) => c.charCodeAt(0));
 
-    const path = `article-thumbnails/ai-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const folder = imagePrompt?.trim() ? 'article-inline' : 'article-thumbnails';
+    const path = `${folder}/ai-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const { error: upErr } = await supabase.storage.from('media').upload(path, bytes, {
       contentType: mimeType, cacheControl: '3600', upsert: false,
     });

@@ -11,6 +11,7 @@ import { updateMetaTags, generateArticleStructuredData, removeArticleStructuredD
 import { sanitizeArticleContent } from '../utils/contentSanitizer';
 import { isHtmlContent } from '../utils/articleContent';
 import { buildArticleUrl } from '../utils/articleUrl';
+import { getVideoEmbedUrl } from '../utils/videoEmbed';
 import { sanitizeHtml } from '../utils/htmlSanitizer';
 import { ArrowLeft, Clock, Share2, Facebook, Twitter, Linkedin, Instagram, Check } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
@@ -351,6 +352,19 @@ export function ArticleDetail() {
             </div>
           )}
 
+          {article.media_type === 'video' && getVideoEmbedUrl(article.external_url) && (
+            <div className="relative w-full mb-8 rounded-xl overflow-hidden bg-black" style={{ paddingTop: '56.25%' }}>
+              <iframe
+                src={getVideoEmbedUrl(article.external_url) || ''}
+                title={article.title}
+                className="absolute inset-0 w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                loading="lazy"
+              />
+            </div>
+          )}
+
           <div className="prose prose-lg max-w-none mb-12" itemProp="articleBody">
             {useHtmlContent && sanitizedHtml ? (
               <>
@@ -393,12 +407,14 @@ export function ArticleDetail() {
                   );
                 })}
               </div>
-            ) : (
+            ) : article.media_type === 'video' && getVideoEmbedUrl(article.external_url) ? null : (
               <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
                 {article.external_url ? (
                   <>
                     <p className="text-gray-600 text-base mb-4">
-                      This article is available from the original source.
+                      {article.media_type === 'video'
+                        ? 'Watch this video on the original platform.'
+                        : 'This article is available from the original source.'}
                     </p>
                     <a
                       href={article.external_url}
@@ -406,13 +422,13 @@ export function ArticleDetail() {
                       rel="noopener noreferrer"
                       className="inline-flex items-center space-x-2 px-6 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors shadow-md"
                     >
-                      <span>Read Full Article</span>
+                      <span>{article.media_type === 'video' ? 'Watch Video' : 'Read Full Article'}</span>
                       <ArrowLeft className="w-4 h-4 rotate-180" />
                     </a>
                   </>
                 ) : (
                   <p className="text-gray-600 text-base">
-                    Article content is currently unavailable.
+                    {article.media_type === 'video' ? 'This video is currently unavailable.' : 'Article content is currently unavailable.'}
                   </p>
                 )}
               </div>

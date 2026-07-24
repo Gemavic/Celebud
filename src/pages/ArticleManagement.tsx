@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { supabase } from '../lib/supabase';
 import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { toEditableHtml } from '../utils/articleContent';
-import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle } from 'lucide-react';
+import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle, Image as ImageIcon } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
 // Posts to the CelebUD Facebook Page + Telegram channel via the
@@ -56,6 +56,8 @@ interface Article {
   thumbnail_url: string | null;
   category_id: string | null;
   author_id: string | null;
+  media_type: string | null;
+  external_url: string | null;
   published_at: string;
   views_count: number;
   comments_count: number;
@@ -88,6 +90,8 @@ export function ArticleManagement() {
     thumbnail_url: '',
     category_id: '',
     author_id: '',
+    media_type: 'article',
+    external_url: '',
     is_featured: false,
     is_trending: false,
     seo_title: '',
@@ -102,6 +106,9 @@ export function ArticleManagement() {
   const [thumbnailUploading, setThumbnailUploading] = useState(false);
   const [thumbnailUploadError, setThumbnailUploadError] = useState<string | null>(null);
   const [thumbnailGenerating, setThumbnailGenerating] = useState(false);
+  const [illustrating, setIllustrating] = useState(false);
+  const [illustrateProgress, setIllustrateProgress] = useState<{ done: number; total: number } | null>(null);
+  const [illustrateError, setIllustrateError] = useState<string | null>(null);
   const [editingAuthorBio, setEditingAuthorBio] = useState(false);
   const [authorBioForm, setAuthorBioForm] = useState({ bio: '', disclaimer: '' });
   const [savingAuthorBio, setSavingAuthorBio] = useState(false);
@@ -167,6 +174,8 @@ export function ArticleManagement() {
           thumbnail_url,
           category_id,
           author_id,
+          media_type,
+          external_url,
           published_at,
           views_count,
           comments_count,
@@ -180,7 +189,7 @@ export function ArticleManagement() {
             slug
           )
         `)
-        .eq('media_type', 'article')
+        .in('media_type', ['article', 'video'])
         .order('published_at', { ascending: false })
         .limit(50);
 
@@ -247,6 +256,8 @@ export function ArticleManagement() {
       thumbnail_url: article.thumbnail_url || '',
       category_id: article.category_id || '',
       author_id: article.author_id || '',
+      media_type: article.media_type || 'article',
+      external_url: article.external_url || '',
       is_featured: article.is_featured || false,
       is_trending: article.is_trending || false,
       seo_title: article.seo_title || '',
@@ -268,6 +279,8 @@ export function ArticleManagement() {
       thumbnail_url: '',
       category_id: '',
       author_id: '',
+      media_type: 'article',
+      external_url: '',
       is_featured: false,
       is_trending: false,
       seo_title: '',
@@ -330,6 +343,8 @@ export function ArticleManagement() {
         thumbnail_url: '',
         category_id: matchedCategory?.id || '',
         author_id: '',
+        media_type: 'article',
+        external_url: '',
         is_featured: false,
         is_trending: false,
         seo_title: draft.seo_title || '',
@@ -404,6 +419,69 @@ export function ArticleManagement() {
     }
   };
 
+  // Matches the "[Suggested image: ...]" placeholder paragraphs the AI
+  // drafter leaves in the body where it couldn't invent a real photo.
+  const SUGGESTED_IMAGE_RE = /<p>\s*<em>\s*\[Suggested image:\s*([^\]]*)\]\s*<\/em>\s*<\/p>/gi;
+
+  const suggestedImageCount = useMemo(
+    () => [...editForm.content.matchAll(SUGGESTED_IMAGE_RE)].length,
+    [editForm.content]
+  );
+
+  const fillSuggestedImages = async () => {
+    const matches = [...editForm.content.matchAll(SUGGESTED_IMAGE_RE)];
+    if (matches.length === 0) return;
+
+    setIllustrating(true);
+    setIllustrateError(null);
+    setIllustrateProgress({ done: 0, total: matches.length });
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setIllustrateError('You must be signed in as an admin to do this.');
+        return;
+      }
+
+      const results: (string | null)[] = [];
+      for (let i = 0; i < matches.length; i++) {
+        const desc = matches[i][1].trim();
+        try {
+          const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-thumbnail`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imagePrompt: desc }),
+          });
+          const data: { url?: string; error?: string } = await resp.json();
+          if (!resp.ok || !data.url) throw new Error(data.error || `status ${resp.status}`);
+          results.push(data.url);
+        } catch (err) {
+          console.error('Inline image generation failed for suggestion:', desc, err);
+          results.push(null);
+        }
+        setIllustrateProgress({ done: i + 1, total: matches.length });
+      }
+
+      let idx = 0;
+      const updatedContent = editForm.content.replace(SUGGESTED_IMAGE_RE, (fullMatch, desc: string) => {
+        const url = results[idx];
+        idx++;
+        if (!url) return fullMatch; // leave the text suggestion in place if this one failed
+        const alt = desc.trim().replace(/"/g, '&quot;');
+        return `<img src="${url}" alt="${alt}" class="rounded-lg max-w-full h-auto my-4" />`;
+      });
+      setEditForm((f) => ({ ...f, content: updatedContent }));
+
+      const failures = results.filter((r) => r === null).length;
+      if (failures > 0) {
+        setIllustrateError(`${failures} of ${matches.length} image${matches.length === 1 ? '' : 's'} could not be generated — the text suggestion was left in place for those.`);
+      }
+    } finally {
+      setIllustrating(false);
+      setIllustrateProgress(null);
+    }
+  };
+
   const openAuthorBioEditor = () => {
     const author = authors.find((a) => a.id === editForm.author_id);
     setAuthorBioForm({ bio: author?.bio || '', disclaimer: author?.disclaimer || '' });
@@ -453,6 +531,8 @@ export function ArticleManagement() {
         thumbnail_url: editForm.thumbnail_url || null,
         category_id: editForm.category_id || null,
         author_id: editForm.author_id || null,
+        media_type: editForm.media_type,
+        external_url: editForm.external_url || null,
         is_featured: editForm.is_featured,
         is_trending: editForm.is_trending,
         seo_title: editForm.seo_title || null,
@@ -461,7 +541,7 @@ export function ArticleManagement() {
 
       const { error } = editingArticle
         ? await supabase.from('media_content').update(payload).eq('id', editingArticle.id)
-        : await supabase.from('media_content').insert({ ...payload, media_type: 'article' });
+        : await supabase.from('media_content').insert(payload);
 
       if (error) throw error;
 
@@ -984,6 +1064,25 @@ export function ArticleManagement() {
                   onChange={(html) => setEditForm((f) => ({ ...f, content: html }))}
                   placeholder="Write or paste your article here..."
                 />
+                {suggestedImageCount > 0 && (
+                  <div className="mt-2 flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={fillSuggestedImages}
+                      disabled={illustrating}
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-purple-700 bg-white border border-purple-300 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors flex-shrink-0"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      {illustrating
+                        ? `Generating ${illustrateProgress?.done ?? 0}/${illustrateProgress?.total ?? suggestedImageCount}…`
+                        : `Fill ${suggestedImageCount} suggested image${suggestedImageCount === 1 ? '' : 's'} with AI`}
+                    </button>
+                    <p className="text-xs text-purple-700">
+                      The draft left {suggestedImageCount === 1 ? 'a spot' : 'spots'} for a photo — generate {suggestedImageCount === 1 ? 'it' : 'them'} now, or replace with a real photo yourself in the editor.
+                    </p>
+                  </div>
+                )}
+                {illustrateError && <p className="mt-1.5 text-sm text-red-600">{illustrateError}</p>}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
