@@ -11,7 +11,7 @@ import {
 } from '../hooks/useCreatorContent';
 import type { ContentType, ContentStatus, Platform, CreatorContentItem } from '../hooks/useCreatorContent';
 import { useCreators } from '../hooks/useCreators';
-import { Video, Radio, Scissors, Share2, Plus, Eye, Heart, MessageSquare, TrendingUp, Calendar, Filter, Search, MoreVertical, CreditCard as Edit3, Trash2, ExternalLink, Upload, Play, Tv, ArrowLeft, CheckCircle, AlertCircle, X, Globe, Hash, Image, Link as LinkIcon, Music, Copy } from 'lucide-react';
+import { Video, Radio, Scissors, Share2, Plus, Eye, Heart, MessageSquare, TrendingUp, Calendar, Filter, Search, MoreVertical, CreditCard as Edit3, Trash2, ExternalLink, Upload, Play, Tv, ArrowLeft, CheckCircle, AlertCircle, X, Globe, Hash, Image, Link as LinkIcon, Music, Copy, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
@@ -707,11 +707,159 @@ function ContentUploadModal({
   };
 
   // Video, audio, and clips can be uploaded straight from the device;
-  // livestreams and social posts are links by nature.
+  // livestreams and social posts are links by nature. Video and audio can
+  // also be generated with AI instead of sourced from a file/link.
   const canUploadFile = ['video', 'audio', 'clip'].includes(form.content_type);
-  const [mediaSource, setMediaSource] = useState<'upload' | 'link'>(
+  const canGenerateAi = ['video', 'audio'].includes(form.content_type);
+  const [mediaSource, setMediaSource] = useState<'upload' | 'link' | 'ai'>(
     isEditing || !canUploadFile ? 'link' : 'upload'
   );
+
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiProgress, setAiProgress] = useState('');
+  const [aiError, setAiError] = useState('');
+
+  const captureFrameFromUrl = (url: string): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      video.src = url;
+
+      video.onloadedmetadata = () => {
+        video.currentTime = Math.min(1, (video.duration || 2) / 2);
+      };
+      video.onseeked = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx || canvas.width === 0) {
+          resolve(null);
+          return;
+        }
+        try {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.8);
+        } catch {
+          resolve(null); // CORS-tainted canvas — non-fatal, just skip the thumbnail
+        }
+      };
+      video.onerror = () => resolve(null);
+    });
+  };
+
+  const generateAiAudio = async () => {
+    if (!aiPrompt.trim()) {
+      setAiError('Enter a topic first.');
+      return;
+    }
+    setAiGenerating(true);
+    setAiError('');
+    setAiProgress('Writing script and voicing it… this takes about 10-20 seconds.');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('You must be signed in to do this.');
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-creator-audio`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: aiPrompt.trim() }),
+      });
+      const data: { url?: string; title?: string; description?: string; error?: string } = await resp.json();
+      if (!resp.ok || !data.url) throw new Error(data.error || `Failed to generate audio (status ${resp.status}).`);
+      setForm((f) => ({
+        ...f,
+        media_url: data.url as string,
+        title: f.title || data.title || '',
+        description: f.description || data.description || '',
+      }));
+      setUploadedName('AI-generated audio');
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Audio generation failed');
+    } finally {
+      setAiGenerating(false);
+      setAiProgress('');
+    }
+  };
+
+  const generateAiVideo = async () => {
+    if (!aiPrompt.trim()) {
+      setAiError('Describe the video first.');
+      return;
+    }
+    setAiGenerating(true);
+    setAiError('');
+    setAiProgress('Starting video generation…');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('You must be signed in to do this.');
+
+      const startResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-creator-video`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start', prompt: aiPrompt.trim() }),
+      });
+      const startData: { operationName?: string; error?: string } = await startResp.json();
+      if (!startResp.ok || !startData.operationName) {
+        throw new Error(startData.error || `Could not start video generation (status ${startResp.status}).`);
+      }
+
+      setAiProgress('Generating your video… this usually takes 1-3 minutes. Keep this window open.');
+      const maxAttempts = 40; // ~40 * 8s = ~5.5 minutes
+      let videoUrl: string | null = null;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((r) => setTimeout(r, 8000));
+        const statusResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-creator-video`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'status', operationName: startData.operationName }),
+        });
+        const statusData: { done?: boolean; url?: string; error?: string } = await statusResp.json();
+        if (!statusResp.ok || statusData.error) {
+          throw new Error(statusData.error || `Video generation failed (status ${statusResp.status}).`);
+        }
+        if (statusData.done && statusData.url) {
+          videoUrl = statusData.url;
+          break;
+        }
+        setAiProgress(`Generating your video… this usually takes 1-3 minutes. Keep this window open. (checked ${attempt + 1} time${attempt === 0 ? '' : 's'})`);
+      }
+
+      if (!videoUrl) {
+        throw new Error('Video generation is taking longer than expected. Try again in a few minutes.');
+      }
+
+      let thumbnailUrl = '';
+      try {
+        const frameBlob = await captureFrameFromUrl(videoUrl);
+        if (frameBlob) {
+          const thumbPath = `${creatorId || 'editorial'}/${Date.now()}-ai-thumb.jpg`;
+          const { error: thumbError } = await supabase.storage
+            .from('creator-media')
+            .upload(thumbPath, frameBlob, { cacheControl: '3600', upsert: false, contentType: 'image/jpeg' });
+          if (!thumbError) thumbnailUrl = supabase.storage.from('creator-media').getPublicUrl(thumbPath).data.publicUrl;
+        }
+      } catch {
+        // Thumbnail capture is a nice-to-have — never block on it.
+      }
+
+      setForm((f) => ({
+        ...f,
+        media_url: videoUrl as string,
+        thumbnail_url: thumbnailUrl || f.thumbnail_url,
+        platform: f.platform || 'custom',
+      }));
+      setUploadedName('AI-generated video');
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Video generation failed');
+    } finally {
+      setAiGenerating(false);
+      setAiProgress('');
+    }
+  };
 
   const captureVideoFrame = (file: File): Promise<Blob | null> => {
     return new Promise((resolve) => {
@@ -1007,7 +1155,7 @@ function ContentUploadModal({
             />
           </div>
 
-          {/* Media: upload from device or paste a link */}
+          {/* Media: upload from device, paste a link, or generate with AI */}
           <div>
             {canUploadFile && (
               <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-3">
@@ -1029,10 +1177,69 @@ function ContentUploadModal({
                 >
                   <LinkIcon className="w-3.5 h-3.5" /> Paste a link
                 </button>
+                {canGenerateAi && (
+                  <button
+                    type="button"
+                    onClick={() => setMediaSource('ai')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                      mediaSource === 'ai' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Generate with AI
+                  </button>
+                )}
               </div>
             )}
 
-            {canUploadFile && mediaSource === 'upload' ? (
+            {canGenerateAi && mediaSource === 'ai' ? (
+              <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-purple-800 mb-1">
+                    {form.content_type === 'audio' ? 'Topic for the spoken segment' : 'Describe the video'}
+                  </label>
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder={
+                      form.content_type === 'audio'
+                        ? "e.g. 'Weekly celebrity gossip roundup' or 'Why term life insurance matters'"
+                        : "e.g. 'A cinematic sunset over a city skyline, calm and cinematic'"
+                    }
+                    rows={2}
+                    disabled={aiGenerating}
+                    className="w-full px-3 py-2 border border-purple-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none disabled:bg-gray-50"
+                  />
+                  {form.content_type === 'video' && (
+                    <p className="text-xs text-purple-600 mt-1">
+                      AI video can't depict real people — best for scenic/conceptual footage, not specific celebrities or events.
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={form.content_type === 'audio' ? generateAiAudio : generateAiVideo}
+                  disabled={aiGenerating || !aiPrompt.trim()}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {aiGenerating ? 'Generating…' : `Generate ${form.content_type === 'audio' ? 'audio' : 'video'}`}
+                </button>
+                {aiProgress && <p className="text-xs text-purple-700">{aiProgress}</p>}
+                {aiError && <p className="text-xs text-red-600">{aiError}</p>}
+                {uploadedName === (form.content_type === 'audio' ? 'AI-generated audio' : 'AI-generated video') && form.media_url && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+                      <CheckCircle className="w-4 h-4" /> Ready — review before publishing
+                    </div>
+                    {form.content_type === 'audio' ? (
+                      <audio controls src={form.media_url} className="w-full" />
+                    ) : (
+                      <video controls src={form.media_url} className="w-full max-h-64 rounded-lg bg-black" />
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : canUploadFile && mediaSource === 'upload' ? (
               <label
                 className={`flex flex-col items-center justify-center gap-2 w-full px-4 py-8 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
                   uploadedName

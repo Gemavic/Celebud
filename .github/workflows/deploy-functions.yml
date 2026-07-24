@@ -55,3 +55,9 @@ jobs:
 
       - name: Deploy generate-thumbnail (AI thumbnails, JWT on)
         run: supabase functions deploy generate-thumbnail --project-ref "$PROJECT_REF"
+
+      - name: Deploy generate-creator-audio (AI audio, JWT on)
+        run: supabase functions deploy generate-creator-audio --project-ref "$PROJECT_REF"
+
+      - name: Deploy generate-creator-video (AI video via Veo, JWT on)
+        run: supabase functions deploy generate-creator-video --project-ref "$PROJECT_REF"
