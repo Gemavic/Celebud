@@ -150,17 +150,37 @@ The JSON's "content" value must be a single valid JSON string (escape any double
     }
 
     const data = await gemResp.json();
-    const cand = data?.candidates?.[0];
-    if (cand?.finishReason === 'SAFETY') {
-      throw new Error('Gemini blocked this topic for safety. Try rephrasing.');
+
+    // The whole prompt can be rejected before any candidate is generated —
+    // most commonly for topics involving minors/children, which Google's
+    // safety policies guard very strictly regardless of intent.
+    const blockReason = data?.promptFeedback?.blockReason;
+    if (blockReason) {
+      console.error('Gemini blocked the prompt:', blockReason, JSON.stringify(data?.promptFeedback).slice(0, 500));
+      throw new Error(
+        `Gemini declined this topic before writing anything (reason: ${blockReason}). This usually means the topic touches a heavily-restricted area — most often anything involving children/minors. Try rephrasing to remove that angle, or write it as a general informational piece rather than depicting a specific child/scene.`
+      );
     }
+
+    const cand = data?.candidates?.[0];
+    const SAFETY_FINISH_REASONS = new Set([
+      'SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII', 'IMAGE_SAFETY', 'RECITATION',
+    ]);
+    if (cand?.finishReason && SAFETY_FINISH_REASONS.has(cand.finishReason)) {
+      console.error('Gemini finished with a safety-related reason:', cand.finishReason);
+      throw new Error(
+        `Gemini refused to complete this draft (reason: ${cand.finishReason}). Topics involving children, graphic distress, or copyrighted text are the most common triggers — try a different angle or wording.`
+      );
+    }
+
     const rawText: string = (cand?.content?.parts || [])
       .map((p: { text?: string }) => p.text || '')
       .join('')
       .trim();
     if (!rawText) {
       console.error('Empty Gemini response:', JSON.stringify(data).slice(0, 800));
-      throw new Error('Gemini returned no draft text — please try again.');
+      const reason = cand?.finishReason ? ` (finishReason: ${cand.finishReason})` : '';
+      throw new Error(`Gemini returned no draft text${reason} — please try again, or try a different topic if this keeps happening.`);
     }
 
     // Robustly extract the JSON object (strip any stray fences/preamble).
