@@ -15,7 +15,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
+// 'gemini-flash-latest' always resolves to Google's current Flash model,
+// so this never breaks when a specific version (e.g. 2.5-flash) is retired.
+const GEMINI_MODEL = 'gemini-flash-latest';
 
 interface DraftRequest {
   topic: string;
