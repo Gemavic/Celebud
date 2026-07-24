@@ -91,7 +91,6 @@ Deno.serve(async (req: Request) => {
               aspectRatio: '9:16',
               resolution: '720p',
               durationSeconds: body.durationSeconds || '8',
-              numberOfVideos: 1,
               personGeneration: 'allow_adult',
             },
           }),
