@@ -258,7 +258,7 @@ function HomePage() {
         </section>
 
         <div className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto mb-12">
-          <GoogleAd slot="HOME_FEED_AD_SLOT" format="horizontal" />
+          <GoogleAd slot="9935838953" format="horizontal" />
         </div>
 
         <Suspense fallback={null}>

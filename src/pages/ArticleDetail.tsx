@@ -372,7 +372,7 @@ export function ArticleDetail() {
                   className="article-rich-content text-gray-700 text-base leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
                 />
-                <GoogleAd slot="MID_ARTICLE_AD_SLOT" format="rectangle" className="my-6" />
+                <GoogleAd slot="2687784187" format="rectangle" className="my-6" />
               </>
             ) : contentParagraphs.length > 0 ? (
               <div className="text-gray-700 text-base leading-relaxed space-y-5">
@@ -401,7 +401,7 @@ export function ArticleDetail() {
                         {paragraph}
                       </p>
                       {showMidArticleAd && (
-                        <GoogleAd slot="MID_ARTICLE_AD_SLOT" format="rectangle" className="my-6" />
+                        <GoogleAd slot="2687784187" format="rectangle" className="my-6" />
                       )}
                     </div>
                   );
@@ -572,7 +572,7 @@ export function ArticleDetail() {
             <AdBanner placement="article" />
           </div>
 
-          <GoogleAd slot="ARTICLE_BOTTOM_AD_SLOT" format="horizontal" className="my-8" />
+          <GoogleAd slot="6950728752" format="horizontal" className="my-8" />
 
           <CommentsSection contentId={article.id} initialCount={article.comments_count || 0} />
         </div>
