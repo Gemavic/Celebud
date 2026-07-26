@@ -996,7 +996,21 @@ Deno.serve(async (req: Request) => {
     const results = [];
     const countryAddedCount: Record<string, number> = {};
 
-    for (const [country, countrySources] of Object.entries(sourcesByCountry)) {
+    // Process countries in the priority order above (Nigeria/Canada first),
+    // not the incidental order they appear in the DB query result. The
+    // Global/International bucket is huge (138 of ~354 sources) and full of
+    // mostly-already-seen items on every run, so scanning it first could
+    // burn the entire function's time budget before ever reaching the
+    // smaller, specifically-guaranteed regional buckets — which is exactly
+    // what was silently starving Nigeria and Canada (both stuck with zero
+    // new articles for over a week, since they were last in line).
+    const orderedCountries = [
+      ...priorityCountries.filter((c) => sourcesByCountry[c]),
+      ...Object.keys(sourcesByCountry).filter((c) => !priorityCountries.includes(c)),
+    ];
+
+    for (const country of orderedCountries) {
+      const countrySources = sourcesByCountry[country];
       if (countrySources.length === 0) continue;
 
       const targetArticles = articlesPerCountry[country as keyof typeof articlesPerCountry];
