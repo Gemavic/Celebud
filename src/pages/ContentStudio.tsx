@@ -14,6 +14,7 @@ import { useCreators } from '../hooks/useCreators';
 import { Video, Radio, Scissors, Share2, Plus, Eye, Heart, MessageSquare, TrendingUp, Calendar, Filter, Search, MoreVertical, CreditCard as Edit3, Trash2, ExternalLink, Upload, Play, Tv, ArrowLeft, CheckCircle, AlertCircle, X, Globe, Hash, Image, Link as LinkIcon, Music, Copy, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { getVideoEmbedUrl, getVideoThumbnail, isEmbeddableVideoUrl } from '../utils/videoEmbed';
 
 type StudioTab = 'overview' | 'videos' | 'audio' | 'livestreams' | 'clips' | 'social';
 
@@ -390,8 +391,17 @@ function ContentPanel({
 
   const playableTypes: ContentType[] = ['video', 'audio', 'clip'];
 
+  // media_url is only safe in a raw <video>/<audio> tag when it's an actual
+  // hosted media file (platform 'custom' — our own upload or AI-generated
+  // storage URL) or a link videoEmbed.ts knows how to turn into an iframe
+  // (YouTube/Vimeo/TikTok). A plain permalink to an X/Instagram/Facebook
+  // post is a webpage, not a media stream, and silently fails to play in a
+  // <video> tag — open those in a new tab instead of showing a broken player.
+  const canPlayInline = (item: CreatorContentItem) =>
+    item.platform === 'custom' || !item.platform || isEmbeddableVideoUrl(item.media_url);
+
   const handlePlay = (item: CreatorContentItem) => {
-    if (playableTypes.includes(item.content_type) && item.media_url) {
+    if (playableTypes.includes(item.content_type) && item.media_url && canPlayInline(item)) {
       setPreviewItem(item);
     } else if (item.external_url) {
       window.open(item.external_url, '_blank', 'noopener,noreferrer');
@@ -646,6 +656,15 @@ function ContentPanel({
                 <Music className="w-16 h-16 text-gray-400" />
                 <p className="text-white font-semibold text-center">{previewItem.title}</p>
                 <audio controls autoPlay src={previewItem.media_url!} className="w-full" />
+              </div>
+            ) : previewItem.platform !== 'custom' && getVideoEmbedUrl(previewItem.media_url) ? (
+              <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
+                <iframe
+                  src={getVideoEmbedUrl(previewItem.media_url) || ''}
+                  className="absolute inset-0 w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
               </div>
             ) : (
               <video controls autoPlay src={previewItem.media_url!} className="w-full max-h-[80vh]" />
@@ -1286,7 +1305,12 @@ function ContentUploadModal({
                   value={form.media_url}
                   onChange={e => {
                     const value = e.target.value;
-                    setForm(f => ({ ...f, media_url: value, platform: detectPlatform(value) || f.platform }));
+                    setForm(f => ({
+                      ...f,
+                      media_url: value,
+                      platform: detectPlatform(value) || f.platform,
+                      thumbnail_url: f.thumbnail_url || getVideoThumbnail(value) || '',
+                    }));
                   }}
                   placeholder="Paste your YouTube, TikTok, or video link here"
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
@@ -1297,6 +1321,16 @@ function ContentUploadModal({
                 {form.platform && (
                   <p className="text-xs font-medium text-emerald-600 mt-1 capitalize">
                     ✓ Platform: {form.platform === 'twitter' ? 'X' : form.platform}
+                  </p>
+                )}
+                {form.platform && form.platform !== 'youtube' && !form.thumbnail_url && (
+                  <p className="text-xs font-medium text-amber-600 mt-1">
+                    {form.platform === 'twitter' ? 'X' : form.platform.charAt(0).toUpperCase() + form.platform.slice(1)} links can't auto-generate a thumbnail — add one below under "Show more options" or it'll display with a placeholder icon.
+                  </p>
+                )}
+                {form.platform && !isEmbeddableVideoUrl(form.media_url) && form.platform !== 'custom' && (
+                  <p className="text-xs font-medium text-amber-600 mt-1">
+                    This link can't be played inline on the site — clicking it will open the original post in a new tab instead.
                   </p>
                 )}
               </div>
