@@ -1027,6 +1027,18 @@ Deno.serve(async (req: Request) => {
           .from('authors')
           .select('id, name');
 
+        const { data: bioProfiles } = await supabase
+          .from('author_bio_profiles')
+          .select('author_id, bio, disclaimer, category_slugs, is_default');
+
+        function resolveBioProfile(authorId: string | undefined, categorySlug: string): { bio: string | null; disclaimer: string | null } {
+          if (!authorId || !bioProfiles) return { bio: null, disclaimer: null };
+          const match = bioProfiles.find((p: any) => p.author_id === authorId && (p.category_slugs || []).includes(categorySlug));
+          const fallback = bioProfiles.find((p: any) => p.author_id === authorId && p.is_default);
+          const chosen = match || fallback;
+          return { bio: chosen?.bio ?? null, disclaimer: chosen?.disclaimer ?? null };
+        }
+
         // Fetch routing rules from the database — single source of truth
         const { data: routingRules } = await supabase
           .from('author_routing_rules')
@@ -1176,6 +1188,8 @@ Deno.serve(async (req: Request) => {
               assignedAuthor = defaultAuthorForSource;
             }
 
+            const { bio: resolvedBio, disclaimer: resolvedDisclaimer } = resolveBioProfile(assignedAuthor?.id, finalCategorySlug);
+
             const { error } = await supabase.from('media_content').insert({
               title: stripHtml(item.title),
               slug,
@@ -1183,6 +1197,8 @@ Deno.serve(async (req: Request) => {
               content: finalContent,
               category_id: articleCategory?.id,
               author_id: assignedAuthor?.id || null,
+              author_bio_snapshot: resolvedBio,
+              author_disclaimer_snapshot: resolvedDisclaimer,
               media_type: 'article',
               thumbnail_url: finalThumbnail,
               external_url: item.link,

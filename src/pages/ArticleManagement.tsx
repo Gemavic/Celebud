@@ -48,6 +48,16 @@ interface Author {
   disclaimer: string | null;
 }
 
+interface BioProfile {
+  id: string;
+  author_id: string;
+  label: string;
+  bio: string | null;
+  disclaimer: string | null;
+  category_slugs: string[];
+  is_default: boolean;
+}
+
 interface Article {
   id: string;
   title: string;
@@ -57,6 +67,8 @@ interface Article {
   thumbnail_url: string | null;
   category_id: string | null;
   author_id: string | null;
+  author_bio_snapshot: string | null;
+  author_disclaimer_snapshot: string | null;
   media_type: string | null;
   external_url: string | null;
   published_at: string;
@@ -82,6 +94,7 @@ export function ArticleManagement() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
+  const [bioProfiles, setBioProfiles] = useState<BioProfile[]>([]);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -110,9 +123,15 @@ export function ArticleManagement() {
   const [illustrating, setIllustrating] = useState(false);
   const [illustrateProgress, setIllustrateProgress] = useState<{ done: number; total: number } | null>(null);
   const [illustrateError, setIllustrateError] = useState<string | null>(null);
-  const [editingAuthorBio, setEditingAuthorBio] = useState(false);
-  const [authorBioForm, setAuthorBioForm] = useState({ bio: '', disclaimer: '' });
-  const [savingAuthorBio, setSavingAuthorBio] = useState(false);
+  const [selectedBioProfileId, setSelectedBioProfileId] = useState('');
+  const [articleBioForm, setArticleBioForm] = useState({ bio: '', disclaimer: '' });
+  const [bioGenerating, setBioGenerating] = useState(false);
+  const [bioGenError, setBioGenError] = useState<string | null>(null);
+  const [bioAiGenerated, setBioAiGenerated] = useState(false);
+  const [saveProfileEnabled, setSaveProfileEnabled] = useState(false);
+  const [saveProfileLabel, setSaveProfileLabel] = useState('');
+  const [saveProfileCategorySlugs, setSaveProfileCategorySlugs] = useState<string[]>([]);
+  const [savingBioProfile, setSavingBioProfile] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [notifyingId, setNotifyingId] = useState<string | null>(null);
   const [notifyResult, setNotifyResult] = useState<string | null>(null);
@@ -130,9 +149,34 @@ export function ArticleManagement() {
     if (profile?.is_admin) {
       fetchCategories();
       fetchAuthors();
+      fetchBioProfiles();
       fetchArticles();
     }
   }, [profile, selectedCategory]);
+
+  const fetchBioProfiles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('author_bio_profiles')
+        .select('id, author_id, label, bio, disclaimer, category_slugs, is_default')
+        .order('label');
+      if (error) throw error;
+      setBioProfiles(data || []);
+    } catch (err) {
+      console.error('Error fetching bio profiles:', err);
+    }
+  };
+
+  // Picks the profile whose category_slugs include the article's category,
+  // else that author's default/general profile, else null (blank) —
+  // mirrors the same fallback logic used server-side in fetch-news.
+  const resolveBioProfileFor = (authorId: string, categoryId: string): BioProfile | null => {
+    const categorySlug = categories.find((c) => c.id === categoryId)?.slug;
+    const authorProfiles = bioProfiles.filter((p) => p.author_id === authorId);
+    const match = categorySlug ? authorProfiles.find((p) => (p.category_slugs || []).includes(categorySlug)) : undefined;
+    const fallback = authorProfiles.find((p) => p.is_default);
+    return match || fallback || null;
+  };
 
   const fetchAuthors = async () => {
     try {
@@ -175,6 +219,8 @@ export function ArticleManagement() {
           thumbnail_url,
           category_id,
           author_id,
+          author_bio_snapshot,
+          author_disclaimer_snapshot,
           media_type,
           external_url,
           published_at,
@@ -247,9 +293,19 @@ export function ArticleManagement() {
     fetchArticles();
   };
 
+  const resetBioPanel = () => {
+    setSelectedBioProfileId('');
+    setArticleBioForm({ bio: '', disclaimer: '' });
+    setBioGenerating(false);
+    setBioGenError(null);
+    setBioAiGenerated(false);
+    setSaveProfileEnabled(false);
+    setSaveProfileLabel('');
+    setSaveProfileCategorySlugs([]);
+  };
+
   const openEditor = (article: Article) => {
     setEditingArticle(article);
-    setEditingAuthorBio(false);
     setEditForm({
       title: article.title || '',
       description: article.description || '',
@@ -264,11 +320,28 @@ export function ArticleManagement() {
       seo_title: article.seo_title || '',
       seo_keywords: article.seo_keywords || '',
     });
+
+    resetBioPanel();
+    if (article.author_bio_snapshot || article.author_disclaimer_snapshot) {
+      setArticleBioForm({
+        bio: article.author_bio_snapshot || '',
+        disclaimer: article.author_disclaimer_snapshot || '',
+      });
+      const matching = bioProfiles.find(
+        (p) => p.author_id === article.author_id && p.bio === article.author_bio_snapshot && p.disclaimer === article.author_disclaimer_snapshot
+      );
+      if (matching) setSelectedBioProfileId(matching.id);
+    } else if (article.author_id) {
+      const resolved = resolveBioProfileFor(article.author_id, article.category_id || '');
+      if (resolved) {
+        setSelectedBioProfileId(resolved.id);
+        setArticleBioForm({ bio: resolved.bio || '', disclaimer: resolved.disclaimer || '' });
+      }
+    }
   };
 
   const openNewArticle = () => {
     setIsCreatingNew(true);
-    setEditingAuthorBio(false);
     setAiTopic('');
     setAiNotes('');
     setAiError(null);
@@ -287,12 +360,124 @@ export function ArticleManagement() {
       seo_title: '',
       seo_keywords: '',
     });
+    resetBioPanel();
   };
 
   const closeEditor = () => {
     setEditingArticle(null);
     setIsCreatingNew(false);
-    setEditingAuthorBio(false);
+    resetBioPanel();
+  };
+
+  // When the category changes mid-edit, re-suggest the matching profile —
+  // but don't clobber a bio the admin already typed/generated.
+  const handleCategoryChange = (categoryId: string) => {
+    const updatedForm = { ...editForm, category_id: categoryId };
+    setEditForm(updatedForm);
+    if (updatedForm.author_id && !articleBioForm.bio && !articleBioForm.disclaimer) {
+      const resolved = resolveBioProfileFor(updatedForm.author_id, categoryId);
+      if (resolved) {
+        setSelectedBioProfileId(resolved.id);
+        setArticleBioForm({ bio: resolved.bio || '', disclaimer: resolved.disclaimer || '' });
+      }
+    }
+  };
+
+  const handleAuthorChange = (authorId: string) => {
+    setEditForm({ ...editForm, author_id: authorId });
+    resetBioPanel();
+    const resolved = resolveBioProfileFor(authorId, editForm.category_id);
+    if (resolved) {
+      setSelectedBioProfileId(resolved.id);
+      setArticleBioForm({ bio: resolved.bio || '', disclaimer: resolved.disclaimer || '' });
+    }
+  };
+
+  const selectBioProfile = (profileId: string) => {
+    setSelectedBioProfileId(profileId);
+    setBioAiGenerated(false);
+    if (!profileId) {
+      setArticleBioForm({ bio: '', disclaimer: '' });
+      return;
+    }
+    const profile = bioProfiles.find((p) => p.id === profileId);
+    setArticleBioForm({ bio: profile?.bio || '', disclaimer: profile?.disclaimer || '' });
+  };
+
+  const generateArticleBio = async () => {
+    if (!editForm.author_id) {
+      setBioGenError('Pick an author first.');
+      return;
+    }
+    setBioGenerating(true);
+    setBioGenError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('You must be signed in as an admin to do this.');
+
+      const author = authors.find((a) => a.id === editForm.author_id);
+      const defaultProfile = bioProfiles.find((p) => p.author_id === editForm.author_id && p.is_default);
+      const categoryName = categories.find((c) => c.id === editForm.category_id)?.name;
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-author-bio`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          authorName: author?.name || 'Staff Writer',
+          expertiseContext: defaultProfile?.bio || author?.bio || '',
+          articleTitle: editForm.title || '(untitled)',
+          articleCategory: categoryName,
+          articleExcerpt: (editForm.description || editForm.content || '').slice(0, 600),
+        }),
+      });
+
+      const data: { error?: string; bio?: string; disclaimer?: string } = await response.json();
+      if (!response.ok) throw new Error(data.error || `Failed to generate bio (status ${response.status}).`);
+
+      setArticleBioForm({ bio: data.bio || '', disclaimer: data.disclaimer || '' });
+      setSelectedBioProfileId('');
+      setBioAiGenerated(true);
+    } catch (err: unknown) {
+      setBioGenError(err instanceof Error ? err.message : 'Failed to generate bio');
+    } finally {
+      setBioGenerating(false);
+    }
+  };
+
+  const toggleSaveProfileCategory = (slug: string) => {
+    setSaveProfileCategorySlugs((prev) =>
+      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
+    );
+  };
+
+  const saveBioProfileNow = async () => {
+    if (!editForm.author_id || !saveProfileLabel.trim()) return;
+    setSavingBioProfile(true);
+    try {
+      const { data, error } = await supabase
+        .from('author_bio_profiles')
+        .insert({
+          author_id: editForm.author_id,
+          label: saveProfileLabel.trim(),
+          bio: articleBioForm.bio || '',
+          disclaimer: articleBioForm.disclaimer || '',
+          category_slugs: saveProfileCategorySlugs,
+          is_default: false,
+        })
+        .select('id, author_id, label, bio, disclaimer, category_slugs, is_default')
+        .single();
+      if (error) throw error;
+      setBioProfiles((prev) => [...prev, data]);
+      setSelectedBioProfileId(data.id);
+      setSaveProfileEnabled(false);
+      setSaveProfileLabel('');
+      setSaveProfileCategorySlugs([]);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to save profile');
+    } finally {
+      setSavingBioProfile(false);
+    }
   };
 
   const generateDraft = async () => {
@@ -502,37 +687,6 @@ export function ArticleManagement() {
     }
   };
 
-  const openAuthorBioEditor = () => {
-    const author = authors.find((a) => a.id === editForm.author_id);
-    setAuthorBioForm({ bio: author?.bio || '', disclaimer: author?.disclaimer || '' });
-    setEditingAuthorBio(true);
-  };
-
-  const saveAuthorBio = async () => {
-    if (!editForm.author_id) return;
-    setSavingAuthorBio(true);
-    try {
-      const { error } = await supabase
-        .from('authors')
-        .update({ bio: authorBioForm.bio || null, disclaimer: authorBioForm.disclaimer || null })
-        .eq('id', editForm.author_id);
-
-      if (error) throw error;
-
-      setAuthors((prev) =>
-        prev.map((a) =>
-          a.id === editForm.author_id ? { ...a, bio: authorBioForm.bio, disclaimer: authorBioForm.disclaimer } : a
-        )
-      );
-      setEditingAuthorBio(false);
-    } catch (err: unknown) {
-      console.error('Error saving author bio:', err);
-      alert(err instanceof Error ? err.message : 'Failed to save author bio');
-    } finally {
-      setSavingAuthorBio(false);
-    }
-  };
-
   const saveArticle = async () => {
     if (!editingArticle && !isCreatingNew) return;
     setSaving(true);
@@ -551,6 +705,8 @@ export function ArticleManagement() {
         thumbnail_url: editForm.thumbnail_url || null,
         category_id: editForm.category_id || null,
         author_id: editForm.author_id || null,
+        author_bio_snapshot: articleBioForm.bio || null,
+        author_disclaimer_snapshot: articleBioForm.disclaimer || null,
         media_type: editForm.media_type,
         external_url: editForm.external_url || null,
         is_featured: editForm.is_featured,
@@ -1219,7 +1375,7 @@ export function ArticleManagement() {
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">Category</label>
                   <select
                     value={editForm.category_id}
-                    onChange={(e) => setEditForm({ ...editForm, category_id: e.target.value })}
+                    onChange={(e) => handleCategoryChange(e.target.value)}
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Uncategorized</option>
@@ -1231,21 +1387,10 @@ export function ArticleManagement() {
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-sm font-semibold text-gray-700">Author / Writer</label>
-                  {editForm.author_id && (
-                    <button
-                      type="button"
-                      onClick={openAuthorBioEditor}
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-700"
-                    >
-                      Edit bio &amp; disclaimer
-                    </button>
-                  )}
-                </div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Author / Writer</label>
                 <select
                   value={editForm.author_id}
-                  onChange={(e) => { setEditForm({ ...editForm, author_id: e.target.value }); setEditingAuthorBio(false); }}
+                  onChange={(e) => handleAuthorChange(e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">— Unassigned —</option>
@@ -1253,53 +1398,116 @@ export function ArticleManagement() {
                     <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
                 </select>
-                <p className="mt-1.5 text-xs text-gray-500">
-                  This author's bio and disclaimer show automatically at the bottom of every article they're
-                  credited on — write it once here.
-                </p>
-
-                {editingAuthorBio && (
-                  <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">About the Author</label>
-                      <textarea
-                        value={authorBioForm.bio}
-                        onChange={(e) => setAuthorBioForm({ ...authorBioForm, bio: e.target.value })}
-                        rows={3}
-                        placeholder="e.g. Matthew Ayandare is a licensed financial advisor..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-y"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Disclaimer (optional)</label>
-                      <textarea
-                        value={authorBioForm.disclaimer}
-                        onChange={(e) => setAuthorBioForm({ ...authorBioForm, disclaimer: e.target.value })}
-                        rows={2}
-                        placeholder="e.g. This article is for educational purposes only and is not financial advice..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-y"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={saveAuthorBio}
-                        disabled={savingAuthorBio}
-                        className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        {savingAuthorBio ? 'Saving...' : 'Save'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingAuthorBio(false)}
-                        className="px-4 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-800"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
+
+              {editForm.author_id && (
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
+                  <p className="text-sm font-semibold text-gray-700">About the Author for this article</p>
+                  <p className="text-xs text-gray-500">
+                    Pick one of this author's saved profiles, or generate one tailored to this specific article. This is what shows on this article only — it won't change what shows on their other articles.
+                  </p>
+
+                  {bioProfiles.filter((p) => p.author_id === editForm.author_id).length > 0 && (
+                    <select
+                      value={selectedBioProfileId}
+                      onChange={(e) => selectBioProfile(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="">— Custom for this article —</option>
+                      {bioProfiles
+                        .filter((p) => p.author_id === editForm.author_id)
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.label}{p.is_default ? ' (default)' : ''}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">About the Author</label>
+                    <textarea
+                      value={articleBioForm.bio}
+                      onChange={(e) => { setArticleBioForm({ ...articleBioForm, bio: e.target.value }); setSelectedBioProfileId(''); }}
+                      rows={3}
+                      placeholder="e.g. Matthew Ayandare is a licensed financial advisor..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-y"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Disclaimer (optional)</label>
+                    <textarea
+                      value={articleBioForm.disclaimer}
+                      onChange={(e) => { setArticleBioForm({ ...articleBioForm, disclaimer: e.target.value }); setSelectedBioProfileId(''); }}
+                      rows={2}
+                      placeholder="e.g. This article is for educational purposes only and is not financial advice..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-y"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={generateArticleBio}
+                      disabled={bioGenerating}
+                      className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      {bioGenerating ? 'Generating...' : 'Generate new bio for this article'}
+                    </button>
+                  </div>
+                  {bioGenError && <p className="text-xs text-red-600">{bioGenError}</p>}
+
+                  {bioAiGenerated && (
+                    <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <p><span className="font-semibold">AI-generated bio — review before saving.</span> Edit above if needed.</p>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-gray-200">
+                    <label className="flex items-center gap-2 text-xs font-semibold text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={saveProfileEnabled}
+                        onChange={(e) => setSaveProfileEnabled(e.target.checked)}
+                      />
+                      Save this as a reusable profile for future articles
+                    </label>
+                    {saveProfileEnabled && (
+                      <div className="mt-2 space-y-2">
+                        <input
+                          type="text"
+                          value={saveProfileLabel}
+                          onChange={(e) => setSaveProfileLabel(e.target.value)}
+                          placeholder="Profile name, e.g. 'Fin-Advisor'"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {categories.map((cat) => (
+                            <label key={cat.id} className="flex items-center gap-1.5 text-xs text-gray-600">
+                              <input
+                                type="checkbox"
+                                checked={saveProfileCategorySlugs.includes(cat.slug)}
+                                onChange={() => toggleSaveProfileCategory(cat.slug)}
+                              />
+                              {cat.name}
+                            </label>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={saveBioProfileNow}
+                          disabled={savingBioProfile || !saveProfileLabel.trim()}
+                          className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {savingBioProfile ? 'Saving...' : 'Save profile'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>

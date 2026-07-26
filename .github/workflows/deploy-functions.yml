@@ -61,3 +61,6 @@ jobs:
 
       - name: Deploy generate-creator-video (AI video via Veo, JWT on)
         run: supabase functions deploy generate-creator-video --project-ref "$PROJECT_REF"
+
+      - name: Deploy generate-author-bio (AI author bios, JWT on)
+        run: supabase functions deploy generate-author-bio --project-ref "$PROJECT_REF"

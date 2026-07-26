@@ -435,29 +435,29 @@ export function ArticleDetail() {
             )}
           </div>
 
-          {article.authors?.bio && (
+          {(article.author_bio_snapshot ?? article.authors?.bio) && (
             <div className="mb-8 p-5 bg-gray-50 border border-gray-200 rounded-xl flex gap-4">
               <img
-                src={article.authors.avatar_url || ''}
-                alt={article.authors.name}
+                src={article.authors?.avatar_url || ''}
+                alt={article.authors?.name}
                 className="w-14 h-14 rounded-full border border-gray-200 flex-shrink-0"
               />
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">About the Author</p>
                 <Link
-                  to={`/author/${article.authors.id}`}
+                  to={`/author/${article.authors?.id}`}
                   className="font-semibold text-gray-900 hover:text-red-600 transition-colors"
                 >
-                  {article.authors.name}
+                  {article.authors?.name}
                 </Link>
-                <p className="text-sm text-gray-600 mt-1 leading-relaxed">{article.authors.bio}</p>
+                <p className="text-sm text-gray-600 mt-1 leading-relaxed">{article.author_bio_snapshot ?? article.authors?.bio}</p>
               </div>
             </div>
           )}
 
-          {article.authors?.disclaimer && (
+          {(article.author_disclaimer_snapshot ?? article.authors?.disclaimer) && (
             <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-              <p className="text-xs text-amber-800 leading-relaxed">{article.authors.disclaimer}</p>
+              <p className="text-xs text-amber-800 leading-relaxed">{article.author_disclaimer_snapshot ?? article.authors?.disclaimer}</p>
             </div>
           )}
 

@@ -54,6 +54,40 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['authors']['Insert']>;
         Relationships: [];
       };
+      author_bio_profiles: {
+        Row: {
+          id: string;
+          author_id: string;
+          label: string;
+          bio: string | null;
+          disclaimer: string | null;
+          category_slugs: string[];
+          is_default: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          author_id: string;
+          label: string;
+          bio?: string | null;
+          disclaimer?: string | null;
+          category_slugs?: string[];
+          is_default?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['author_bio_profiles']['Insert']>;
+        Relationships: [
+          {
+            foreignKeyName: 'author_bio_profiles_author_id_fkey';
+            columns: ['author_id'];
+            isOneToOne: false;
+            referencedRelation: 'authors';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       media_content: {
         Row: {
           id: string;
@@ -63,6 +97,8 @@ export interface Database {
           content: string | null;
           category_id: string | null;
           author_id: string | null;
+          author_bio_snapshot: string | null;
+          author_disclaimer_snapshot: string | null;
           media_type: string;
           media_url: string | null;
           thumbnail_url: string | null;
@@ -89,6 +125,8 @@ export interface Database {
           content?: string | null;
           category_id?: string | null;
           author_id?: string | null;
+          author_bio_snapshot?: string | null;
+          author_disclaimer_snapshot?: string | null;
           media_type?: string;
           media_url?: string | null;
           thumbnail_url?: string | null;
@@ -1208,6 +1246,7 @@ export interface Database {
 
 export type Category = Database['public']['Tables']['categories']['Row'];
 export type Author = Database['public']['Tables']['authors']['Row'];
+export type AuthorBioProfile = Database['public']['Tables']['author_bio_profiles']['Row'];
 export type MediaContent = Database['public']['Tables']['media_content']['Row'];
 export type Tag = Database['public']['Tables']['tags']['Row'];
 
