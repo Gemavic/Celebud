@@ -1,5 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { parse as parseHTML } from 'npm:node-html-parser@6';
+import { buildSeoTitle, buildSeoKeywords } from '../_shared/seo.ts';
+import { detectImageTopic, pickStockImage, searchPexelsImage } from '../_shared/articleImages.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,112 +36,6 @@ function isWorldCupContent(title: string, description: string): boolean {
 
 function getWorldCupThumbnail(): string {
   return fifaWorldCupThumbnails[Math.floor(Math.random() * fifaWorldCupThumbnails.length)];
-}
-
-const categoryFallbackImages: Record<string, string[]> = {
-  'immigration': [
-    'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1200&q=80',
-    'https://images.unsplash.com/photo-1488085061387-422e29b40080?w=1200&q=80',
-    'https://images.unsplash.com/photo-1569098644584-210bcd375b59?w=1200&q=80',
-    'https://images.unsplash.com/photo-1503220317375-aaad61436b1b?w=1200&q=80',
-  ],
-  'politics': [
-    'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=1200&q=80',
-    'https://images.unsplash.com/photo-1551135049-8a33b5883817?w=1200&q=80',
-    'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1200&q=80',
-    'https://images.unsplash.com/photo-1555374018-13a8994ab246?w=1200&q=80',
-  ],
-  'business': [
-    'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&q=80',
-    'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80',
-    'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1200&q=80',
-    'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1200&q=80',
-  ],
-  'finance': [
-    'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=1200&q=80',
-    'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&q=80',
-    'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=1200&q=80',
-    'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&q=80',
-  ],
-  'technology': [
-    'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=80',
-    'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=1200&q=80',
-    'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=1200&q=80',
-    'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=80',
-  ],
-  'entertainment': [
-    'https://images.unsplash.com/photo-1574267432644-f610f5ac2b0f?w=1200&q=80',
-    'https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=1200&q=80',
-    'https://images.unsplash.com/photo-1514306191717-452ec28c7814?w=1200&q=80',
-    'https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=1200&q=80',
-  ],
-  'celebrity': [
-    'https://images.unsplash.com/photo-1499364615650-ec38552f4f34?w=1200&q=80',
-    'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1200&q=80',
-    'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1200&q=80',
-    'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?w=1200&q=80',
-  ],
-  'lifestyle': [
-    'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=1200&q=80',
-    'https://images.unsplash.com/photo-1511690743698-d9d85f2fbf38?w=1200&q=80',
-    'https://images.unsplash.com/photo-1556740749-887f6717d7e4?w=1200&q=80',
-    'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=1200&q=80',
-  ],
-  'education': [
-    'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&q=80',
-    'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1200&q=80',
-    'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=1200&q=80',
-    'https://images.unsplash.com/photo-1519406596751-0a3ccc4937fe?w=1200&q=80',
-  ],
-  'travel': [
-    'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&q=80',
-    'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1200&q=80',
-    'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=1200&q=80',
-    'https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?w=1200&q=80',
-  ],
-  'society': [
-    'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1200&q=80',
-    'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=1200&q=80',
-    'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=1200&q=80',
-    'https://images.unsplash.com/photo-1528605105345-5344ea20e269?w=1200&q=80',
-  ],
-  'security': [
-    'https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=1200&q=80',
-    'https://images.unsplash.com/photo-1453873531674-2151bcd01707?w=1200&q=80',
-    'https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=1200&q=80',
-    'https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=1200&q=80',
-  ],
-  'sports': [
-    'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&q=80',
-    'https://images.unsplash.com/photo-1606925797300-0b35e9d1794e?w=1200&q=80',
-    'https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?w=1200&q=80',
-    'https://images.unsplash.com/photo-1522778119026-d647f0596c20?w=1200&q=80',
-    'https://images.unsplash.com/photo-1551958219-acbc608c6377?w=1200&q=80',
-    'https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?w=1200&q=80',
-  ],
-  'health': [
-    'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=1200&q=80',
-    'https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?w=1200&q=80',
-    'https://images.unsplash.com/photo-1559757175-5700dde675bc?w=1200&q=80',
-    'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=1200&q=80',
-  ],
-  'legal': [
-    'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&q=80',
-    'https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=1200&q=80',
-    'https://images.unsplash.com/photo-1479142506502-19b3a3b7ff33?w=1200&q=80',
-    'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1200&q=80',
-  ],
-  'news': [
-    'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&q=80',
-    'https://images.unsplash.com/photo-1586339949916-3e9457bef6d3?w=1200&q=80',
-    'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200&q=80',
-    'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=1200&q=80',
-  ],
-};
-
-function getCategoryFallbackImage(category: string): string {
-  const images = categoryFallbackImages[category] || categoryFallbackImages['news'];
-  return images[Math.floor(Math.random() * images.length)];
 }
 
 interface RSSItem {
@@ -1007,15 +903,33 @@ Deno.serve(async (req: Request) => {
             const finalCategorySlug = detectedCategorySlug !== 'news' ? detectedCategorySlug : sourceCategorySlug;
             const articleCategory = categories?.find((c: any) => c.slug === finalCategorySlug);
 
-            // Thumbnails: we intentionally never hotlink images scraped from
-            // a third-party article page or its og:image tag anymore — that
-            // was the cause of the broken-image reports (sites blocking
-            // hotlinking or moving files) and a content-ownership risk.
-            // We only use our own licensed/owned stock imagery.
+            // Thumbnails: never hotlink a third-party article's own photo
+            // (breaks when they block it, and it isn't ours to republish).
+            // Instead match on the story's actual SUBJECT — wildfire,
+            // earthquake, courtroom — rather than only its broad category,
+            // and pick deterministically from the article's slug so the same
+            // article always keeps the same image instead of similar stories
+            // randomly clustering on one photo.
             const isWorldCup = isWorldCupContent(item.title, item.description);
-            const finalThumbnail = isWorldCup
-              ? getWorldCupThumbnail()
-              : getCategoryFallbackImage(finalCategorySlug);
+            let finalThumbnail: string;
+            if (isWorldCup) {
+              finalThumbnail = getWorldCupThumbnail();
+            } else {
+              const topic = detectImageTopic(item.title, item.description, finalCategorySlug);
+              finalThumbnail = (await searchPexelsImage(topic.query, slug))
+                || pickStockImage(topic.pool, slug);
+            }
+
+            // Every article gets usable SEO metadata at ingest. enrich-articles
+            // later replaces these with AI-written versions, but nothing is
+            // ever stored with the empty seo_title/seo_keywords that left
+            // ~4,400 existing articles invisible to search engines.
+            const seoTitle = buildSeoTitle(stripHtml(item.title));
+            const seoKeywords = buildSeoKeywords(
+              stripHtml(item.title),
+              finalDescription,
+              articleCategory?.name || finalCategorySlug
+            );
 
             const priority = calculatePriorityScore(item.title, item.description);
 
@@ -1057,6 +971,8 @@ Deno.serve(async (req: Request) => {
               author_disclaimer_snapshot: resolvedDisclaimer,
               media_type: 'article',
               thumbnail_url: finalThumbnail,
+              seo_title: seoTitle,
+              seo_keywords: seoKeywords,
               external_url: item.link,
               source_id: source.id,
               source_published_at: item.pubDate,

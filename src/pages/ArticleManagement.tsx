@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { supabase } from '../lib/supabase';
@@ -91,6 +91,13 @@ export function ArticleManagement() {
   const { canApportionArticles } = usePermissions();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  // Article rebuild (AI re-reporting + SEO + thumbnails), run in batches.
+  const [enriching, setEnriching] = useState(false);
+  const [enrichStop, setEnrichStop] = useState(false);
+  const [enrichStatus, setEnrichStatus] = useState<string | null>(null);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
+  const [enrichDone, setEnrichDone] = useState(0);
+  const [enrichRemaining, setEnrichRemaining] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
@@ -171,6 +178,82 @@ export function ArticleManagement() {
   // Picks the profile whose category_slugs include the article's category,
   // else that author's default/general profile, else null (blank) —
   // mirrors the same fallback logic used server-side in fetch-news.
+  // Keeps the Stop button responsive: the batch loop below reads this ref,
+  // which updates immediately, rather than state captured in its closure.
+  const enrichStopRef = useRef(false);
+
+  /**
+   * Rebuilds fetched articles into properly written stories with SEO and
+   * matching thumbnails. The edge function handles one batch per call and
+   * reports how many are left, so this keeps calling it until the queue is
+   * empty (or the admin stops it). Safe to stop and resume — finished
+   * articles are marked and never reprocessed.
+   */
+  const runEnrichment = async () => {
+    setEnriching(true);
+    setEnrichStop(false);
+    enrichStopRef.current = false;
+    setEnrichError(null);
+    setEnrichDone(0);
+    setEnrichStatus('Starting…');
+
+    let totalDone = 0;
+    let totalFailed = 0;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('You must be signed in as an admin to do this.');
+      const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-articles`;
+
+      for (;;) {
+        if (enrichStopRef.current) {
+          setEnrichStatus(`Stopped. ${totalDone} article${totalDone === 1 ? '' : 's'} rebuilt so far.`);
+          break;
+        }
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ limit: 24 }),
+        });
+
+        const data: {
+          error?: string; processed?: number; failed?: number;
+          remaining?: number; errors?: string[];
+        } = await response.json();
+
+        if (!response.ok) throw new Error(data.error || `Rebuild failed (status ${response.status}).`);
+
+        totalDone += data.processed || 0;
+        totalFailed += data.failed || 0;
+        setEnrichDone(totalDone);
+        setEnrichRemaining(data.remaining ?? 0);
+
+        if (!data.remaining || data.remaining <= 0) {
+          setEnrichStatus(`Finished. ${totalDone} article${totalDone === 1 ? '' : 's'} rebuilt${totalFailed ? `, ${totalFailed} skipped` : ''}.`);
+          break;
+        }
+
+        // A batch that manages nothing at all means every article in it
+        // failed — stop rather than spinning through the whole archive.
+        if ((data.processed || 0) === 0 && (data.failed || 0) > 0) {
+          throw new Error(data.errors?.[0] || 'Every article in this batch failed — stopping.');
+        }
+
+        setEnrichStatus(`Rebuilt ${totalDone}… ${data.remaining.toLocaleString()} to go.`);
+      }
+
+      await fetchArticles();
+    } catch (err: unknown) {
+      setEnrichError(err instanceof Error ? err.message : 'Rebuild failed');
+    } finally {
+      setEnriching(false);
+    }
+  };
+
   const resolveBioProfileFor = (authorId: string, categoryId: string): BioProfile | null => {
     // Authors opted out of automatic bios are never auto-filled; their bio
     // must be picked or typed deliberately on each article.
@@ -906,6 +989,66 @@ export function ArticleManagement() {
             {articles.reduce((sum, a) => sum + (a.comments_count || 0), 0).toLocaleString()}
           </p>
         </div>
+      </div>
+
+      {/* Rebuild fetched articles into full stories with SEO + thumbnails */}
+      <div className="bg-white rounded-lg shadow p-6 mb-8 border border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-blue-600" />
+              Rebuild fetched articles
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Re-reports each fetched story in CelebUD's own words with proper sections and a
+              conclusion, writes its SEO title, description and keywords, and attaches a matching
+              image. Your hand-written articles are never touched. You can stop any time and
+              pick up where you left off.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {enriching && (
+              <button
+                onClick={() => { enrichStopRef.current = true; setEnrichStop(true); }}
+                disabled={enrichStop}
+                className="px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
+              >
+                {enrichStop ? 'Stopping…' : 'Stop'}
+              </button>
+            )}
+            <button
+              onClick={runEnrichment}
+              disabled={enriching}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60 transition-colors"
+            >
+              {enriching
+                ? <><RefreshCw className="w-4 h-4 animate-spin" /> Rebuilding…</>
+                : <><Sparkles className="w-4 h-4" /> Start rebuild</>}
+            </button>
+          </div>
+        </div>
+
+        {(enrichStatus || enrichError) && (
+          <div className="mt-4">
+            {enrichError ? (
+              <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {enrichError}
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-gray-700">{enrichStatus}</p>
+                {enrichRemaining !== null && enrichRemaining > 0 && (
+                  <div className="mt-2 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-600 transition-all duration-500"
+                      style={{ width: `${Math.min(100, (enrichDone / Math.max(1, enrichDone + enrichRemaining)) * 100)}%` }}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filters */}

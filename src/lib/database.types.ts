@@ -115,6 +115,7 @@ export interface Database {
           comments_count: number;
           seo_title: string | null;
           seo_keywords: string | null;
+          enriched_at: string | null;
           published_at: string;
           created_at: string;
           updated_at: string;
@@ -143,6 +144,7 @@ export interface Database {
           comments_count?: number;
           seo_title?: string | null;
           seo_keywords?: string | null;
+          enriched_at?: string | null;
           published_at?: string;
           created_at?: string;
           updated_at?: string;
