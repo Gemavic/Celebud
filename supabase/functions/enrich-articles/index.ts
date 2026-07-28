@@ -67,6 +67,7 @@ interface ArticleRow {
   source_id: string | null;
   is_featured: boolean;
   is_trending: boolean;
+  thumbnail_url: string | null;
   enrichment_attempts?: number;
 }
 
@@ -100,7 +101,7 @@ function stripHtml(input: string): string {
  * Pull the source article's text purely as RESEARCH INPUT for the rewrite.
  * Nothing returned here is ever published verbatim.
  */
-async function fetchSourceFacts(url: string): Promise<string> {
+async function fetchSourceFacts(url: string): Promise<{ text: string; image: string }> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12_000);
@@ -114,9 +115,20 @@ async function fetchSourceFacts(url: string): Promise<string> {
       signal: controller.signal,
     });
     clearTimeout(timer);
-    if (!resp.ok) return '';
+    if (!resp.ok) return { text: '', image: '' };
 
     const root = parseHTML(await resp.text());
+
+    // The publisher's own lead photo, taken from the Open Graph tag that
+    // outlets publish specifically so their story can be shown elsewhere
+    // with a picture. Always preferred over a generated image.
+    let image =
+      root.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
+      root.querySelector('meta[name="twitter:image"]')?.getAttribute('content') ||
+      '';
+    if (image && !image.startsWith('http')) {
+      try { image = new URL(image, url).href; } catch { image = ''; }
+    }
     for (const sel of [
       'script', 'style', 'noscript', 'iframe', 'nav', 'header', 'footer',
       'aside', 'form', 'figcaption', 'svg',
@@ -159,10 +171,21 @@ async function fetchSourceFacts(url: string): Promise<string> {
 
     // Cap the research material. 3,000 characters is ample to re-report a
     // news story and halves the input billed per article.
-    return deduped.join('\n\n').slice(0, 3000);
+    return { text: deduped.join('\n\n').slice(0, 3000), image };
   } catch {
-    return '';
+    return { text: '', image: '' };
   }
+}
+
+/**
+ * Is this thumbnail a real photo we should keep, as opposed to a generic
+ * stock filler that is safe to replace?
+ */
+function isRealPhoto(url: string | null | undefined): boolean {
+  if (!url) return false;
+  // Generic stock pools and previously generated images are replaceable.
+  if (/images\.unsplash\.com|article-thumbnails\/ai-/.test(url)) return false;
+  return true;
 }
 
 interface Rewrite {
@@ -402,9 +425,12 @@ Deno.serve(async (req: Request) => {
     // touched by any automated pass.
     let query = supabase
       .from('media_content')
-      .select('id, title, slug, description, content, external_url, category_id, source_id, is_featured, is_trending, enrichment_attempts')
+      .select('id, title, slug, description, content, thumbnail_url, external_url, category_id, source_id, is_featured, is_trending, enrichment_attempts')
       .eq('media_type', 'article')
-      .or('is_manual.is.null,is_manual.eq.false');
+      .or('is_manual.is.null,is_manual.eq.false')
+      // No source link means this is our own writing, not a fetched story.
+      // It must never be queued - not even for a thumbnail change.
+      .not('external_url', 'is', null);
 
     query = ids
       ? query.in('id', ids)
@@ -422,6 +448,7 @@ Deno.serve(async (req: Request) => {
       .select('id', { count: 'exact', head: true })
       .eq('media_type', 'article')
       .or('is_manual.is.null,is_manual.eq.false')
+      .not('external_url', 'is', null)
       .is('enriched_at', null)
       .lt('enrichment_attempts', MAX_ATTEMPTS);
 
@@ -440,6 +467,7 @@ Deno.serve(async (req: Request) => {
     let failed = 0;
     let imagesGenerated = 0;
     let skippedThin = 0;
+    let realPhotosUsed = 0;
     let billingStopped = false;
     const errors: string[] = [];
     let timedOut = false;
@@ -456,14 +484,19 @@ Deno.serve(async (req: Request) => {
       const matchedSource = sources?.find((s: { id: string }) => s.id === article.source_id);
       if (matchedSource?.name) sourceName = matchedSource.name;
 
-      const scraped = article.external_url ? await fetchSourceFacts(article.external_url) : '';
       const existing = stripHtml(article.content || article.description || '');
-      const facts = scraped.length >= existing.length ? scraped : existing;
 
-      // Enough material to genuinely re-report? If not, keep the existing
-      // text rather than inviting the model to invent supporting detail —
-      // the article still gets proper metadata and a matching image below.
-      const canRewrite = facts.length >= MIN_SOURCE_CHARS;
+      // Only ever rewrite from an EXTERNAL source. Feeding an article's own
+      // text back in as "research notes" is not re-reporting, it is
+      // rewriting original work — that is how hand-written newsroom pieces
+      // (including personal family articles) got turned into third-person
+      // news copy and wrongly credited to an outside outlet. No source URL
+      // means there is nothing to re-report, so the text is left untouched.
+      const scraped = article.external_url
+        ? await fetchSourceFacts(article.external_url)
+        : { text: '', image: '' };
+      const facts = scraped.text;
+      const canRewrite = Boolean(article.external_url) && facts.length >= MIN_SOURCE_CHARS;
 
       let contentHtml = '';
       let rewrite: Rewrite | null = null;
@@ -479,17 +512,30 @@ Deno.serve(async (req: Request) => {
       const seoKeywords = (rewrite?.seo_keywords || '').trim()
         || buildSeoKeywords(article.title, description, categoryName);
 
-      // Hybrid imagery: a unique AI image for the stories readers see most
-      // (featured/trending), a matched topical photo for everything else.
+      // Image priority, cheapest and most authentic first:
+      //   1. A real photo the article already has — never overwritten.
+      //   2. The publisher's own lead photo for this exact story.
+      //   3. A matched topical stock photo.
+      //   4. A generated image, only if there is genuinely nothing else
+      //      and the caller opted in.
       let thumbnail: string | null = null;
-      if (withImages && (article.is_featured || article.is_trending)) {
-        thumbnail = await generateAiImage(supabase, apiKey, article.title, description);
-        if (thumbnail) imagesGenerated++;
-      }
-      if (!thumbnail) {
+
+      if (isRealPhoto(article.thumbnail_url)) {
+        thumbnail = article.thumbnail_url;
+      } else if (scraped.image) {
+        thumbnail = scraped.image;
+        realPhotosUsed++;
+      } else {
         const topic = detectImageTopic(article.title, description, categorySlug);
         thumbnail = (await searchPexelsImage(topic.query, article.slug))
           || pickStockImage(topic.pool, article.slug);
+
+        // Nothing genuine available — this is the only case worth paying
+        // to generate an image for.
+        if (!thumbnail && withImages) {
+          thumbnail = await generateAiImage(supabase, apiKey, article.title, description);
+          if (thumbnail) imagesGenerated++;
+        }
       }
 
       const update: Record<string, unknown> = {
@@ -557,6 +603,7 @@ Deno.serve(async (req: Request) => {
       .select('id', { count: 'exact', head: true })
       .eq('media_type', 'article')
       .or('is_manual.is.null,is_manual.eq.false')
+      .not('external_url', 'is', null)
       .is('enriched_at', null)
       .lt('enrichment_attempts', MAX_ATTEMPTS);
 
@@ -567,6 +614,7 @@ Deno.serve(async (req: Request) => {
         failed,
         imagesGenerated,
         metadataOnly: skippedThin,
+        realPhotosUsed,
         billingStopped,
         // Measured, not estimated: straight from Google's token counts.
         usage: {

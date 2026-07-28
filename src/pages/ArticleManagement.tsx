@@ -848,6 +848,12 @@ export function ArticleManagement() {
         is_trending: editForm.is_trending,
         seo_title: editForm.seo_title || null,
         seo_keywords: editForm.seo_keywords || null,
+        // Anything written or edited here is newsroom work. This flag is what
+        // keeps automated passes (the article rebuild) away from it — without
+        // it the rebuild rewrote hand-written pieces and replaced their
+        // photos. Also stamped as already-enriched so it can never be queued.
+        is_manual: true,
+        enriched_at: new Date().toISOString(),
       };
 
       const { error } = editingArticle
