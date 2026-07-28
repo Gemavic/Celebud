@@ -42,6 +42,20 @@ const DEFAULT_BATCH = 30;
 // the metadata and image.
 const MIN_SOURCE_CHARS = 200;
 
+// An article that has failed this many times is dropped from the queue.
+// Without this, failures stayed at the front of a newest-first queue and
+// were re-sent to the AI on every single batch — paying again and again
+// for work that could never succeed.
+const MAX_ATTEMPTS = 2;
+
+/**
+ * Billing/quota failures affect every subsequent call, so the whole run must
+ * stop immediately rather than grinding through batches racking up errors.
+ */
+function isBillingFailure(message: string): boolean {
+  return /credits? are depleted|prepayment|billing|quota|RESOURCE_EXHAUSTED|exceeded your current quota|429/i.test(message);
+}
+
 interface ArticleRow {
   id: string;
   title: string;
@@ -53,6 +67,7 @@ interface ArticleRow {
   source_id: string | null;
   is_featured: boolean;
   is_trending: boolean;
+  enrichment_attempts?: number;
 }
 
 const JUNK_PATTERNS = [
@@ -337,19 +352,25 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const batchSize: number = Math.min(Math.max(Number(body.limit) || DEFAULT_BATCH, 1), 100);
     const ids: string[] | undefined = Array.isArray(body.ids) && body.ids.length ? body.ids : undefined;
-    const withImages: boolean = body.withImages !== false;
+    // AI images cost roughly 8x a text rewrite, so they are OFF unless the
+    // caller explicitly asks for them.
+    const withImages: boolean = body.withImages === true;
 
     // is_manual articles are hand-written by the newsroom and must never be
     // touched by any automated pass.
     let query = supabase
       .from('media_content')
-      .select('id, title, slug, description, content, external_url, category_id, source_id, is_featured, is_trending')
+      .select('id, title, slug, description, content, external_url, category_id, source_id, is_featured, is_trending, enrichment_attempts')
       .eq('media_type', 'article')
       .or('is_manual.is.null,is_manual.eq.false');
 
     query = ids
       ? query.in('id', ids)
-      : query.is('enriched_at', null).order('published_at', { ascending: false }).limit(batchSize);
+      : query
+          .is('enriched_at', null)
+          .lt('enrichment_attempts', MAX_ATTEMPTS)
+          .order('published_at', { ascending: false })
+          .limit(batchSize);
 
     const { data: articles, error: fetchErr } = await query;
     if (fetchErr) throw new Error(`Could not load articles: ${fetchErr.message}`);
@@ -359,7 +380,8 @@ Deno.serve(async (req: Request) => {
       .select('id', { count: 'exact', head: true })
       .eq('media_type', 'article')
       .or('is_manual.is.null,is_manual.eq.false')
-      .is('enriched_at', null);
+      .is('enriched_at', null)
+      .lt('enrichment_attempts', MAX_ATTEMPTS);
 
     if (!articles || articles.length === 0) {
       return new Response(JSON.stringify({ success: true, processed: 0, failed: 0, remaining: remainingBefore ?? 0, message: 'Nothing left to enrich.' }), {
@@ -376,6 +398,7 @@ Deno.serve(async (req: Request) => {
     let failed = 0;
     let imagesGenerated = 0;
     let skippedThin = 0;
+    let billingStopped = false;
     const errors: string[] = [];
     let timedOut = false;
 
@@ -453,15 +476,38 @@ Deno.serve(async (req: Request) => {
       if (Date.now() - started > TIME_BUDGET_MS) { timedOut = true; break; }
       const wave = articles.slice(i, i + CONCURRENCY) as ArticleRow[];
       const results = await Promise.allSettled(wave.map((a) => enrichOne(a)));
+
+      const failedThisWave: Array<{ article: ArticleRow; reason: string }> = [];
       results.forEach((r, idx) => {
         if (r.status === 'fulfilled') {
           processed++;
         } else {
           failed++;
           const reason = r.reason instanceof Error ? r.reason.message : String(r.reason);
+          failedThisWave.push({ article: wave[idx], reason });
+          if (isBillingFailure(reason)) billingStopped = true;
           if (errors.length < 10) errors.push(`${wave[idx].title.slice(0, 60)}: ${reason}`);
         }
       });
+
+      // Record the failure so a permanently-broken article leaves the queue
+      // instead of returning to the front of every future batch and being
+      // charged for again.
+      await Promise.allSettled(
+        failedThisWave.map(({ article, reason }) =>
+          supabase
+            .from('media_content')
+            .update({
+              enrichment_attempts: (article.enrichment_attempts ?? 0) + 1,
+              enrichment_error: reason.slice(0, 500),
+            })
+            .eq('id', article.id)
+        )
+      );
+
+      // Out of credit or over quota: every remaining call would fail the
+      // same way, so stop the whole run instead of burning through batches.
+      if (billingStopped) break;
     }
 
     const { count: remaining } = await supabase
@@ -469,7 +515,8 @@ Deno.serve(async (req: Request) => {
       .select('id', { count: 'exact', head: true })
       .eq('media_type', 'article')
       .or('is_manual.is.null,is_manual.eq.false')
-      .is('enriched_at', null);
+      .is('enriched_at', null)
+      .lt('enrichment_attempts', MAX_ATTEMPTS);
 
     return new Response(
       JSON.stringify({
@@ -478,6 +525,7 @@ Deno.serve(async (req: Request) => {
         failed,
         imagesGenerated,
         metadataOnly: skippedThin,
+        billingStopped,
         remaining: remaining ?? 0,
         timedOut,
         elapsedMs: Date.now() - started,

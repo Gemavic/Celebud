@@ -98,6 +98,9 @@ export function ArticleManagement() {
   const [enrichError, setEnrichError] = useState<string | null>(null);
   const [enrichDone, setEnrichDone] = useState(0);
   const [enrichRemaining, setEnrichRemaining] = useState<number | null>(null);
+  // AI images cost roughly 8x a text rewrite, so they stay off unless asked.
+  const [enrichImages, setEnrichImages] = useState(false);
+  const [enrichQueue, setEnrichQueue] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
@@ -189,6 +192,19 @@ export function ArticleManagement() {
    * empty (or the admin stops it). Safe to stop and resume — finished
    * articles are marked and never reprocessed.
    */
+  // How many articles still need rebuilding, so the cost is visible upfront.
+  const loadEnrichQueue = async () => {
+    const { count } = await supabase
+      .from('media_content')
+      .select('id', { count: 'exact', head: true })
+      .eq('media_type', 'article')
+      .is('enriched_at', null)
+      .lt('enrichment_attempts', 2);
+    setEnrichQueue(count ?? 0);
+  };
+
+  useEffect(() => { loadEnrichQueue(); }, []);
+
   const runEnrichment = async () => {
     setEnriching(true);
     setEnrichStop(false);
@@ -217,15 +233,24 @@ export function ArticleManagement() {
             Authorization: `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ limit: 24 }),
+          body: JSON.stringify({ limit: 30, withImages: enrichImages }),
         });
 
         const data: {
           error?: string; processed?: number; failed?: number;
-          remaining?: number; errors?: string[];
+          remaining?: number; errors?: string[]; billingStopped?: boolean;
         } = await response.json();
 
         if (!response.ok) throw new Error(data.error || `Rebuild failed (status ${response.status}).`);
+
+        // Out of Google credit: stop straight away rather than keep calling
+        // and racking up failures.
+        if (data.billingStopped) {
+          setEnrichRemaining(data.remaining ?? 0);
+          throw new Error(
+            `Stopped: your Google AI credit is exhausted. ${totalDone + (data.processed || 0)} articles were rebuilt before this. Top up at aistudio.google.com, then press Start rebuild again — nothing already finished will be charged twice.`
+          );
+        }
 
         totalDone += data.processed || 0;
         totalFailed += data.failed || 0;
@@ -1005,6 +1030,32 @@ export function ArticleManagement() {
               image. Your hand-written articles are never touched. You can stop any time and
               pick up where you left off.
             </p>
+
+            {enrichQueue !== null && (
+              <div className="mt-3 text-sm">
+                <p className="text-gray-700">
+                  <span className="font-semibold">{enrichQueue.toLocaleString()}</span> article
+                  {enrichQueue === 1 ? '' : 's'} left to rebuild — estimated cost{' '}
+                  <span className="font-semibold">
+                    ${(enrichQueue * (enrichImages ? 0.044 : 0.005)).toFixed(2)}
+                  </span>{' '}
+                  {enrichImages ? 'with AI images' : 'text and SEO only'}.
+                </p>
+                <label className="mt-2 inline-flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={enrichImages}
+                    disabled={enriching}
+                    onChange={(e) => setEnrichImages(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-600">
+                    Also generate unique AI images for featured and trending stories
+                    <span className="text-gray-500"> — about 8x the cost per article</span>
+                  </span>
+                </label>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {enriching && (
