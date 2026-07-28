@@ -873,7 +873,7 @@ Deno.serve(async (req: Request) => {
 
         const { data: authors } = await supabase
           .from('authors')
-          .select('id, name');
+          .select('id, name, auto_bio_enabled');
 
         const { data: bioProfiles } = await supabase
           .from('author_bio_profiles')
@@ -881,6 +881,10 @@ Deno.serve(async (req: Request) => {
 
         function resolveBioProfile(authorId: string | undefined, categorySlug: string): { bio: string | null; disclaimer: string | null } {
           if (!authorId || !bioProfiles) return { bio: null, disclaimer: null };
+          // Authors opted out of automatic bios get nothing attached here —
+          // their bio is added deliberately per article in Article Management.
+          const author = authors?.find((a: any) => a.id === authorId);
+          if (author?.auto_bio_enabled === false) return { bio: null, disclaimer: null };
           const match = bioProfiles.find((p: any) => p.author_id === authorId && (p.category_slugs || []).includes(categorySlug));
           const fallback = bioProfiles.find((p: any) => p.author_id === authorId && p.is_default);
           const chosen = match || fallback;

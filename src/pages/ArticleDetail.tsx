@@ -28,6 +28,10 @@ export function ArticleDetail() {
   // first on X" footer. Detect it so the byline reads "Curator" and the
   // original publisher is credited prominently (a Google News
   // attribution requirement).
+  // Authors with auto_bio_enabled off never get their general profile bio
+  // attached automatically — only a bio explicitly set on the article itself.
+  const autoBioEnabled = article?.authors?.auto_bio_enabled !== false;
+
   const syndicationSource = useMemo(() => {
     const text = (article?.content || '') + ' ' + (article?.description || '');
     const match = text.match(/appeared first on\s+(?:<a[^>]*>)?\s*([^<.\n]{2,60})/i);
@@ -435,7 +439,7 @@ export function ArticleDetail() {
             )}
           </div>
 
-          {(article.author_bio_snapshot ?? article.authors?.bio) && (
+          {(article.author_bio_snapshot ?? (autoBioEnabled ? article.authors?.bio : null)) && (
             <div className="mb-8 p-5 bg-gray-50 border border-gray-200 rounded-xl flex gap-4">
               <img
                 src={article.authors?.avatar_url || ''}
@@ -455,7 +459,7 @@ export function ArticleDetail() {
             </div>
           )}
 
-          {(article.author_disclaimer_snapshot ?? article.authors?.disclaimer) && (
+          {(article.author_disclaimer_snapshot ?? (autoBioEnabled ? article.authors?.disclaimer : null)) && (
             <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl">
               <p className="text-xs text-amber-800 leading-relaxed">{article.author_disclaimer_snapshot ?? article.authors?.disclaimer}</p>
             </div>

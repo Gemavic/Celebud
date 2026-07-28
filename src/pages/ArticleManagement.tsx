@@ -46,6 +46,7 @@ interface Author {
   name: string;
   bio: string | null;
   disclaimer: string | null;
+  auto_bio_enabled: boolean;
 }
 
 interface BioProfile {
@@ -171,6 +172,9 @@ export function ArticleManagement() {
   // else that author's default/general profile, else null (blank) —
   // mirrors the same fallback logic used server-side in fetch-news.
   const resolveBioProfileFor = (authorId: string, categoryId: string): BioProfile | null => {
+    // Authors opted out of automatic bios are never auto-filled; their bio
+    // must be picked or typed deliberately on each article.
+    if (authors.find((a) => a.id === authorId)?.auto_bio_enabled === false) return null;
     const categorySlug = categories.find((c) => c.id === categoryId)?.slug;
     const authorProfiles = bioProfiles.filter((p) => p.author_id === authorId);
     const match = categorySlug ? authorProfiles.find((p) => (p.category_slugs || []).includes(categorySlug)) : undefined;
@@ -182,7 +186,7 @@ export function ArticleManagement() {
     try {
       const { data, error } = await supabase
         .from('authors')
-        .select('id, name, bio, disclaimer')
+        .select('id, name, bio, disclaimer, auto_bio_enabled')
         .order('name');
       if (error) throw error;
       setAuthors(data || []);

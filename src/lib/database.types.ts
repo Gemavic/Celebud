@@ -39,6 +39,7 @@ export interface Database {
           avatar_url: string | null;
           bio: string | null;
           disclaimer: string | null;
+          auto_bio_enabled: boolean;
           user_id: string | null;
           created_at: string;
         };
@@ -48,6 +49,7 @@ export interface Database {
           avatar_url?: string | null;
           bio?: string | null;
           disclaimer?: string | null;
+          auto_bio_enabled?: boolean;
           user_id?: string | null;
           created_at?: string;
         };
