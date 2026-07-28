@@ -169,9 +169,11 @@ async function fetchSourceFacts(url: string): Promise<{ text: string; image: str
       return true;
     });
 
-    // Cap the research material. 3,000 characters is ample to re-report a
-    // news story and halves the input billed per article.
-    return { text: deduped.join('\n\n').slice(0, 3000), image };
+    // Restored to 6,000 characters. Trimming this made articles thinner,
+    // and it was never the cost problem: input bills at $0.30/1M against
+    // output at $2.50/1M, so the extra research costs a fraction of a cent
+    // and is what gives the writing its detail.
+    return { text: deduped.join('\n\n').slice(0, 6000), image };
   } catch {
     return { text: '', image: '' };
   }
@@ -262,7 +264,10 @@ ${sourceFacts || article.description || article.content || '(No detailed notes a
       contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
       generationConfig: {
         temperature: 0.65,
-        maxOutputTokens: 2600,
+        // Restored to 4096. This is a ceiling, not a target — it costs
+        // nothing unless an article actually uses it, and lowering it only
+        // risked truncating the detailed pieces the newsroom wants kept.
+        maxOutputTokens: 4096,
         // Gemini 2.5 Flash "thinks" by default and bills those hidden
         // reasoning tokens at the OUTPUT rate — several times the cost of
         // the article itself. Rewriting supplied notes needs no reasoning
