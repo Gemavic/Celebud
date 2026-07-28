@@ -205,7 +205,11 @@ export function ArticleManagement() {
 
   useEffect(() => { loadEnrichQueue(); }, []);
 
-  const runEnrichment = async () => {
+  /**
+   * @param maxArticles stop after roughly this many (a measured test run);
+   *                    omit to work through the whole queue.
+   */
+  const runEnrichment = async (maxArticles?: number) => {
     setEnriching(true);
     setEnrichStop(false);
     enrichStopRef.current = false;
@@ -215,6 +219,8 @@ export function ArticleManagement() {
 
     let totalDone = 0;
     let totalFailed = 0;
+    // Measured from Google's token counts, not estimated.
+    let totalCost = 0;
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -233,13 +239,19 @@ export function ArticleManagement() {
             Authorization: `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ limit: 30, withImages: enrichImages }),
+          body: JSON.stringify({
+            limit: maxArticles ? Math.min(maxArticles, 30) : 30,
+            withImages: enrichImages,
+          }),
         });
 
         const data: {
           error?: string; processed?: number; failed?: number;
           remaining?: number; errors?: string[]; billingStopped?: boolean;
+          usage?: { costUsd?: number; costPerArticleUsd?: number; thoughtTokens?: number };
         } = await response.json();
+
+        totalCost += data.usage?.costUsd || 0;
 
         if (!response.ok) throw new Error(data.error || `Rebuild failed (status ${response.status}).`);
 
@@ -257,8 +269,19 @@ export function ArticleManagement() {
         setEnrichDone(totalDone);
         setEnrichRemaining(data.remaining ?? 0);
 
+        // Measured test run: stop after the sample so the real per-article
+        // cost can be checked before committing to the whole archive.
+        if (maxArticles && totalDone >= maxArticles) {
+          const each = totalDone > 0 ? totalCost / totalDone : 0;
+          setEnrichStatus(
+            `Test run: ${totalDone} rebuilt for $${totalCost.toFixed(3)} — that is $${each.toFixed(4)} per article. ` +
+            `The remaining ${(data.remaining ?? 0).toLocaleString()} would cost about $${((data.remaining ?? 0) * each).toFixed(2)}.`
+          );
+          break;
+        }
+
         if (!data.remaining || data.remaining <= 0) {
-          setEnrichStatus(`Finished. ${totalDone} article${totalDone === 1 ? '' : 's'} rebuilt${totalFailed ? `, ${totalFailed} skipped` : ''}.`);
+          setEnrichStatus(`Finished. ${totalDone} article${totalDone === 1 ? '' : 's'} rebuilt${totalFailed ? `, ${totalFailed} skipped` : ''} — actual cost $${totalCost.toFixed(2)}.`);
           break;
         }
 
@@ -268,7 +291,7 @@ export function ArticleManagement() {
           throw new Error(data.errors?.[0] || 'Every article in this batch failed — stopping.');
         }
 
-        setEnrichStatus(`Rebuilt ${totalDone}… ${data.remaining.toLocaleString()} to go.`);
+        setEnrichStatus(`Rebuilt ${totalDone} — actual spend so far $${totalCost.toFixed(2)}. ${data.remaining.toLocaleString()} to go.`);
       }
 
       await fetchArticles();
@@ -1068,7 +1091,15 @@ export function ArticleManagement() {
               </button>
             )}
             <button
-              onClick={runEnrichment}
+              onClick={() => runEnrichment(10)}
+              disabled={enriching}
+              className="px-4 py-2.5 text-sm font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-60 transition-colors"
+              title="Rebuild 10 articles and report the exact cost per article"
+            >
+              Test 10 first
+            </button>
+            <button
+              onClick={() => runEnrichment()}
               disabled={enriching}
               className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60 transition-colors"
             >

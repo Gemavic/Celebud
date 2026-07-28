@@ -157,8 +157,9 @@ async function fetchSourceFacts(url: string): Promise<string> {
       return true;
     });
 
-    // Cap the research material so one long page can't blow the token budget.
-    return deduped.join('\n\n').slice(0, 6000);
+    // Cap the research material. 3,000 characters is ample to re-report a
+    // news story and halves the input billed per article.
+    return deduped.join('\n\n').slice(0, 3000);
   } catch {
     return '';
   }
@@ -169,6 +170,21 @@ interface Rewrite {
   description?: string;
   content?: string;
   seo_keywords?: string;
+}
+
+// Real billed usage, accumulated across the run. Reported back so cost is
+// measured from Google's own token counts rather than estimated.
+const usage = { promptTokens: 0, outputTokens: 0, thoughtTokens: 0, calls: 0 };
+
+// Gemini 2.5 Flash list price per 1M tokens (USD). Thinking tokens bill at
+// the output rate, which is why they are counted in with output below.
+const USD_PER_1M_INPUT = 0.30;
+const USD_PER_1M_OUTPUT = 2.50;
+
+function estimateRunCostUsd(): number {
+  const input = (usage.promptTokens / 1_000_000) * USD_PER_1M_INPUT;
+  const output = ((usage.outputTokens + usage.thoughtTokens) / 1_000_000) * USD_PER_1M_OUTPUT;
+  return input + output;
 }
 
 async function rewriteArticle(
@@ -221,7 +237,15 @@ ${sourceFacts || article.description || article.content || '(No detailed notes a
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-      generationConfig: { temperature: 0.65, maxOutputTokens: 4096 },
+      generationConfig: {
+        temperature: 0.65,
+        maxOutputTokens: 2600,
+        // Gemini 2.5 Flash "thinks" by default and bills those hidden
+        // reasoning tokens at the OUTPUT rate — several times the cost of
+        // the article itself. Rewriting supplied notes needs no reasoning
+        // budget, so it is switched off. This was the main cost overrun.
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     }),
   });
 
@@ -231,6 +255,16 @@ ${sourceFacts || article.description || article.content || '(No detailed notes a
   }
 
   const data = await resp.json();
+
+  // Google's own token counts — the only trustworthy basis for cost.
+  const um = data?.usageMetadata;
+  if (um) {
+    usage.calls++;
+    usage.promptTokens += um.promptTokenCount || 0;
+    usage.outputTokens += um.candidatesTokenCount || 0;
+    usage.thoughtTokens += um.thoughtsTokenCount || 0;
+  }
+
   if (data?.promptFeedback?.blockReason) {
     throw new Error(`blocked: ${data.promptFeedback.blockReason}`);
   }
@@ -309,6 +343,14 @@ Deno.serve(async (req: Request) => {
   }
 
   const started = Date.now();
+  // Warm function instances reuse module state between requests, so the
+  // counters must be zeroed per run or each response would report the
+  // cumulative total instead of this run's.
+  usage.promptTokens = 0;
+  usage.outputTokens = 0;
+  usage.thoughtTokens = 0;
+  usage.calls = 0;
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -526,6 +568,14 @@ Deno.serve(async (req: Request) => {
         imagesGenerated,
         metadataOnly: skippedThin,
         billingStopped,
+        // Measured, not estimated: straight from Google's token counts.
+        usage: {
+          ...usage,
+          costUsd: Number(estimateRunCostUsd().toFixed(4)),
+          costPerArticleUsd: processed > 0
+            ? Number((estimateRunCostUsd() / processed).toFixed(5))
+            : 0,
+        },
         remaining: remaining ?? 0,
         timedOut,
         elapsedMs: Date.now() - started,
