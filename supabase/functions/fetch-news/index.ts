@@ -28,8 +28,8 @@ const fifaWorldCupThumbnails = [
 ];
 
 function isWorldCupContent(title: string, description: string): boolean {
-  const text = (title + ' ' + description).toLowerCase();
-  return fifaWorldCupKeywords.some(kw => text.includes(kw));
+  const text = `${title} ${description}`;
+  return fifaWorldCupKeywords.some(kw => wordMatch(text, kw));
 }
 
 function getWorldCupThumbnail(): string {
