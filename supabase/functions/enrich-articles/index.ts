@@ -33,8 +33,14 @@ const IMAGE_MODEL = 'gemini-2.5-flash-image';
 // Leave headroom under the platform's execution limit so the final DB writes
 // and the JSON response always complete.
 const TIME_BUDGET_MS = 105_000;
-const CONCURRENCY = 4;
-const DEFAULT_BATCH = 24;
+const CONCURRENCY = 6;
+const DEFAULT_BATCH = 30;
+
+// Below this much source material there is not enough to re-report a story
+// honestly. Rather than let the model pad a headline into an article (which
+// invites invented detail), we leave the existing text alone and only fix
+// the metadata and image.
+const MIN_SOURCE_CHARS = 200;
 
 interface ArticleRow {
   id: string;
@@ -369,6 +375,7 @@ Deno.serve(async (req: Request) => {
     let processed = 0;
     let failed = 0;
     let imagesGenerated = 0;
+    let skippedThin = 0;
     const errors: string[] = [];
     let timedOut = false;
 
@@ -384,14 +391,25 @@ Deno.serve(async (req: Request) => {
       const matchedSource = sources?.find((s: { id: string }) => s.id === article.source_id);
       if (matchedSource?.name) sourceName = matchedSource.name;
 
-      const facts = article.external_url ? await fetchSourceFacts(article.external_url) : '';
-      const rewrite = await rewriteArticle(apiKey, article, facts, sourceName, categoryName);
+      const scraped = article.external_url ? await fetchSourceFacts(article.external_url) : '';
+      const existing = stripHtml(article.content || article.description || '');
+      const facts = scraped.length >= existing.length ? scraped : existing;
 
-      const contentHtml = (rewrite?.content || '').trim();
-      if (!contentHtml) throw new Error('model returned no article body');
+      // Enough material to genuinely re-report? If not, keep the existing
+      // text rather than inviting the model to invent supporting detail —
+      // the article still gets proper metadata and a matching image below.
+      const canRewrite = facts.length >= MIN_SOURCE_CHARS;
+
+      let contentHtml = '';
+      let rewrite: Rewrite | null = null;
+      if (canRewrite) {
+        rewrite = await rewriteArticle(apiKey, article, facts, sourceName, categoryName);
+        contentHtml = (rewrite?.content || '').trim();
+        if (!contentHtml) throw new Error('model returned no article body');
+      }
 
       const description = (rewrite?.description || '').trim()
-        || buildSeoDescription(stripHtml(contentHtml));
+        || buildSeoDescription(stripHtml(contentHtml) || existing, article.title);
       const seoTitle = (rewrite?.seo_title || '').trim() || buildSeoTitle(article.title);
       const seoKeywords = (rewrite?.seo_keywords || '').trim()
         || buildSeoKeywords(article.title, description, categoryName);
@@ -409,19 +427,24 @@ Deno.serve(async (req: Request) => {
           || pickStockImage(topic.pool, article.slug);
       }
 
+      const update: Record<string, unknown> = {
+        description,
+        seo_title: seoTitle.slice(0, 70),
+        seo_keywords: seoKeywords,
+        thumbnail_url: thumbnail,
+        enriched_at: new Date().toISOString(),
+      };
+      // Only overwrite the body when we actually produced one — a thin
+      // source must never blank out the text that is already there.
+      if (contentHtml) update.content = contentHtml;
+
       const { error: updateErr } = await supabase
         .from('media_content')
-        .update({
-          content: contentHtml,
-          description,
-          seo_title: seoTitle.slice(0, 70),
-          seo_keywords: seoKeywords,
-          thumbnail_url: thumbnail,
-          enriched_at: new Date().toISOString(),
-        })
+        .update(update)
         .eq('id', article.id);
 
       if (updateErr) throw new Error(`save failed: ${updateErr.message}`);
+      if (!canRewrite) skippedThin++;
     };
 
     // Small parallel waves: fast enough to clear the backlog, gentle enough
@@ -454,6 +477,7 @@ Deno.serve(async (req: Request) => {
         processed,
         failed,
         imagesGenerated,
+        metadataOnly: skippedThin,
         remaining: remaining ?? 0,
         timedOut,
         elapsedMs: Date.now() - started,
