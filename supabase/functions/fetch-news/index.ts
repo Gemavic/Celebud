@@ -759,172 +759,6 @@ function isJunkParagraph(text: string): boolean {
   return junkParagraphPatterns.some(p => p.test(text));
 }
 
-async function fetchFullArticleContent(url: string): Promise<{ content: string; thumbnail: string }> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-      redirect: 'follow',
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-    if (!response.ok) return { content: '', thumbnail: '' };
-
-    const html = await response.text();
-    const root = parseHTML(html);
-
-    let ogImage = '';
-    const ogImageMeta = root.querySelector('meta[property="og:image"]');
-    if (ogImageMeta) {
-      ogImage = ogImageMeta.getAttribute('content') || '';
-    }
-    if (!ogImage) {
-      const twitterImage = root.querySelector('meta[name="twitter:image"]');
-      if (twitterImage) {
-        ogImage = twitterImage.getAttribute('content') || '';
-      }
-    }
-    if (ogImage && !ogImage.startsWith('http')) {
-      ogImage = resolveImageUrl(ogImage, url);
-    }
-
-    const junkSelectors = [
-      'script', 'style', 'noscript', 'iframe', 'nav', 'header', 'footer',
-      'aside', 'form', 'figcaption', 'svg',
-      '[class*="comment"]', '[class*="sidebar"]', '[class*="widget"]',
-      '[class*="advert"]', '[class*="banner"]', '[class*="social"]',
-      '[class*="share"]', '[class*="newsletter"]', '[class*="related"]',
-      '[class*="author-bio"]', '[class*="byline"]', '[class*="credit"]',
-      '[class*="breadcrumb"]', '[class*="pagination"]', '[class*="tag-list"]',
-      '[class*="cookie"]', '[class*="popup"]', '[class*="modal"]',
-      '[class*="recommended"]', '[class*="also-read"]', '[class*="more-stories"]',
-      '[id*="comment"]', '[id*="sidebar"]', '[id*="footer"]',
-    ];
-    for (const sel of junkSelectors) {
-      try { root.querySelectorAll(sel).forEach(el => el.remove()); } catch { /* skip */ }
-    }
-
-    const containerSelectors = [
-      '[itemprop="articleBody"]',
-      'article .article-body', 'article .article-content',
-      '.article-body', '.article-content', '.article_body', '.article_content',
-      '.post-content', '.post_content', '.entry-content', '.entry_content',
-      '.story-body', '.story-content', '.story_body', '.story_content',
-      '.td-post-content', '.content-body', '.content_body',
-      '.c-article-body', '.article__body', '.article__content',
-      '#article-body', '#article-content', '#story-body',
-      'article',
-      '[role="article"]',
-      'main .content', 'main',
-      '.post', '.entry',
-    ];
-
-    let source = null;
-    for (const sel of containerSelectors) {
-      try {
-        const el = root.querySelector(sel);
-        if (el) {
-          const paragraphs = el.querySelectorAll('p');
-          const totalText = paragraphs.map(p => p.text.trim()).filter(t => t.length > 30).join(' ');
-          if (totalText.length > 150) {
-            source = el;
-            break;
-          }
-        }
-      } catch { /* skip */ }
-    }
-
-    if (!source) {
-      const allParagraphs = root.querySelectorAll('p');
-      const longParagraphs = allParagraphs.filter(p => p.text.trim().length > 50);
-      if (longParagraphs.length >= 2) {
-        source = root;
-      }
-    }
-
-    if (!source) return { content: '', thumbnail: ogImage };
-
-    const images: string[] = [];
-    try {
-      const imgs = source.querySelectorAll('img');
-      for (const img of imgs) {
-        const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || '';
-        if (src && !src.includes('data:image') && !src.includes('base64') && isValidArticleImage(src)) {
-          images.push(resolveImageUrl(src, url));
-        }
-      }
-    } catch { /* skip */ }
-
-    const paragraphs = source.querySelectorAll('p');
-    const textParts: string[] = [];
-    let imgIdx = 0;
-
-    for (const p of paragraphs) {
-      const text = p.text.trim();
-      if (text.length >= 25 && !isJunkParagraph(text)) {
-        textParts.push(text);
-        if (images[imgIdx] && textParts.length > 2 && textParts.length % 4 === 0) {
-          textParts.push(`[IMAGE:${images[imgIdx]}]`);
-          imgIdx++;
-        }
-      }
-    }
-
-    if (textParts.length < 3) {
-      const divs = source.querySelectorAll('div');
-      for (const div of divs) {
-        const directText = div.text.trim();
-        if (directText.length > 60 && !isJunkParagraph(directText)) {
-          const sentences = directText.match(/[^.!?\n]+[.!?]+/g) || [];
-          for (const sentence of sentences) {
-            const cleaned = sentence.trim();
-            if (cleaned.length > 35 && !isJunkParagraph(cleaned)) {
-              textParts.push(cleaned);
-            }
-          }
-          if (textParts.length >= 3) break;
-        }
-      }
-    }
-
-    if (textParts.length < 3) {
-      const allText = source.text;
-      const sentences = allText.match(/[^.!?\n]+[.!?]+/g) || [];
-      for (const sentence of sentences) {
-        const cleaned = sentence.trim();
-        if (cleaned.length > 35 && !isJunkParagraph(cleaned)) {
-          textParts.push(cleaned);
-        }
-      }
-    }
-
-    const seen = new Set<string>();
-    const dedupedParts: string[] = [];
-    for (const part of textParts) {
-      const normalized = part.toLowerCase().trim().substring(0, 80);
-      if (!seen.has(normalized)) {
-        seen.add(normalized);
-        dedupedParts.push(part);
-      }
-    }
-
-    const finalContent = sanitizeContactInfo(dedupedParts.join('\n\n'));
-    return {
-      content: finalContent.length > 80 ? finalContent : '',
-      thumbnail: ogImage,
-    };
-  } catch {
-    return { content: '', thumbnail: '' };
-  }
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -1142,38 +976,42 @@ Deno.serve(async (req: Request) => {
             .maybeSingle();
 
           if (!existingByTitle) {
-            let fullContent = item.content;
-            let scrapedThumbnail = '';
+            // NOTE: Full-article scraping (visiting the source URL and
+            // reconstructing its body text + images) has been intentionally
+            // removed. Republishing another outlet's full article text and
+            // images is a copyright and AdSense-policy risk, not genuine
+            // curation. We now only ever store the RSS feed's own short
+            // description as a teaser, with a clear link back to the
+            // original source for the full story.
+            const EXCERPT_MAX_LENGTH = 320;
+            const rawExcerpt = (item.description || item.content || '').trim();
+            const truncatedExcerpt = rawExcerpt.length > EXCERPT_MAX_LENGTH
+              ? rawExcerpt.slice(0, EXCERPT_MAX_LENGTH).replace(/\s+\S*$/, '') + '…'
+              : rawExcerpt;
 
-            if (item.link) {
-              const scraped = await fetchFullArticleContent(item.link);
-              if (scraped.content && scraped.content.length > fullContent.length) {
-                fullContent = scraped.content;
-              }
-              if (scraped.thumbnail && isValidArticleImage(scraped.thumbnail)) {
-                scrapedThumbnail = scraped.thumbnail;
-              }
-            }
-
-            const finalContent = stripHtml(sanitizeContactInfo(fullContent));
-            const finalDescription = stripHtml(sanitizeContactInfo(item.description));
+            const finalDescription = stripHtml(sanitizeContactInfo(truncatedExcerpt));
+            const sourceName = source.name || 'the original source';
+            const finalContent = finalDescription
+              ? `${finalDescription}\n\nContinue reading the full story at ${sourceName}.`
+              : '';
 
             if (!finalContent && !finalDescription) {
               continue;
             }
 
-            const detectedCategorySlug = categorizeArticle(item.title, item.description + ' ' + fullContent.substring(0, 500));
+            const detectedCategorySlug = categorizeArticle(item.title, item.description);
             const finalCategorySlug = detectedCategorySlug !== 'news' ? detectedCategorySlug : sourceCategorySlug;
             const articleCategory = categories?.find((c: any) => c.slug === finalCategorySlug);
 
-            let finalThumbnail = item.thumbnail;
+            // Thumbnails: we intentionally never hotlink images scraped from
+            // a third-party article page or its og:image tag anymore — that
+            // was the cause of the broken-image reports (sites blocking
+            // hotlinking or moving files) and a content-ownership risk.
+            // We only use our own licensed/owned stock imagery.
             const isWorldCup = isWorldCupContent(item.title, item.description);
-
-            if (isWorldCup && (!finalThumbnail || finalThumbnail === '' || !isValidArticleImage(finalThumbnail))) {
-              finalThumbnail = scrapedThumbnail || getWorldCupThumbnail();
-            } else if (!finalThumbnail || finalThumbnail === '') {
-              finalThumbnail = scrapedThumbnail || getCategoryFallbackImage(finalCategorySlug);
-            }
+            const finalThumbnail = isWorldCup
+              ? getWorldCupThumbnail()
+              : getCategoryFallbackImage(finalCategorySlug);
 
             const priority = calculatePriorityScore(item.title, item.description);
 
