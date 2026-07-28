@@ -241,7 +241,8 @@ RULES for "content":
 - Use <h2> for section headings (and <h3> for sub-sections). Give the article at least two or three clearly-titled sections.
 - Use <p> for paragraphs, <strong> for key terms, <em> for emphasis, <ul>/<ol> with <li> for lists, <blockquote> for a genuine quote from the notes.
 - Include a <table> with <thead>/<tbody> ONLY when the story genuinely has comparable data (figures, timelines, before/after). Never fake a table.
-- Aim for 600-900 words when the research supports it. Never pad.
+- COMPLETENESS IS THE PRIORITY. Carry over EVERY substantive fact from the notes: every name, place, figure, date, cause, consequence, official statement and quoted remark. Rewriting means changing the WORDING, never dropping the information. A reader must finish your article knowing everything the notes established — if anything material is missing, the article has failed.
+- Let the notes set the length: rich notes deserve 800-1200 words, thin notes a shorter piece. Never pad with filler, and never compress by leaving facts out.
 - End with a <h2>Conclusion</h2> section that genuinely summarises what it means and what happens next.
 - Then add attribution exactly like: <p><em>Reporting based on coverage by ${sourceName}.</em></p>
 - Do NOT use <h1>, <div>, <span>, class or style attributes, markdown, or code fences. Do NOT repeat the headline inside the body. Never invent <img> tags or image URLs.
