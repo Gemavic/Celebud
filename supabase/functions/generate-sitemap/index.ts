@@ -144,11 +144,24 @@ Deno.serve(async (req: Request) => {
     }
 
     // --- Default: full sitemap ---
-    const { data: articles, error } = await supabase
-      .from('media_content')
-      .select('id, slug, title, updated_at, published_at')
-      .order('updated_at', { ascending: false });
-    if (error) throw error;
+    // Paged deliberately: PostgREST caps a single request at 1,000 rows, so
+    // an unpaged query silently submitted only the newest 1,000 articles and
+    // left the rest of the archive undiscoverable by search engines. A
+    // sitemap may hold 50,000 URLs, so the whole archive fits in one file.
+    const PAGE = 1000;
+    const SITEMAP_MAX_URLS = 50000;
+    const articles: Article[] = [];
+    for (let from = 0; from < SITEMAP_MAX_URLS; from += PAGE) {
+      const { data: page, error } = await supabase
+        .from('media_content')
+        .select('id, slug, title, updated_at, published_at')
+        .order('updated_at', { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (error) throw error;
+      if (!page || page.length === 0) break;
+      articles.push(...(page as Article[]));
+      if (page.length < PAGE) break;
+    }
 
     const currentDate = new Date().toISOString();
     const staticPages = [

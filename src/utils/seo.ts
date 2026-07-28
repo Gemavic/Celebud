@@ -86,12 +86,18 @@ export function generateArticleStructuredData(article: {
   publishedDate: string;
   modifiedDate?: string;
   url: string;
+  /** Comma-separated SEO keywords for this specific story. */
+  keywords?: string;
+  /** Section/category name — used by Google News for topic clustering. */
+  section?: string;
 }) {
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': 'NewsArticle',
     headline: article.title,
     description: article.description,
+    ...(article.keywords ? { keywords: article.keywords } : {}),
+    ...(article.section ? { articleSection: article.section } : {}),
     image: article.image ? [article.image] : [],
     datePublished: article.publishedDate,
     dateModified: article.modifiedDate || article.publishedDate,

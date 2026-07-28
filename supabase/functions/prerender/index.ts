@@ -57,6 +57,7 @@ function baseHtml({
   type,
   jsonLd,
   bodyHtml,
+  keywords,
 }: {
   title: string;
   description: string;
@@ -65,6 +66,7 @@ function baseHtml({
   type: 'website' | 'article';
   jsonLd: Record<string, unknown>;
   bodyHtml: string;
+  keywords?: string;
 }) {
   return `<!doctype html>
 <html lang="en">
@@ -72,6 +74,7 @@ function baseHtml({
 <meta charset="UTF-8" />
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}" />
+${keywords ? `<meta name="keywords" content="${escapeHtml(keywords)}" />` : ''}
 <link rel="canonical" href="${url}" />
 <meta name="robots" content="index, follow, max-image-preview:large" />
 
@@ -139,6 +142,10 @@ Deno.serve(async (req: Request) => {
           logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.png` },
         },
         mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+        // Section and keywords are what Google News and Top Stories use to
+        // place a story in the right topic cluster.
+        articleSection: article.categories?.name || undefined,
+        keywords: article.seo_keywords || undefined,
       };
 
       const bodyHtml = `
@@ -151,8 +158,12 @@ Deno.serve(async (req: Request) => {
 </article>`;
 
       const html = baseHtml({
-        title: `${article.title} - ${SITE_NAME}`,
+        // Prefer the purpose-written SEO title: it is trimmed to the length
+        // search results actually display, so headlines are not cut off
+        // mid-word in Google.
+        title: `${article.seo_title || article.title} - ${SITE_NAME}`,
         description: article.description || article.title,
+        keywords: article.seo_keywords || undefined,
         image: article.thumbnail_url || undefined,
         url,
         type: 'article',

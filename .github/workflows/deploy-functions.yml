@@ -67,3 +67,20 @@ jobs:
 
       - name: Deploy enrich-articles (AI article rewriting + SEO, JWT on)
         run: supabase functions deploy enrich-articles --project-ref "$PROJECT_REF"
+
+      # The SEO functions are live under CAPITALISED names (vercel.json
+      # rewrites point at /Prerender and /Generate-sitemap). Deploying the
+      # lowercase folder name would create a second, unused function and
+      # leave the live one stale — which is exactly why SEO fixes had not
+      # been reaching search engines. Stage a copy under the live name.
+      - name: Stage prerender + generate-sitemap under their live names
+        run: |
+          mkdir -p supabase/functions/Prerender supabase/functions/Generate-sitemap
+          cp -r supabase/functions/prerender/. supabase/functions/Prerender/
+          cp -r supabase/functions/generate-sitemap/. supabase/functions/Generate-sitemap/
+
+      - name: Deploy Prerender (crawler HTML, public - JWT off)
+        run: supabase functions deploy Prerender --project-ref "$PROJECT_REF" --no-verify-jwt
+
+      - name: Deploy Generate-sitemap (sitemap/RSS, public - JWT off)
+        run: supabase functions deploy Generate-sitemap --project-ref "$PROJECT_REF" --no-verify-jwt

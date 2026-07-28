@@ -93,9 +93,16 @@ export function ArticleDetail() {
     const canonicalPath = buildArticleUrl(article);
 
     updateMetaTags({
-      title: `${article.title} - CelebUD`,
+      // seo_title is trimmed to the length search results actually show, so
+      // headlines are not truncated mid-word in Google.
+      title: `${article.seo_title || article.title} - CelebUD`,
       description: article.description || article.title,
-      keywords: `${article.categories?.name || 'celebrity news'}, entertainment, celebrity, news`,
+      // Per-article keywords written for this specific story. The previous
+      // hardcoded list sent Google the same generic terms for every single
+      // article, which tells search engines nothing about what each one is
+      // about.
+      keywords: article.seo_keywords
+        || `${article.categories?.name || 'celebrity news'}, entertainment, celebrity, news`,
       image: article.thumbnail_url || undefined,
       url: canonicalPath,
       type: 'article',
@@ -113,6 +120,8 @@ export function ArticleDetail() {
       publishedDate: article.published_at,
       modifiedDate: article.updated_at,
       url: `${window.location.origin}${canonicalPath}`,
+      keywords: article.seo_keywords || undefined,
+      section: article.categories?.name || undefined,
     });
 
     return () => {
