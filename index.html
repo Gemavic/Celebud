@@ -17,7 +17,12 @@
     <meta name="author" content="CelebUD Magazine" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
 
-    <link rel="canonical" href="https://celebud.com" />
+    <!-- No hardcoded canonical: this file is served for EVERY route, so a
+         fixed value here tells crawlers that every article's "real" page is
+         the homepage — which is how a whole site gets dropped as duplicates.
+         Crawlers get correct per-page canonicals from the Prerender function,
+         and the app sets one at runtime (src/utils/seo.ts) for everyone else.
+         Having no canonical is far safer than having a wrong one. -->
     <link rel="alternate" type="application/rss+xml" title="CelebUD News Feed" href="https://celebud.com/feed.xml" />
 
     <meta property="og:type" content="website" />
