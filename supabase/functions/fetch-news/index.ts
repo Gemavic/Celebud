@@ -92,10 +92,19 @@ function isValidArticleImage(imageUrl: string): boolean {
  * a picture. Used only when the RSS feed itself carried no usable image.
  * No AI, no cost — just one small page fetch.
  */
+// Most feeds already carry their own picture, so this page lookup is only a
+// fallback. It is still capped per run: without a limit the extra fetches
+// pushed the whole function past its 150s ceiling, which cut short how many
+// articles got imported at all.
+const MAX_IMAGE_LOOKUPS = 25;
+let imageLookupsUsed = 0;
+
 async function fetchSourceImage(url: string): Promise<string> {
+  if (imageLookupsUsed >= MAX_IMAGE_LOOKUPS) return '';
+  imageLookupsUsed++;
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 5000);
     const resp = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -693,6 +702,10 @@ function isJunkParagraph(text: string): boolean {
 }
 
 Deno.serve(async (req: Request) => {
+  // Warm instances reuse module state between requests, so this must be
+  // zeroed per run or later runs would skip image lookups entirely.
+  imageLookupsUsed = 0;
+
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 200,
