@@ -6,7 +6,7 @@ import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { toEditableHtml } from '../utils/articleContent';
 import { getVideoEmbedUrl, getVideoThumbnail, isEmbeddableVideoUrl } from '../utils/videoEmbed';
-import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle, Image as ImageIcon, Video, FileText } from 'lucide-react';
+import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle, Image as ImageIcon, Video, FileText, Pin } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
 // Posts to the CelebUD Facebook Page + Telegram channel via the
@@ -77,6 +77,8 @@ interface Article {
   comments_count: number;
   is_featured: boolean;
   is_trending: boolean;
+  /** Pinned articles stay on the site until an editor removes them. */
+  is_pinned?: boolean;
   seo_title: string | null;
   seo_keywords: string | null;
   categories: {
@@ -119,6 +121,7 @@ export function ArticleManagement() {
     external_url: '',
     is_featured: false,
     is_trending: false,
+    is_pinned: false,
     seo_title: '',
     seo_keywords: '',
   });
@@ -363,6 +366,7 @@ export function ArticleManagement() {
           comments_count,
           is_featured,
           is_trending,
+          is_pinned,
           seo_title,
           seo_keywords,
           categories:category_id (
@@ -452,6 +456,7 @@ export function ArticleManagement() {
       external_url: article.external_url || '',
       is_featured: article.is_featured || false,
       is_trending: article.is_trending || false,
+      is_pinned: article.is_pinned || false,
       seo_title: article.seo_title || '',
       seo_keywords: article.seo_keywords || '',
     });
@@ -844,7 +849,8 @@ export function ArticleManagement() {
         author_disclaimer_snapshot: articleBioForm.disclaimer || null,
         media_type: editForm.media_type,
         external_url: editForm.external_url || null,
-        is_featured: editForm.is_featured,
+        is_featured: editForm.is_pinned ? true : editForm.is_featured,
+        is_pinned: editForm.is_pinned,
         is_trending: editForm.is_trending,
         seo_title: editForm.seo_title || null,
         seo_keywords: editForm.seo_keywords || null,
@@ -1268,6 +1274,14 @@ export function ArticleManagement() {
                       {article.media_type === 'video' && (
                         <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-blue-700 bg-blue-50 rounded-full flex-shrink-0">
                           <Video className="w-3 h-3" /> Video
+                        </span>
+                      )}
+                      {article.is_pinned && (
+                        <span
+                          className="flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-amber-800 bg-amber-100 rounded-full flex-shrink-0"
+                          title="Pinned — stays on the site until you unpin or archive it"
+                        >
+                          <Pin className="w-3 h-3" /> Pinned
                         </span>
                       )}
                       <span className="truncate">{article.title}</span>
@@ -1777,6 +1791,26 @@ export function ArticleManagement() {
                     className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                   />
                   <span className="text-sm font-medium text-gray-700">Featured</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer" title="Pinned articles stay on the site until you unpin or archive them. The nightly trending job cannot remove them.">
+                  <input
+                    type="checkbox"
+                    checked={editForm.is_pinned}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        is_pinned: e.target.checked,
+                        // Pinning implies featured; unpinning leaves the
+                        // featured state alone so it can expire normally.
+                        is_featured: e.target.checked ? true : editForm.is_featured,
+                      })
+                    }
+                    className="w-4 h-4 text-amber-600 rounded border-gray-300 focus:ring-amber-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Pin permanently
+                    <span className="block text-xs font-normal text-gray-500">Stays until you remove it</span>
+                  </span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input

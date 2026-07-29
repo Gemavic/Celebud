@@ -111,6 +111,7 @@ export interface Database {
           is_featured: boolean;
           is_trending: boolean;
           is_manual: boolean | null;
+          is_pinned: boolean;
           views_count: number;
           comments_count: number;
           seo_title: string | null;
@@ -140,6 +141,7 @@ export interface Database {
           is_featured?: boolean;
           is_trending?: boolean;
           is_manual?: boolean | null;
+          is_pinned?: boolean;
           views_count?: number;
           comments_count?: number;
           seo_title?: string | null;
