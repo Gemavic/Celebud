@@ -42,18 +42,54 @@ export function ArticleDetail() {
     if (!id || !article) return;
 
     const loadRelatedArticles = async () => {
-      if (article.category_id) {
-        const { data: related } = await supabase
-          .from('media_content')
-          .select('*, categories(*), authors(*)')
-          .eq('category_id', article.category_id)
-          .neq('id', id)
-          .limit(3);
+      if (!article.category_id) return;
 
-        if (related) {
-          setRelatedArticles(related as MediaContentWithRelations[]);
-        }
-      }
+      // Pull a recent pool from the same section, then rank it by how much
+      // it genuinely overlaps with THIS story. The previous version took
+      // three rows with no ordering at all, so "Related Articles" was
+      // effectively whichever rows the database happened to return.
+      const { data: pool } = await supabase
+        .from('media_content')
+        .select('*, categories(*), authors(*)')
+        .eq('category_id', article.category_id)
+        .eq('media_type', 'article')
+        .neq('id', id)
+        .order('published_at', { ascending: false })
+        .limit(40);
+
+      if (!pool || pool.length === 0) return;
+
+      const stop = new Set([
+        'the', 'and', 'for', 'with', 'from', 'that', 'this', 'what', 'why',
+        'how', 'you', 'your', 'are', 'was', 'has', 'have', 'not', 'but',
+        'news', 'canada', 'canadian',
+      ]);
+      const terms = (text: string) =>
+        new Set(
+          (text || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9\s]/g, ' ')
+            .split(/\s+/)
+            .filter((w) => w.length > 3 && !stop.has(w))
+        );
+
+      const mine = terms(`${article.title} ${article.seo_keywords || ''}`);
+
+      const scored = (pool as MediaContentWithRelations[])
+        .map((candidate) => {
+          const theirs = terms(`${candidate.title} ${candidate.seo_keywords || ''}`);
+          let overlap = 0;
+          theirs.forEach((t) => { if (mine.has(t)) overlap++; });
+          // Nudge the newsroom's own written pieces upward — they are the
+          // articles worth keeping a reader on the site for.
+          const ownWork = !candidate.source_id ? 1.5 : 0;
+          return { candidate, score: overlap + ownWork };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 6)
+        .map((s) => s.candidate);
+
+      setRelatedArticles(scored);
     };
 
     loadRelatedArticles();
@@ -549,13 +585,16 @@ export function ArticleDetail() {
           {relatedArticles.length > 0 && (
             <div className="mt-12">
               <h2 className="text-xl font-semibold text-gray-900 mb-6 pb-3 border-b border-gray-200">
-                Related Articles
+                Continue Reading
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                 {relatedArticles.map((related) => (
                   <Link
                     key={related.id}
-                    to={`/article/${related.id}`}
+                    // Slugged URL, not the bare id: these are internal links
+                    // search engines follow, and they should point at the
+                    // same canonical address the sitemap lists.
+                    to={buildArticleUrl(related)}
                     className="group block"
                   >
                     <div className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
