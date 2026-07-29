@@ -58,6 +58,7 @@ function baseHtml({
   jsonLd,
   bodyHtml,
   keywords,
+  extraJsonLd,
 }: {
   title: string;
   description: string;
@@ -67,6 +68,8 @@ function baseHtml({
   jsonLd: Record<string, unknown>;
   bodyHtml: string;
   keywords?: string;
+  /** Optional second JSON-LD block, e.g. BreadcrumbList. */
+  extraJsonLd?: Record<string, unknown>;
 }) {
   return `<!doctype html>
 <html lang="en">
@@ -91,6 +94,7 @@ ${image ? `<meta property="og:image" content="${image}" />` : ''}
 ${image ? `<meta name="twitter:image" content="${image}" />` : ''}
 
 <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+${extraJsonLd ? `<script type="application/ld+json">${JSON.stringify(extraJsonLd)}</script>` : ''}
 </head>
 <body>
 ${bodyHtml}
@@ -148,6 +152,30 @@ Deno.serve(async (req: Request) => {
         keywords: article.seo_keywords || undefined,
       };
 
+      // Breadcrumbs give Google the "CelebUD › Politics › Headline" trail
+      // shown above search results, which lifts click-through.
+      const breadcrumb = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+          ...(article.categories
+            ? [{
+                '@type': 'ListItem',
+                position: 2,
+                name: article.categories.name,
+                item: `${SITE_URL}/?category=${article.categories.slug}`,
+              }]
+            : []),
+          {
+            '@type': 'ListItem',
+            position: article.categories ? 3 : 2,
+            name: article.title,
+            item: url,
+          },
+        ],
+      };
+
       const bodyHtml = `
 <article>
   <h1>${escapeHtml(article.title)}</h1>
@@ -168,6 +196,7 @@ Deno.serve(async (req: Request) => {
         url,
         type: 'article',
         jsonLd,
+        extraJsonLd: breadcrumb,
         bodyHtml,
       });
 
@@ -220,6 +249,22 @@ Deno.serve(async (req: Request) => {
         '@type': 'WebSite',
         name: SITE_NAME,
         url: SITE_URL,
+        // Lets Google show a search box for the site directly in results,
+        // and identifies the publisher so the brand can earn a knowledge panel.
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: {
+            '@type': 'EntryPoint',
+            urlTemplate: `${SITE_URL}/?search={search_term_string}`,
+          },
+          'query-input': 'required name=search_term_string',
+        },
+        publisher: {
+          '@type': 'NewsMediaOrganization',
+          name: SITE_NAME,
+          url: SITE_URL,
+          logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.png` },
+        },
       },
       bodyHtml: `<main><h1>Latest Stories</h1><ul>${listHtml}</ul></main>`,
     });
