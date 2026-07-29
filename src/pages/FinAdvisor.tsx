@@ -17,6 +17,7 @@ import {
   CheckCircle,
   Clock,
   Landmark,
+  Search,
   Lightbulb,
   LineChart,
   PiggyBank,
@@ -24,11 +25,27 @@ import {
   Target,
   TrendingUp,
   Wallet,
+  X,
 } from 'lucide-react';
 
-// Only these categories may appear on FIN-ADVISOR - financial and
-// insurance content exclusively (matches fetch-news financial routing).
-const FINANCE_CATEGORY_SLUGS = ['fin-advisor', 'finance-accounting', 'business', 'insurance'];
+// Categories that may appear on FIN-ADVISOR.
+//
+// These must match slugs that ACTUALLY EXIST in the categories table. The
+// previous list named 'finance-accounting' and 'insurance', neither of which
+// exists, so half the filter did nothing — while the real 'finance' category
+// (233 articles) was left out entirely and never surfaced here.
+const FINANCE_CATEGORY_SLUGS = ['fin-advisor', 'finance', 'business'];
+
+// Shown as filter chips, in the order readers are most likely to want.
+const FINANCE_FILTERS: Array<{ slug: string; label: string }> = [
+  { slug: 'all', label: 'All' },
+  { slug: 'fin-advisor', label: 'Expert Guides' },
+  { slug: 'finance', label: 'Finance' },
+  { slug: 'business', label: 'Business' },
+];
+
+// How many articles to load per page in the library.
+const PAGE_SIZE = 18;
 
 interface FinanceArticle {
   id: string;
@@ -282,18 +299,68 @@ export function FinAdvisor() {
   const [articles, setArticles] = useState<FinanceArticle[]>([]);
   const [articlesLoading, setArticlesLoading] = useState(true);
 
+  // Searchable library state.
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');          // debounced value actually sent
+  const [filter, setFilter] = useState('all');
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
+
+  // Wait for a pause in typing before querying, so a search does not fire a
+  // request per keystroke.
   useEffect(() => {
+    const t = setTimeout(() => {
+      setQuery(search.trim());
+      setPage(0);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [filter]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     (async () => {
-      const { data } = await supabase
+      setArticlesLoading(true);
+
+      const slugs = filter === 'all' ? FINANCE_CATEGORY_SLUGS : [filter];
+      let q = supabase
         .from('media_content')
-        .select('id, slug, title, description, thumbnail_url, published_at, categories!inner(name, slug)')
-        .in('categories.slug', FINANCE_CATEGORY_SLUGS)
+        .select(
+          'id, slug, title, description, thumbnail_url, published_at, categories!inner(name, slug)',
+          { count: 'exact' }
+        )
+        .eq('media_type', 'article')
+        .in('categories.slug', slugs);
+
+      if (query) {
+        // Escape PostgREST's delimiters so a comma or parenthesis in the
+        // search box cannot break out of the filter expression.
+        const safe = query.replace(/[,()\\]/g, ' ').trim();
+        if (safe) q = q.or(`title.ilike.%${safe}%,description.ilike.%${safe}%`);
+      }
+
+      const from = page * PAGE_SIZE;
+      const { data, count } = await q
         .order('published_at', { ascending: false })
-        .limit(24);
-      setArticles((data as unknown as FinanceArticle[]) || []);
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (cancelled) return;
+
+      const rows = (data as unknown as FinanceArticle[]) || [];
+      // Append when paging, replace when the search or filter changed.
+      setArticles((prev) => (page === 0 ? rows : [...prev, ...rows]));
+      setTotalCount(count ?? null);
+      setHasMore(rows.length === PAGE_SIZE);
       setArticlesLoading(false);
     })();
-  }, []);
+
+    return () => { cancelled = true; };
+  }, [query, filter, page]);
 
   const openTopic = (key: string) => {
     setActiveTopic(key);
@@ -464,9 +531,70 @@ export function FinAdvisor() {
 
           {tab === 'articles' && (
             <div>
-              {articlesLoading && <p className="text-center text-gray-500 py-12">Loading articles...</p>}
+              {/* Search + filters */}
+              <div className="mb-6 space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search insurance, mortgages, credit, tax, benefits…"
+                    aria-label="Search finance and insurance articles"
+                    className="w-full pl-12 pr-11 py-3.5 bg-white border border-gray-200 rounded-2xl shadow-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
+                  />
+                  {search && (
+                    <button
+                      onClick={() => setSearch('')}
+                      aria-label="Clear search"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {FINANCE_FILTERS.map((f) => (
+                    <button
+                      key={f.slug}
+                      onClick={() => setFilter(f.slug)}
+                      className={`px-4 py-2 text-sm font-semibold rounded-full border transition-colors ${
+                        filter === f.slug
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300 hover:text-emerald-700'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                  {totalCount !== null && !articlesLoading && (
+                    <span className="ml-auto text-sm text-gray-500">
+                      {totalCount.toLocaleString()} article{totalCount === 1 ? '' : 's'}
+                      {query ? ` matching “${query}”` : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {articlesLoading && page === 0 && (
+                <p className="text-center text-gray-500 py-12">Loading articles…</p>
+              )}
               {!articlesLoading && articles.length === 0 && (
-                <p className="text-center text-gray-500 py-12">No finance articles yet - check back soon.</p>
+                <div className="text-center py-14">
+                  <BookOpen className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-600 font-medium">
+                    {query ? `Nothing found for “${query}”.` : 'No finance articles yet — check back soon.'}
+                  </p>
+                  {query && (
+                    <button
+                      onClick={() => { setSearch(''); setFilter('all'); }}
+                      className="mt-3 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+                    >
+                      Clear search and show everything
+                    </button>
+                  )}
+                </div>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {articles.map((a) => (
@@ -506,6 +634,18 @@ export function FinAdvisor() {
                   </Link>
                 ))}
               </div>
+
+              {hasMore && (
+                <div className="text-center mt-8">
+                  <button
+                    onClick={() => setPage((p) => p + 1)}
+                    disabled={articlesLoading}
+                    className="px-6 py-3 text-sm font-semibold text-emerald-700 bg-white border border-emerald-200 rounded-xl hover:bg-emerald-50 disabled:opacity-60 transition-colors"
+                  >
+                    {articlesLoading ? 'Loading…' : 'Load more articles'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
