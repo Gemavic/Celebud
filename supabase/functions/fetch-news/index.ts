@@ -86,6 +86,43 @@ function isValidArticleImage(imageUrl: string): boolean {
   return true;
 }
 
+/**
+ * The publisher's own lead photo for a story, from the Open Graph tag
+ * outlets publish specifically so their article can be shown elsewhere with
+ * a picture. Used only when the RSS feed itself carried no usable image.
+ * No AI, no cost — just one small page fetch.
+ */
+async function fetchSourceImage(url: string): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!resp.ok) return '';
+
+    // Only the <head> is needed, so stop reading once past it.
+    const html = (await resp.text()).slice(0, 60000);
+    const root = parseHTML(html);
+    let img =
+      root.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
+      root.querySelector('meta[name="twitter:image"]')?.getAttribute('content') ||
+      '';
+    if (img && !img.startsWith('http')) {
+      try { img = new URL(img, url).href; } catch { return ''; }
+    }
+    return img && isValidArticleImage(img) ? img : '';
+  } catch {
+    return '';
+  }
+}
+
 function parseRSS(xmlText: string): RSSItem[] {
   const items: RSSItem[] = [];
 
@@ -883,16 +920,24 @@ Deno.serve(async (req: Request) => {
             // curation. We now only ever store the RSS feed's own short
             // description as a teaser, with a clear link back to the
             // original source for the full story.
-            const EXCERPT_MAX_LENGTH = 320;
-            const rawExcerpt = (item.description || item.content || '').trim();
-            const truncatedExcerpt = rawExcerpt.length > EXCERPT_MAX_LENGTH
-              ? rawExcerpt.slice(0, EXCERPT_MAX_LENGTH).replace(/\s+\S*$/, '') + '…'
-              : rawExcerpt;
+            // Interim text, shown until enrich-articles re-reports the story
+            // in full. Take the richest summary the feed offers rather than
+            // the first field that happens to exist — a 320-character stub
+            // made every fresh article look empty on the site.
+            const rssDescription = stripHtml(item.description || '').trim();
+            const rssContent = stripHtml(item.content || '').trim();
+            const richest = rssContent.length > rssDescription.length ? rssContent : rssDescription;
 
-            const finalDescription = stripHtml(sanitizeContactInfo(truncatedExcerpt));
+            const trimTo = (text: string, max: number) =>
+              text.length > max ? text.slice(0, max).replace(/\s+\S*$/, '') + '…' : text;
+
+            // Meta description stays short for search results; the body keeps
+            // as much of the publisher's own summary as the feed provides.
+            const finalDescription = stripHtml(sanitizeContactInfo(trimTo(richest, 300)));
+            const bodyText = stripHtml(sanitizeContactInfo(trimTo(richest, 1200)));
             const sourceName = source.name || 'the original source';
-            const finalContent = finalDescription
-              ? `${finalDescription}\n\nContinue reading the full story at ${sourceName}.`
+            const finalContent = bodyText
+              ? `${bodyText}\n\nContinue reading the full story at ${sourceName}.`
               : '';
 
             if (!finalContent && !finalDescription) {
@@ -910,14 +955,31 @@ Deno.serve(async (req: Request) => {
             // and pick deterministically from the article's slug so the same
             // article always keeps the same image instead of similar stories
             // randomly clustering on one photo.
-            const isWorldCup = isWorldCupContent(item.title, item.description);
-            let finalThumbnail: string;
-            if (isWorldCup) {
-              finalThumbnail = getWorldCupThumbnail();
-            } else {
-              const topic = detectImageTopic(item.title, item.description, finalCategorySlug);
-              finalThumbnail = (await searchPexelsImage(topic.query, slug))
-                || pickStockImage(topic.pool, slug);
+            // Image priority, most authentic first:
+            //   1. The photo the RSS feed itself supplied for this story
+            //      (media:content / media:thumbnail / enclosure). This is the
+            //      publisher's own picture of the actual event — it was being
+            //      parsed and then thrown away in favour of stock.
+            //   2. The article page's own Open Graph photo.
+            //   3. A topical stock photo, only when the story has no real
+            //      picture available at all.
+            let finalThumbnail = '';
+
+            if (item.thumbnail && isValidArticleImage(item.thumbnail)) {
+              finalThumbnail = item.thumbnail;
+            } else if (item.link) {
+              finalThumbnail = await fetchSourceImage(item.link);
+            }
+
+            if (!finalThumbnail) {
+              const isWorldCup = isWorldCupContent(item.title, item.description);
+              if (isWorldCup) {
+                finalThumbnail = getWorldCupThumbnail();
+              } else {
+                const topic = detectImageTopic(item.title, item.description, finalCategorySlug);
+                finalThumbnail = (await searchPexelsImage(topic.query, slug))
+                  || pickStockImage(topic.pool, slug);
+              }
             }
 
             // Every article gets usable SEO metadata at ingest. enrich-articles
