@@ -209,6 +209,12 @@ interface Rewrite {
   seo_keywords?: string;
 }
 
+// Set once the API tells us this model version will not accept
+// thinkingConfig, so we stop paying a wasted 400 on every article. Left
+// deliberately OUTSIDE the per-request reset: a warm instance should
+// remember, and a cold start costs at most one retry to relearn.
+let thinkingConfigUnsupported = false;
+
 // Real billed usage, accumulated across the run. Reported back so cost is
 // measured from Google's own token counts rather than estimated.
 const usage = { promptTokens: 0, outputTokens: 0, thoughtTokens: 0, calls: 0 };
@@ -269,26 +275,46 @@ Research notes (facts only — rewrite completely, never copy):
 ${sourceFacts || article.description || article.content || '(No detailed notes available — write a brief, factual piece using only the headline, and keep all claims general.)'}`;
 
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-  const resp = await fetch(endpoint, {
+
+  const baseConfig = {
+    temperature: 0.65,
+    // A ceiling, not a target — it costs nothing unless an article uses it,
+    // and lowering it only risked truncating the detailed pieces the
+    // newsroom wants kept.
+    maxOutputTokens: 4096,
+  };
+
+  const buildBody = (withThinkingDisabled: boolean) => JSON.stringify({
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+    generationConfig: withThinkingDisabled
+      // Gemini 2.5 models "think" by default and bill those hidden reasoning
+      // tokens at the OUTPUT rate — several times the cost of the article
+      // itself. Rewriting supplied notes needs no reasoning budget.
+      ? { ...baseConfig, thinkingConfig: { thinkingBudget: 0 } }
+      : baseConfig,
+  });
+
+  const send = (withThinkingDisabled: boolean) => fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-      generationConfig: {
-        temperature: 0.65,
-        // Restored to 4096. This is a ceiling, not a target — it costs
-        // nothing unless an article actually uses it, and lowering it only
-        // risked truncating the detailed pieces the newsroom wants kept.
-        maxOutputTokens: 4096,
-        // Gemini 2.5 Flash "thinks" by default and bills those hidden
-        // reasoning tokens at the OUTPUT rate — several times the cost of
-        // the article itself. Rewriting supplied notes needs no reasoning
-        // budget, so it is switched off. This was the main cost overrun.
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-    }),
+    body: buildBody(withThinkingDisabled),
   });
+
+  // Not every model version accepts thinkingConfig; whichever one
+  // 'gemini-flash-latest' currently points at rejects it with a 400
+  // INVALID_ARGUMENT. Try the cheap path first, then fall back to a plain
+  // request rather than failing the article outright — better to pay a
+  // little more than to publish nothing.
+  let resp = await send(!thinkingConfigUnsupported);
+  if (!resp.ok && resp.status === 400 && !thinkingConfigUnsupported) {
+    const detail = await resp.clone().text();
+    if (/INVALID_ARGUMENT|thinking/i.test(detail)) {
+      console.warn('Model rejected thinkingConfig; retrying without it and disabling for this run.');
+      thinkingConfigUnsupported = true;
+      resp = await send(false);
+    }
+  }
 
   if (!resp.ok) {
     const detail = await resp.text();
