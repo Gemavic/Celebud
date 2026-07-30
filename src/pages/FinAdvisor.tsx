@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Header } from '../components/Header';
 import { buildArticleUrl } from '../utils/articleUrl';
+import { InlineNewsletterCta } from '../components/InlineNewsletterCta';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -655,6 +656,8 @@ export function FinAdvisor() {
               <PageDisclaimer />
             </div>
           )}
+
+          <InlineNewsletterCta source="fin-advisor" />
 
           <AboutTheAuthor />
         </div>

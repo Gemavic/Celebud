@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Header } from '../components/Header';
 import { buildArticleUrl } from '../utils/articleUrl';
+import { InlineNewsletterCta } from '../components/InlineNewsletterCta';
 import { BookOpen, Clock, Pin, Search, X, Eye } from 'lucide-react';
 
 const PAGE_SIZE = 18;
@@ -100,6 +101,8 @@ export function OriginalsPage() {
               </p>
             )}
           </div>
+
+          <InlineNewsletterCta source="originals" compact />
 
           {/* Search */}
           <div className="relative mb-8">

@@ -6,6 +6,7 @@ import { Header } from '../components/Header';
 import CommentsSection from '../components/CommentsSection';
 import { AdBanner } from '../components/AdBanner';
 import { GoogleAd } from '../components/GoogleAd';
+import { InlineNewsletterCta } from '../components/InlineNewsletterCta';
 import { formatDistanceToNow } from '../utils/date';
 import { updateMetaTags, generateArticleStructuredData, removeArticleStructuredData } from '../utils/seo';
 import { sanitizeArticleContent } from '../utils/contentSanitizer';
@@ -581,6 +582,12 @@ export function ArticleDetail() {
               </button>
             </div>
           </div>
+
+          {/* Email capture where readers actually finish an article — most
+              social visitors land here directly and never see the homepage
+              signup. Placed above Continue Reading so it appears while they
+              are still engaged, not after they have clicked away. */}
+          <InlineNewsletterCta source="article" />
 
           {relatedArticles.length > 0 && (
             <div className="mt-12">
