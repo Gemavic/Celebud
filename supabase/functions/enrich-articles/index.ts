@@ -141,13 +141,11 @@ async function fetchSourceFacts(url: string): Promise<{ text: string; image: str
     if (image && !image.startsWith('http')) {
       try { image = new URL(image, url).href; } catch { image = ''; }
     }
+    // Strip only tags that never hold article prose. Class-based removal is
+    // deliberately NOT done here — see below.
     for (const sel of [
-      'script', 'style', 'noscript', 'iframe', 'nav', 'header', 'footer',
-      'aside', 'form', 'figcaption', 'svg',
-      '[class*="comment"]', '[class*="sidebar"]', '[class*="widget"]',
-      '[class*="advert"]', '[class*="banner"]', '[class*="social"]',
-      '[class*="share"]', '[class*="newsletter"]', '[class*="related"]',
-      '[class*="cookie"]', '[class*="popup"]', '[class*="modal"]',
+      'script', 'style', 'noscript', 'iframe', 'svg',
+      'nav', 'footer', 'aside', 'form', 'figcaption',
     ]) {
       try { root.querySelectorAll(sel).forEach((el) => el.remove()); } catch { /* skip */ }
     }
@@ -157,13 +155,42 @@ async function fetchSourceFacts(url: string): Promise<{ text: string; image: str
       '.post-content', '.entry-content', '.story-body', '.story-content',
       '.td-post-content', '.article__body', '#article-body', 'article', 'main',
     ];
+    const paraLength = (el: typeof root) =>
+      el.querySelectorAll('p').map((p) => p.text.trim()).filter((t) => t.length > 30).join(' ').length;
+
     let source = root;
     for (const sel of containers) {
       try {
         const el = root.querySelector(sel);
         if (!el) continue;
-        const text = el.querySelectorAll('p').map((p) => p.text.trim()).filter((t) => t.length > 30).join(' ');
-        if (text.length > 150) { source = el; break; }
+        if (paraLength(el) > 150) { source = el; break; }
+      } catch { /* skip */ }
+    }
+
+    // Only NOW remove class-matched clutter, and only when the element is a
+    // small fragment rather than a wrapper around the story.
+    //
+    // This ordering matters enormously. Doing class-based removal first, on
+    // the whole document, destroyed the article on most real news sites:
+    // publishers routinely wrap the body in containers whose class contains
+    // "share", "social" or "related", so a blanket [class*="share"] delete
+    // took the entire story with it. Measured before this fix: Tribune
+    // Nigeria 12,837 chars -> 0, Variety 11,234 -> 0, Premium Times
+    // 3,786 -> 121. Every one of those articles was then skipped as "too
+    // thin to rewrite" when the text had been there all along.
+    const totalLen = Math.max(paraLength(source), 1);
+    for (const sel of [
+      '[class*="comment"]', '[class*="sidebar"]', '[class*="widget"]',
+      '[class*="advert"]', '[class*="banner"]', '[class*="social"]',
+      '[class*="share"]', '[class*="newsletter"]', '[class*="related"]',
+      '[class*="cookie"]', '[class*="popup"]', '[class*="modal"]',
+    ]) {
+      try {
+        source.querySelectorAll(sel).forEach((el) => {
+          // A node holding more than a third of the prose is the article
+          // itself, not an advert next to it.
+          if (paraLength(el) < totalLen / 3) el.remove();
+        });
       } catch { /* skip */ }
     }
 
