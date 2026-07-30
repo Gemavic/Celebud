@@ -17,6 +17,7 @@ const WritersDashboard = lazy(() => import('./pages/WritersDashboard').then(modu
 const ArticleRecovery = lazy(() => import('./pages/ArticleRecovery').then(module => ({ default: module.ArticleRecovery })));
 const ReporterSignup = lazy(() => import('./pages/ReporterSignup').then(module => ({ default: module.ReporterSignup })));
 const ReporterManagement = lazy(() => import('./pages/ReporterManagement').then(module => ({ default: module.ReporterManagement })));
+const OriginalsPage = lazy(() => import('./pages/OriginalsPage').then(m => ({ default: m.OriginalsPage })));
 const FinAdvisor = lazy(() => import('./pages/FinAdvisor').then(module => ({ default: module.FinAdvisor })));
 const AuthorPage = lazy(() => import('./pages/AuthorPage').then(module => ({ default: module.AuthorPage })));
 const AboutPage = lazy(() => import('./pages/TrustPages').then(module => ({ default: module.AboutPage })));
@@ -55,6 +56,7 @@ function App() {
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/admin/writers" element={<WritersDashboard />} />
             <Route path="/reporters/apply" element={<ReporterSignup />} />
+            <Route path="/originals" element={<OriginalsPage />} />
             <Route path="/fin-advisor" element={<FinAdvisor />} />
             <Route path="/author/:id" element={<AuthorPage />} />
             <Route path="/about" element={<AboutPage />} />

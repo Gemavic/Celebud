@@ -14,6 +14,7 @@ const NAV_LINKS: { label: string; to: string }[] = [
   { label: 'Society', to: '/?category=society' },
   { label: 'Entertainment', to: '/?category=entertainment' },
   { label: 'Fin-Advisor', to: '/fin-advisor' },
+  { label: 'Originals', to: '/originals' },
   { label: 'Business', to: '/?category=business' },
   { label: 'Lifestyle', to: '/?category=lifestyle' },
   { label: 'Videos', to: '/?category=video' },

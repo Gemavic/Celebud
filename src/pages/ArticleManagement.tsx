@@ -6,7 +6,7 @@ import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { toEditableHtml } from '../utils/articleContent';
 import { getVideoEmbedUrl, getVideoThumbnail, isEmbeddableVideoUrl } from '../utils/videoEmbed';
-import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle, Image as ImageIcon, Video, FileText, Pin } from 'lucide-react';
+import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle, Image as ImageIcon, Video, FileText, Pin, Archive } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
 // Posts to the CelebUD Facebook Page + Telegram channel via the
@@ -160,6 +160,8 @@ export function ArticleManagement() {
   const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
   const [bulkPosting, setBulkPosting] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; results: string[] } | null>(null);
+  // Shared by bulk archive and bulk delete.
+  const [bulkWorking, setBulkWorking] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -912,6 +914,91 @@ export function ArticleManagement() {
     }
   };
 
+  /**
+   * Moves the selected articles into media_content_archive and removes them
+   * from the live site. Fully reversible from Admin -> Recovery, which is why
+   * this is the default bulk action rather than deletion.
+   */
+  const bulkArchive = async () => {
+    const ids = [...selectedArticles];
+    if (ids.length === 0) return;
+    if (!confirm(
+      `Archive ${ids.length} article${ids.length === 1 ? '' : 's'}?\n\n` +
+      `They will come off the site but stay fully recoverable from ` +
+      `Admin → Recovery. Nothing is permanently lost.`
+    )) return;
+
+    setBulkWorking(true);
+    setBulkProgress({ done: 0, total: ids.length, results: [] });
+    const results: string[] = [];
+    let done = 0;
+
+    for (const id of ids) {
+      const article = articles.find((a) => a.id === id);
+      try {
+        // Copy the full row across first, then remove the original — if the
+        // copy fails we must not delete anything.
+        const { data: row, error: readErr } = await supabase
+          .from('media_content').select('*').eq('id', id).maybeSingle();
+        if (readErr || !row) throw new Error(readErr?.message || 'could not read article');
+
+        const { error: copyErr } = await supabase
+          .from('media_content_archive')
+          .upsert({ ...row, archived_at: new Date().toISOString() });
+        if (copyErr) throw new Error(`archive copy failed: ${copyErr.message}`);
+
+        const { error: delErr } = await supabase.from('media_content').delete().eq('id', id);
+        if (delErr) throw new Error(`removal failed: ${delErr.message}`);
+
+        results.push(`Archived: ${article?.title?.slice(0, 50) || id}`);
+      } catch (err) {
+        results.push(`FAILED: ${article?.title?.slice(0, 40) || id} — ${err instanceof Error ? err.message : 'error'}`);
+      }
+      done++;
+      setBulkProgress({ done, total: ids.length, results: [...results] });
+    }
+
+    setBulkWorking(false);
+    setSelectedArticles(new Set());
+    await fetchArticles();
+  };
+
+  /**
+   * Permanent deletion with no archive copy. Requires typing DELETE, because
+   * unlike archiving there is no way back from this.
+   */
+  const bulkDelete = async () => {
+    const ids = [...selectedArticles];
+    if (ids.length === 0) return;
+
+    const typed = prompt(
+      `PERMANENTLY DELETE ${ids.length} article${ids.length === 1 ? '' : 's'}?\n\n` +
+      `This cannot be undone and leaves no archive copy. ` +
+      `If you might want them back, cancel and use Archive instead.\n\n` +
+      `Type DELETE to confirm:`
+    );
+    if (typed !== 'DELETE') return;
+
+    setBulkWorking(true);
+    setBulkProgress({ done: 0, total: ids.length, results: [] });
+    const results: string[] = [];
+    let done = 0;
+
+    // Deleted in chunks so one long list cannot time out mid-way.
+    const CHUNK = 25;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      const { error } = await supabase.from('media_content').delete().in('id', chunk);
+      results.push(error ? `FAILED (${chunk.length}): ${error.message}` : `Deleted ${chunk.length}`);
+      done += chunk.length;
+      setBulkProgress({ done, total: ids.length, results: [...results] });
+    }
+
+    setBulkWorking(false);
+    setSelectedArticles(new Set());
+    await fetchArticles();
+  };
+
   const filteredArticles = articles.filter(article =>
     article.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -1245,6 +1332,25 @@ export function ArticleManagement() {
                     ? <><RefreshCw className="w-4 h-4 animate-spin" /> Posting {bulkProgress?.done}/{bulkProgress?.total}...</>
                     : <><Send className="w-4 h-4" /> Push {selectedArticles.size} to Facebook &amp; Telegram</>
                   }
+                </button>
+                <button
+                  onClick={bulkArchive}
+                  disabled={bulkWorking || bulkPosting}
+                  title="Take these off the site but keep them fully recoverable from Admin → Recovery"
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors"
+                >
+                  {bulkWorking
+                    ? <><RefreshCw className="w-4 h-4 animate-spin" /> {bulkProgress?.done}/{bulkProgress?.total}</>
+                    : <><Archive className="w-4 h-4" /> Archive {selectedArticles.size}</>
+                  }
+                </button>
+                <button
+                  onClick={bulkDelete}
+                  disabled={bulkWorking || bulkPosting}
+                  title="Permanent — no archive copy is kept"
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" /> Delete {selectedArticles.size}
                 </button>
               </>
             )}
