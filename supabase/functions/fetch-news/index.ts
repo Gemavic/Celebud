@@ -93,19 +93,28 @@ function isValidArticleImage(imageUrl: string): boolean {
  * a picture. Used only when the RSS feed itself carried no usable image.
  * No AI, no cost — just one small page fetch.
  */
-// Most feeds already carry their own picture, so this page lookup is only a
-// fallback. It is still capped per run: without a limit the extra fetches
-// pushed the whole function past its 150s ceiling, which cut short how many
-// articles got imported at all.
-const MAX_IMAGE_LOOKUPS = 25;
-let imageLookupsUsed = 0;
+// One page fetch per article yields BOTH the publisher's lead photo and
+// their own summary — the meta/og description, which is very often two to
+// three times longer than the one-line teaser an RSS feed carries. Since we
+// pay the round-trip anyway, taking both is free.
+//
+// Still capped per run: unbounded fetches pushed the whole function past its
+// 150s ceiling, which cut short how many articles got imported at all.
+const MAX_SOURCE_LOOKUPS = 30;
+let sourceLookupsUsed = 0;
 
-async function fetchSourceImage(url: string): Promise<string> {
-  if (imageLookupsUsed >= MAX_IMAGE_LOOKUPS) return '';
-  imageLookupsUsed++;
+interface SourcePreview {
+  image: string;
+  description: string;
+}
+
+async function fetchSourcePreview(url: string): Promise<SourcePreview> {
+  const empty: SourcePreview = { image: '', description: '' };
+  if (sourceLookupsUsed >= MAX_SOURCE_LOOKUPS) return empty;
+  sourceLookupsUsed++;
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(), 4000);
     const resp = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -115,21 +124,32 @@ async function fetchSourceImage(url: string): Promise<string> {
       signal: controller.signal,
     });
     clearTimeout(timer);
-    if (!resp.ok) return '';
+    if (!resp.ok) return empty;
 
     // Only the <head> is needed, so stop reading once past it.
     const html = (await resp.text()).slice(0, 60000);
     const root = parseHTML(html);
+
     let img =
       root.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
       root.querySelector('meta[name="twitter:image"]')?.getAttribute('content') ||
       '';
     if (img && !img.startsWith('http')) {
-      try { img = new URL(img, url).href; } catch { return ''; }
+      try { img = new URL(img, url).href; } catch { img = ''; }
     }
-    return img && isValidArticleImage(img) ? img : '';
+
+    const description = stripHtml(
+      root.querySelector('meta[property="og:description"]')?.getAttribute('content') ||
+      root.querySelector('meta[name="description"]')?.getAttribute('content') ||
+      ''
+    ).trim();
+
+    return {
+      image: img && isValidArticleImage(img) ? img : '',
+      description,
+    };
   } catch {
-    return '';
+    return empty;
   }
 }
 
@@ -705,7 +725,7 @@ function isJunkParagraph(text: string): boolean {
 Deno.serve(async (req: Request) => {
   // Warm instances reuse module state between requests, so this must be
   // zeroed per run or later runs would skip image lookups entirely.
-  imageLookupsUsed = 0;
+  sourceLookupsUsed = 0;
   // URLs published this run, announced to search engines at the end.
   const newArticleUrls: string[] = [];
 
@@ -942,13 +962,30 @@ Deno.serve(async (req: Request) => {
             // made every fresh article look empty on the site.
             const rssDescription = stripHtml(item.description || '').trim();
             const rssContent = stripHtml(item.content || '').trim();
-            const richest = rssContent.length > rssDescription.length ? rssContent : rssDescription;
+            let richest = rssContent.length > rssDescription.length ? rssContent : rssDescription;
+
+            // Many feeds publish only a single sentence. When that happens,
+            // look at the article page itself: its own meta/og description is
+            // typically two to three times longer, and the same fetch also
+            // gives us the publisher's lead photo, so it costs one round-trip
+            // for both. Raising the character cap alone could never fix a
+            // 160-character feed — there was simply nothing more to keep.
+            let sourcePreview: SourcePreview = { image: '', description: '' };
+            const feedIsThin = richest.length < 600;
+            const needsPhoto = !(item.thumbnail && isValidArticleImage(item.thumbnail));
+
+            if (item.link && (feedIsThin || needsPhoto)) {
+              sourcePreview = await fetchSourcePreview(item.link);
+              if (sourcePreview.description.length > richest.length) {
+                richest = sourcePreview.description;
+              }
+            }
 
             const trimTo = (text: string, max: number) =>
               text.length > max ? text.slice(0, max).replace(/\s+\S*$/, '') + '…' : text;
 
             // Meta description stays short for search results; the body keeps
-            // as much of the publisher's own summary as the feed provides.
+            // as much of the publisher's own summary as is available.
             const finalDescription = stripHtml(sanitizeContactInfo(trimTo(richest, 300)));
             const bodyText = stripHtml(sanitizeContactInfo(trimTo(richest, 1200)));
             const sourceName = source.name || 'the original source';
@@ -983,8 +1020,9 @@ Deno.serve(async (req: Request) => {
 
             if (item.thumbnail && isValidArticleImage(item.thumbnail)) {
               finalThumbnail = item.thumbnail;
-            } else if (item.link) {
-              finalThumbnail = await fetchSourceImage(item.link);
+            } else {
+              // Reuses the page already fetched above — no second round-trip.
+              finalThumbnail = sourcePreview.image;
             }
 
             if (!finalThumbnail) {
