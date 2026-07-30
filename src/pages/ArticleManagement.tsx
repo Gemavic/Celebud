@@ -915,6 +915,55 @@ export function ArticleManagement() {
   };
 
   /**
+   * Pins or unpins the selected articles.
+   *
+   * Pinning makes an article permanent on the site: the nightly
+   * update_trending_featured_flags() job may not un-feature it, and it appears
+   * in the public Originals collection. Pinning implies featured, matching the
+   * safety net in the database function.
+   *
+   * Use it selectively — pinning everything would make "featured" meaningless
+   * and clutter the homepage.
+   */
+  const bulkSetPinned = async (pinned: boolean) => {
+    const ids = [...selectedArticles];
+    if (ids.length === 0) return;
+
+    if (pinned && !confirm(
+      `Pin ${ids.length} article${ids.length === 1 ? '' : 's'} permanently?\n\n` +
+      `They will stay featured on the site and appear in CelebUD Originals ` +
+      `until you unpin, archive or delete them. Nothing automatic can remove them.`
+    )) return;
+
+    setBulkWorking(true);
+    setBulkProgress({ done: 0, total: ids.length, results: [] });
+    const results: string[] = [];
+    let done = 0;
+
+    const payload = pinned
+      ? { is_pinned: true, is_featured: true, last_featured_at: new Date().toISOString() }
+      : { is_pinned: false };
+
+    // Chunked so a long selection cannot time out mid-way.
+    const CHUNK = 50;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      const { error } = await supabase.from('media_content').update(payload).in('id', chunk);
+      results.push(
+        error
+          ? `FAILED (${chunk.length}): ${error.message}`
+          : `${pinned ? 'Pinned' : 'Unpinned'} ${chunk.length}`
+      );
+      done += chunk.length;
+      setBulkProgress({ done, total: ids.length, results: [...results] });
+    }
+
+    setBulkWorking(false);
+    setSelectedArticles(new Set());
+    await fetchArticles();
+  };
+
+  /**
    * Moves the selected articles into media_content_archive and removes them
    * from the live site. Fully reversible from Admin -> Recovery, which is why
    * this is the default bulk action rather than deletion.
@@ -1332,6 +1381,22 @@ export function ArticleManagement() {
                     ? <><RefreshCw className="w-4 h-4 animate-spin" /> Posting {bulkProgress?.done}/{bulkProgress?.total}...</>
                     : <><Send className="w-4 h-4" /> Push {selectedArticles.size} to Facebook &amp; Telegram</>
                   }
+                </button>
+                <button
+                  onClick={() => bulkSetPinned(true)}
+                  disabled={bulkWorking || bulkPosting}
+                  title="Keep these on the site permanently and show them in CelebUD Originals"
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors shadow-sm"
+                >
+                  <Pin className="w-4 h-4" /> Pin {selectedArticles.size}
+                </button>
+                <button
+                  onClick={() => bulkSetPinned(false)}
+                  disabled={bulkWorking || bulkPosting}
+                  title="Remove the permanent pin — the article stays on the site but can lose homepage placement after 30 days"
+                  className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
+                >
+                  Unpin
                 </button>
                 <button
                   onClick={bulkArchive}
