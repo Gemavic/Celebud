@@ -48,6 +48,18 @@ const MIN_SOURCE_CHARS = 200;
 // for work that could never succeed.
 const MAX_ATTEMPTS = 2;
 
+// Categories where a rewritten article earns its cost: readers search these
+// deliberately, they hold their value for months rather than hours, and they
+// carry the highest advertising rates. Sports scores and celebrity gossip go
+// stale in a day, so paying to rewrite them is money spent on nothing.
+//
+// Callers pass scope:'high-value' to rewrite only these, or scope:'all' for
+// everything. Roughly 40% of the queue sits in these categories.
+const HIGH_VALUE_CATEGORIES = [
+  'fin-advisor', 'finance', 'business', 'immigration',
+  'health', 'legal', 'education', 'politics',
+];
+
 /**
  * Billing/quota failures affect every subsequent call, so the whole run must
  * stop immediately rather than grinding through batches racking up errors.
@@ -427,16 +439,28 @@ Deno.serve(async (req: Request) => {
     // caller explicitly asks for them.
     const withImages: boolean = body.withImages === true;
 
+    // scope:'high-value' rewrites only the categories worth paying for;
+    // 'all' rewrites everything. Defaults to high-value so an accidental
+    // call cannot spend money on stale sports scores.
+    const scope: string = body.scope === 'all' ? 'all' : 'high-value';
+    const scopeSlugs: string[] | null = Array.isArray(body.categories) && body.categories.length
+      ? body.categories
+      : (scope === 'high-value' ? HIGH_VALUE_CATEGORIES : null);
+
     // is_manual articles are hand-written by the newsroom and must never be
     // touched by any automated pass.
     let query = supabase
       .from('media_content')
-      .select('id, title, slug, description, content, thumbnail_url, external_url, category_id, source_id, is_featured, is_trending, enrichment_attempts')
+      .select(
+        'id, title, slug, description, content, thumbnail_url, external_url, category_id, source_id, is_featured, is_trending, enrichment_attempts, categories!inner(slug)'
+      )
       .eq('media_type', 'article')
       .or('is_manual.is.null,is_manual.eq.false')
       // No source link means this is our own writing, not a fetched story.
       // It must never be queued - not even for a thumbnail change.
       .not('external_url', 'is', null);
+
+    if (scopeSlugs) query = query.in('categories.slug', scopeSlugs);
 
     query = ids
       ? query.in('id', ids)
@@ -449,14 +473,23 @@ Deno.serve(async (req: Request) => {
     const { data: articles, error: fetchErr } = await query;
     if (fetchErr) throw new Error(`Could not load articles: ${fetchErr.message}`);
 
-    const { count: remainingBefore } = await supabase
-      .from('media_content')
-      .select('id', { count: 'exact', head: true })
-      .eq('media_type', 'article')
-      .or('is_manual.is.null,is_manual.eq.false')
-      .not('external_url', 'is', null)
-      .is('enriched_at', null)
-      .lt('enrichment_attempts', MAX_ATTEMPTS);
+    // Counts must honour the same scope as the work itself, or progress and
+    // cost estimates would describe a different set of articles.
+    const countRemaining = async (): Promise<number> => {
+      let c = supabase
+        .from('media_content')
+        .select(scopeSlugs ? 'id, categories!inner(slug)' : 'id', { count: 'exact', head: true })
+        .eq('media_type', 'article')
+        .or('is_manual.is.null,is_manual.eq.false')
+        .not('external_url', 'is', null)
+        .is('enriched_at', null)
+        .lt('enrichment_attempts', MAX_ATTEMPTS);
+      if (scopeSlugs) c = c.in('categories.slug', scopeSlugs);
+      const { count } = await c;
+      return count ?? 0;
+    };
+
+    const remainingBefore = await countRemaining();
 
     if (!articles || articles.length === 0) {
       return new Response(JSON.stringify({ success: true, processed: 0, failed: 0, remaining: remainingBefore ?? 0, message: 'Nothing left to enrich.' }), {
@@ -604,14 +637,7 @@ Deno.serve(async (req: Request) => {
       if (billingStopped) break;
     }
 
-    const { count: remaining } = await supabase
-      .from('media_content')
-      .select('id', { count: 'exact', head: true })
-      .eq('media_type', 'article')
-      .or('is_manual.is.null,is_manual.eq.false')
-      .not('external_url', 'is', null)
-      .is('enriched_at', null)
-      .lt('enrichment_attempts', MAX_ATTEMPTS);
+    const remaining = await countRemaining();
 
     return new Response(
       JSON.stringify({
@@ -630,7 +656,8 @@ Deno.serve(async (req: Request) => {
             ? Number((estimateRunCostUsd() / processed).toFixed(5))
             : 0,
         },
-        remaining: remaining ?? 0,
+        remaining,
+        scope,
         timedOut,
         elapsedMs: Date.now() - started,
         errors,

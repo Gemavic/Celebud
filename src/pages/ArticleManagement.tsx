@@ -103,6 +103,9 @@ export function ArticleManagement() {
   // AI images cost roughly 8x a text rewrite, so they stay off unless asked.
   const [enrichImages, setEnrichImages] = useState(false);
   const [enrichQueue, setEnrichQueue] = useState<number | null>(null);
+  // 'high-value' rewrites only the categories worth paying for (~40% of the
+  // queue); 'all' rewrites everything including sports and celebrity wire.
+  const [enrichScope, setEnrichScope] = useState<'high-value' | 'all'>('high-value');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
@@ -196,17 +199,28 @@ export function ArticleManagement() {
    * articles are marked and never reprocessed.
    */
   // How many articles still need rebuilding, so the cost is visible upfront.
-  const loadEnrichQueue = async () => {
-    const { count } = await supabase
+  // Must mirror HIGH_VALUE_CATEGORIES in the enrich-articles function so the
+  // count and cost shown here describe the same articles it will process.
+  const HIGH_VALUE_SLUGS = [
+    'fin-advisor', 'finance', 'business', 'immigration',
+    'health', 'legal', 'education', 'politics',
+  ];
+
+  const loadEnrichQueue = async (scope: 'high-value' | 'all') => {
+    let q = supabase
       .from('media_content')
-      .select('id', { count: 'exact', head: true })
+      .select(scope === 'all' ? 'id' : 'id, categories!inner(slug)', { count: 'exact', head: true })
       .eq('media_type', 'article')
+      .or('is_manual.is.null,is_manual.eq.false')
+      .not('external_url', 'is', null)
       .is('enriched_at', null)
       .lt('enrichment_attempts', 2);
+    if (scope === 'high-value') q = q.in('categories.slug', HIGH_VALUE_SLUGS);
+    const { count } = await q;
     setEnrichQueue(count ?? 0);
   };
 
-  useEffect(() => { loadEnrichQueue(); }, []);
+  useEffect(() => { loadEnrichQueue(enrichScope); }, [enrichScope]);
 
   /**
    * @param maxArticles stop after roughly this many (a measured test run);
@@ -245,6 +259,7 @@ export function ArticleManagement() {
           body: JSON.stringify({
             limit: maxArticles ? Math.min(maxArticles, 30) : 30,
             withImages: enrichImages,
+            scope: enrichScope,
           }),
         });
 
@@ -1068,6 +1083,25 @@ export function ArticleManagement() {
 
             {enrichQueue !== null && (
               <div className="mt-3 text-sm">
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {([
+                    ['high-value', 'Valuable categories only'],
+                    ['all', 'Every category'],
+                  ] as Array<['high-value' | 'all', string]>).map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setEnrichScope(key)}
+                      disabled={enriching}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors disabled:opacity-60 ${
+                        enrichScope === key
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <p className="text-gray-700">
                   <span className="font-semibold">{enrichQueue.toLocaleString()}</span> article
                   {enrichQueue === 1 ? '' : 's'} left to rebuild — estimated cost{' '}
@@ -1075,6 +1109,11 @@ export function ArticleManagement() {
                     ${(enrichQueue * (enrichImages ? 0.044 : 0.005)).toFixed(2)}
                   </span>{' '}
                   {enrichImages ? 'with AI images' : 'text and SEO only'}.
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {enrichScope === 'high-value'
+                    ? 'Finance, business, immigration, health, legal, education and politics — where a rewrite holds its value. Sports and celebrity wire stay as short attributed teasers.'
+                    : 'Includes sports and celebrity wire stories, which go stale within a day.'}
                 </p>
                 <label className="mt-2 inline-flex items-start gap-2 cursor-pointer">
                   <input

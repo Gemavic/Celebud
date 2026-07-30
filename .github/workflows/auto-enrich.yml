@@ -1,0 +1,105 @@
+# Rewrites newly fetched articles automatically, without anyone pressing a
+# button in the admin area.
+#
+# WHY THIS EXISTS
+#   fetch-news imports articles as a short attributed teaser. Turning those
+#   into full CelebUD-written articles is enrich-articles' job, and until now
+#   that only ever ran when an admin clicked "Start rebuild" — so every new
+#   article stayed thin indefinitely.
+#
+# WHAT IT DOES
+#   Every 3 hours it asks enrich-articles for one batch. The function itself
+#   decides what needs doing, skips hand-written articles, respects the retry
+#   cap, and aborts immediately if the Google AI credit runs out — so this can
+#   never run away with spend.
+#
+# SCOPE
+#   Defaults to 'high-value', meaning only the categories where a rewrite
+#   earns its cost (finance, business, immigration, health, legal, education,
+#   politics, fin-advisor). Sports scores and celebrity gossip are left as
+#   attributed teasers, which is both cheaper and perfectly legitimate.
+#   Run manually with scope 'all' to include everything.
+#
+# REQUIRED SECRETS (both must hold the SAME value)
+#   1. Supabase  -> Edge Functions -> Secrets -> ENRICH_CRON_SECRET
+#   2. GitHub    -> Settings -> Secrets and variables -> Actions -> ENRICH_CRON_SECRET
+#   Without them this workflow skips itself rather than failing loudly.
+
+name: Auto-enrich new articles
+
+on:
+  schedule:
+    # Every 3 hours. One batch per run keeps spend predictable and steady.
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Which categories to rewrite'
+        required: false
+        default: 'high-value'
+        type: choice
+        options:
+          - high-value
+          - all
+      batches:
+        description: 'How many batches to run (30 articles each)'
+        required: false
+        default: '1'
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    env:
+      FUNCTION_URL: https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/enrich-articles
+      CRON_SECRET: ${{ secrets.ENRICH_CRON_SECRET }}
+      SCOPE: ${{ github.event.inputs.scope || 'high-value' }}
+      BATCHES: ${{ github.event.inputs.batches || '1' }}
+    steps:
+      - name: Skip if the cron secret is not configured
+        id: guard
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "ENRICH_CRON_SECRET is not set — skipping." >> "$GITHUB_STEP_SUMMARY"
+            echo "Add it to BOTH Supabase Edge Function secrets and GitHub Actions secrets to enable automatic rewriting." >> "$GITHUB_STEP_SUMMARY"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rewrite a batch
+        if: steps.guard.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          echo "### Auto-enrich (scope: $SCOPE)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          for i in $(seq 1 "$BATCHES"); do
+            response=$(curl -sS -X POST "$FUNCTION_URL" \
+              -H "Content-Type: application/json" \
+              -H "X-Cron-Secret: $CRON_SECRET" \
+              -d "{\"scope\":\"$SCOPE\",\"limit\":30,\"withImages\":false}" \
+              --max-time 180) || { echo "Request failed on batch $i" >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+
+            processed=$(echo "$response" | grep -o '"processed":[0-9]*'  | head -1 | cut -d: -f2 || echo 0)
+            failed=$(echo    "$response" | grep -o '"failed":[0-9]*'     | head -1 | cut -d: -f2 || echo 0)
+            remaining=$(echo "$response" | grep -o '"remaining":[0-9]*'  | head -1 | cut -d: -f2 || echo 0)
+            cost=$(echo      "$response" | grep -o '"costUsd":[0-9.]*'   | head -1 | cut -d: -f2 || echo 0)
+            billing=$(echo   "$response" | grep -o '"billingStopped":true' || true)
+
+            echo "- Batch $i: rewrote ${processed:-0}, skipped ${failed:-0}, ${remaining:-0} left, \$${cost:-0}" >> "$GITHUB_STEP_SUMMARY"
+
+            # Out of credit: stop immediately rather than hammering the API.
+            if [ -n "$billing" ]; then
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "**Stopped: Google AI credit exhausted or spend cap reached.**" >> "$GITHUB_STEP_SUMMARY"
+              echo "Top up or raise the cap at aistudio.google.com/spend — nothing already finished will be charged twice." >> "$GITHUB_STEP_SUMMARY"
+              break
+            fi
+
+            # Nothing left to do.
+            if [ "${remaining:-0}" = "0" ]; then
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "All caught up — nothing left in this scope." >> "$GITHUB_STEP_SUMMARY"
+              break
+            fi
+          done
