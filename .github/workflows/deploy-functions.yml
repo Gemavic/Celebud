@@ -68,6 +68,9 @@ jobs:
       - name: Deploy enrich-articles (AI article rewriting + SEO, JWT on)
         run: supabase functions deploy enrich-articles --project-ref "$PROJECT_REF"
 
+      - name: Deploy send-newsletter (email editions, JWT on)
+        run: supabase functions deploy send-newsletter --project-ref "$PROJECT_REF"
+
       # The SEO functions are live under CAPITALISED names (vercel.json
       # rewrites point at /Prerender and /Generate-sitemap). Deploying the
       # lowercase folder name would create a second, unused function and
