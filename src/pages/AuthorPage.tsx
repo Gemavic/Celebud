@@ -51,6 +51,53 @@ export function AuthorPage() {
     })();
   }, [id]);
 
+  // Person + ProfilePage structured data.
+  //
+  // This is the signal that tells Google a real, identifiable journalist
+  // stands behind these articles, and which pieces are theirs. It matters
+  // most for the finance and insurance writing: Google treats money and
+  // health topics as "your money or your life" and weighs demonstrable
+  // author expertise far more heavily there than on general news.
+  useEffect(() => {
+    if (!author) return;
+
+    const SCRIPT_ID = 'author-person-schema';
+    document.getElementById(SCRIPT_ID)?.remove();
+
+    const script = document.createElement('script');
+    script.id = SCRIPT_ID;
+    script.type = 'application/ld+json';
+    script.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'ProfilePage',
+      mainEntity: {
+        '@type': 'Person',
+        name: author.name,
+        url: `${window.location.origin}/author/${author.id}`,
+        ...(author.bio ? { description: author.bio } : {}),
+        // Absolute URL: schema.org image values must resolve on their own.
+        ...(author.avatar_url
+          ? { image: new URL(author.avatar_url, window.location.origin).href }
+          : {}),
+        // Deliberately no hardcoded jobTitle. Several of these authors are
+        // licensed financial advisers and insurance agents, not journalists —
+        // asserting the wrong occupation would misstate their credentials,
+        // which is precisely the signal Google scrutinises on money and health
+        // topics. The bio carries the real qualification.
+        worksFor: {
+          '@type': 'NewsMediaOrganization',
+          name: 'CelebUD',
+          url: window.location.origin,
+        },
+      },
+    });
+    document.head.appendChild(script);
+
+    document.title = `${author.name} — CelebUD`;
+
+    return () => { document.getElementById(SCRIPT_ID)?.remove(); };
+  }, [author]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />

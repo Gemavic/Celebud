@@ -632,7 +632,9 @@ Deno.serve(async (req: Request) => {
 
       const update: Record<string, unknown> = {
         description,
-        seo_title: seoTitle.slice(0, 70),
+        // 60 chars, matching buildSeoTitle — beyond that Google truncates the
+        // title in search results.
+        seo_title: seoTitle.slice(0, 60),
         seo_keywords: seoKeywords,
         thumbnail_url: thumbnail,
         enriched_at: new Date().toISOString(),

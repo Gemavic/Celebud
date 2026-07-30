@@ -43,7 +43,10 @@ function isTitleCase(title: string): boolean {
   return capitalised / words.length > 0.6;
 }
 
-const SEO_TITLE_MAX = 70;
+// Google truncates search-result titles around 55-60 characters on desktop
+// and shorter on mobile, so 70 meant headlines were being cut off in results
+// even though they fit our own limit. 60 keeps the whole title visible.
+const SEO_TITLE_MAX = 60;
 const SEO_DESCRIPTION_MAX = 160;
 
 /**
