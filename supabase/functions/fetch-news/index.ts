@@ -132,6 +132,12 @@ interface SourcePreview {
 async function fetchSourcePreview(url: string): Promise<SourcePreview> {
   const empty: SourcePreview = { image: '', description: '', fullText: '', images: [] };
   if (sourceLookupsUsed >= MAX_SOURCE_LOOKUPS) return empty;
+  // Stop starting new captures once the run is mostly spent. A count cap
+  // alone is not enough: 30 captures at the 9s timeout is 270s against a
+  // 150s ceiling, and the function would be killed mid-run, losing whatever
+  // it had imported. Articles still import after this point — they simply
+  // arrive without captured source text, which the next run can fill in.
+  if (Date.now() - runStartedAt > SOURCE_LOOKUP_DEADLINE_MS) return empty;
   sourceLookupsUsed++;
   try {
     const controller = new AbortController();
@@ -874,6 +880,9 @@ Deno.serve(async (req: Request) => {
   // Warm instances reuse module state between requests, so this must be
   // zeroed per run or later runs would skip image lookups entirely.
   sourceLookupsUsed = 0;
+  // Must be stamped per request, not at module load: a warm instance would
+  // otherwise measure from whenever it first started and skip every capture.
+  runStartedAt = Date.now();
   // URLs published this run, announced to search engines at the end.
   const newArticleUrls: string[] = [];
   // How many feed items the quality gate turned away this run.
