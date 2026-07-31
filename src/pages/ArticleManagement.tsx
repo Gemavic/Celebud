@@ -79,6 +79,8 @@ interface Article {
   is_trending: boolean;
   /** Pinned articles stay on the site until an editor removes them. */
   is_pinned?: boolean;
+  /** Written in-house — never eligible for automated rewriting. */
+  is_manual?: boolean | null;
   seo_title: string | null;
   seo_keywords: string | null;
   categories: {
@@ -162,6 +164,8 @@ export function ArticleManagement() {
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; results: string[] } | null>(null);
   // Shared by bulk archive and bulk delete.
   const [bulkWorking, setBulkWorking] = useState(false);
+  // Which single article is being rewritten by hand right now.
+  const [rewritingId, setRewritingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -322,6 +326,58 @@ export function ArticleManagement() {
     }
   };
 
+  /**
+   * Rewrites ONE article, chosen by hand.
+   *
+   * Automatic rewriting is switched off — articles are published as short
+   * attributed teasers and stay that way until someone decides a particular
+   * story is worth the cost. This is that decision, one article at a time.
+   */
+  const rewriteOne = async (article: Article) => {
+    setRewritingId(article.id);
+    setNotifyResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('You must be signed in as an admin.');
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-articles`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          // ids targets exactly this article and nothing else.
+          body: JSON.stringify({ ids: [article.id], withImages: false }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Rewrite failed (${res.status}).`);
+
+      if (data.billingStopped) {
+        throw new Error('Google AI credit is exhausted — top up at aistudio.google.com.');
+      }
+      if (!data.processed) {
+        throw new Error(
+          data.errors?.[0] ||
+          'Nothing was rewritten — the source page may be paywalled or too short to work from.'
+        );
+      }
+
+      const cost = data.usage?.costUsd;
+      setNotifyResult(
+        `Rewritten${cost ? ` — cost $${cost.toFixed(3)}` : ''}. Refreshing…`
+      );
+      await fetchArticles();
+    } catch (err) {
+      setNotifyResult(`Error: ${err instanceof Error ? err.message : 'Rewrite failed'}`);
+    } finally {
+      setRewritingId(null);
+      setTimeout(() => setNotifyResult(null), 6000);
+    }
+  };
+
   const resolveBioProfileFor = (authorId: string, categoryId: string): BioProfile | null => {
     // Authors opted out of automatic bios are never auto-filled; their bio
     // must be picked or typed deliberately on each article.
@@ -384,6 +440,7 @@ export function ArticleManagement() {
           is_featured,
           is_trending,
           is_pinned,
+          is_manual,
           seo_title,
           seo_keywords,
           categories:category_id (
@@ -1211,10 +1268,11 @@ export function ArticleManagement() {
               Rebuild fetched articles
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              Re-reports each fetched story in CelebUD's own words with proper sections and a
-              conclusion, writes its SEO title, description and keywords, and attaches a matching
-              image. Your hand-written articles are never touched. You can stop any time and
-              pick up where you left off.
+              Nothing is rewritten automatically. Articles are published as short excerpts that
+              credit and link to the original source, and stay that way until you choose otherwise —
+              use <strong>Rewrite</strong> on an individual article, or select several and rebuild
+              them here. Your hand-written articles are never touched, and you can stop any time
+              and pick up where you left off.
             </p>
 
             {enrichQueue !== null && (
@@ -1579,6 +1637,18 @@ export function ArticleManagement() {
                       <Bell className="w-4 h-4" />
                       {notifyingId === article.id ? 'Sending…' : 'Notify'}
                     </button>
+                    {article.external_url && !article.is_manual && (
+                      <button
+                        onClick={() => rewriteOne(article)}
+                        disabled={rewritingId === article.id}
+                        title="Rewrite just this article with AI (about 2 cents). Nothing else is touched."
+                        className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors disabled:opacity-50"
+                      >
+                        {rewritingId === article.id
+                          ? <><RefreshCw className="w-4 h-4 animate-spin" /> Rewriting…</>
+                          : <><Sparkles className="w-4 h-4" /> Rewrite</>}
+                      </button>
+                    )}
                     <button
                       onClick={() => openEditor(article)}
                       className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"

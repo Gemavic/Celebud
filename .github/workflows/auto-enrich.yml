@@ -28,9 +28,18 @@
 name: Auto-enrich new articles
 
 on:
-  schedule:
-    # Every 3 hours. One batch per run keeps spend predictable and steady.
-    - cron: '0 */3 * * *'
+  # AUTOMATIC REWRITING IS OFF, at the newsroom's request.
+  #
+  # Articles are fetched and published as short attributed teasers, and
+  # nothing rewrites them unless a person asks for it. Rewriting is chosen
+  # per article from Article Management, or in bulk by selecting articles
+  # there — so no money is ever spent without a deliberate decision.
+  #
+  # The schedule below is intentionally commented out. Uncomment it only if
+  # unattended rewriting is wanted again.
+  #
+  # schedule:
+  #   - cron: '0 */3 * * *'
   workflow_dispatch:
     inputs:
       scope:
