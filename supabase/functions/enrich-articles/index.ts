@@ -40,7 +40,11 @@ const DEFAULT_BATCH = 30;
 // honestly. Rather than let the model pad a headline into an article (which
 // invites invented detail), we leave the existing text alone and only fix
 // the metadata and image.
-const MIN_SOURCE_CHARS = 200;
+// Raised from 200. A 200-character source could only ever produce a
+// 200-word article — the model was correctly refusing to pad, so thin
+// research produced thin pages. Below this floor the story is left as a
+// short attributed teaser instead of becoming a weak article.
+const MIN_SOURCE_CHARS = 600;
 
 // An article that has failed this many times is dropped from the queue.
 // Without this, failures stayed at the front of a newest-first queue and
@@ -287,7 +291,9 @@ RULES for "content":
 - Use <p> for paragraphs, <strong> for key terms, <em> for emphasis, <ul>/<ol> with <li> for lists, <blockquote> for a genuine quote from the notes.
 - Include a <table> with <thead>/<tbody> ONLY when the story genuinely has comparable data (figures, timelines, before/after). Never fake a table.
 - COMPLETENESS IS THE PRIORITY. Carry over EVERY substantive fact from the notes: every name, place, figure, date, cause, consequence, official statement and quoted remark. Rewriting means changing the WORDING, never dropping the information. A reader must finish your article knowing everything the notes established — if anything material is missing, the article has failed.
-- Let the notes set the length: rich notes deserve 800-1200 words, thin notes a shorter piece. Never pad with filler, and never compress by leaving facts out.
+- LENGTH: at least 700 words, and 900-1200 for a substantial story. If the research notes alone cannot carry that, USE SEARCH to gather the missing context — background, how the situation developed, who the people and institutions involved are, what comparable events happened before, what the likely consequences are, and what happens next. A reader arriving knowing nothing must leave genuinely informed.
+- Everything you add through search must be verifiable fact, attributed where it matters. Adding researched context is required; inventing detail is still forbidden. If you genuinely cannot verify enough to reach 700 words, write the most complete piece the facts support rather than padding it out.
+- Never restate the same point in different words to reach a length. Depth means new information, not repetition.
 - End with a <h2>Conclusion</h2> section that genuinely summarises what it means and what happens next.
 - Then add attribution exactly like: <p><em>Reporting based on coverage by ${sourceName}.</em></p>
 - Do NOT use <h1>, <div>, <span>, class or style attributes, markdown, or code fences. Do NOT repeat the headline inside the body. Never invent <img> tags or image URLs.
@@ -305,15 +311,20 @@ ${sourceFacts || article.description || article.content || '(No detailed notes a
 
   const baseConfig = {
     temperature: 0.65,
-    // A ceiling, not a target — it costs nothing unless an article uses it,
-    // and lowering it only risked truncating the detailed pieces the
-    // newsroom wants kept.
-    maxOutputTokens: 4096,
+    // Raised with the length requirement: a 900-1200 word HTML article plus
+    // the surrounding JSON does not fit in 4096 tokens, and the model would
+    // have been cut off mid-sentence.
+    maxOutputTokens: 8192,
   };
 
   const buildBody = (withThinkingDisabled: boolean) => JSON.stringify({
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+    // Live search. Without it the model can only use the snippet we hand it,
+    // which is exactly why thin sources produced 200-word articles — it was
+    // correctly refusing to invent the rest. With search it can add real
+    // background and context instead of padding.
+    tools: [{ google_search: {} }],
     generationConfig: withThinkingDisabled
       // Gemini 2.5 models "think" by default and bill those hidden reasoning
       // tokens at the OUTPUT rate — several times the cost of the article
