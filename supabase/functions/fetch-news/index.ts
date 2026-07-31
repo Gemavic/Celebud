@@ -153,6 +153,66 @@ async function fetchSourcePreview(url: string): Promise<SourcePreview> {
   }
 }
 
+// ── Quality gate ────────────────────────────────────────────────────
+//
+// Categories where a story stays useful for months and where readers search
+// deliberately. These get a slightly easier bar than sports scores.
+const HIGH_VALUE_CATEGORIES = new Set([
+  'fin-advisor', 'finance', 'business', 'immigration',
+  'health', 'legal', 'education', 'politics',
+]);
+
+// Titles that are advertising, listicle filler or aggregator noise rather
+// than news. These reliably attract no readers and no search interest.
+const LOW_VALUE_TITLE_PATTERNS = [
+  /\bpromo code\b/i, /\bcoupon\b/i, /\bdiscount code\b/i, /\bdeal of the day\b/i,
+  /\b\d+% off\b/i, /\bbest deals?\b/i, /\bon sale (now|today)\b/i,
+  /\bsponsored\b/i, /\badvertorial\b/i, /\bpartner content\b/i,
+  /\blive (blog|updates?|stream)\b/i, /\bas it happened\b/i,
+  /\bwhat to watch\b/i, /\bhoroscope\b/i, /\bdaily briefing\b/i,
+  /\bopen thread\b/i, /\bcaption this\b/i,
+  /^\s*(photos?|video|watch|gallery)\s*:/i,
+];
+
+// A day-month-year date inside the headline. Papers publish their daily
+// edition under titles like "BusinessDay 30th Jul 2026" — a masthead and a
+// date, with no story behind it.
+const DATE_IN_TITLE =
+  /\b\d{1,2}(st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+\d{4}\b/i;
+
+const MIN_SUMMARY_CHARS = 300;       // below this there is no article to build
+const MIN_SUMMARY_HIGH_VALUE = 220;  // slightly easier for evergreen sections
+const MIN_TITLE_WORDS = 4;
+
+/**
+ * Decides whether a feed item deserves a page on the site.
+ *
+ * Rejects, in order: junk headlines, headlines too short to be a story, and
+ * summaries too thin to rewrite into anything worth reading.
+ */
+function passesQualityGate(item: RSSItem, summary: string, categorySlug: string): boolean {
+  const title = (item.title || '').trim();
+  if (!title) return false;
+
+  if (LOW_VALUE_TITLE_PATTERNS.some((p) => p.test(title))) return false;
+
+  const words = title.split(/\s+/).filter(Boolean).length;
+
+  // A short headline built around a date is a paper's daily edition, not a
+  // story. Long headlines may legitimately mention a date, so only short
+  // ones are rejected.
+  if (DATE_IN_TITLE.test(title) && words <= 6) return false;
+
+  // Headlines too short to describe anything never become real articles.
+  if (words < MIN_TITLE_WORDS) return false;
+
+  const floor = HIGH_VALUE_CATEGORIES.has(categorySlug)
+    ? MIN_SUMMARY_HIGH_VALUE
+    : MIN_SUMMARY_CHARS;
+
+  return (summary || '').trim().length >= floor;
+}
+
 function parseRSS(xmlText: string): RSSItem[] {
   const items: RSSItem[] = [];
 
@@ -728,6 +788,8 @@ Deno.serve(async (req: Request) => {
   sourceLookupsUsed = 0;
   // URLs published this run, announced to search engines at the end.
   const newArticleUrls: string[] = [];
+  // How many feed items the quality gate turned away this run.
+  let skippedLowQuality = 0;
 
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -788,7 +850,10 @@ Deno.serve(async (req: Request) => {
       sourcesByCountry[key].push(source);
     }
 
-    const totalArticlesTarget = 100;
+    // Reduced from 100 to 30 a day: fewer, better stories. Volume is what
+    // left ~4,000 thin articles unindexed, and the quality gate above now
+    // rejects anything that cannot carry a real page.
+    const totalArticlesTarget = 30;
     const articlesPerCountry: Record<string, number> = {};
     for (const [country, share] of Object.entries(priorityAllocations)) {
       articlesPerCountry[country] = Math.floor(totalArticlesTarget * share);
@@ -1001,6 +1066,16 @@ Deno.serve(async (req: Request) => {
             const finalCategorySlug = detectedCategorySlug !== 'news' ? detectedCategorySlug : sourceCategorySlug;
             const articleCategory = categories?.find((c: any) => c.slug === finalCategorySlug);
 
+            // ── QUALITY GATE ──────────────────────────────────────────
+            // Import fewer, better stories rather than everything a feed
+            // offers. Publishing thousands of thin items is what left ~4,000
+            // articles sitting unindexed, so anything that cannot carry a
+            // real page is rejected here rather than cleaned up later.
+            if (!passesQualityGate(item, richest, finalCategorySlug)) {
+              skippedLowQuality++;
+              continue;
+            }
+
             // Thumbnails: never hotlink a third-party article's own photo
             // (breaks when they block it, and it isn't ours to republish).
             // Instead match on the story's actual SUBJECT — wildfire,
@@ -1163,6 +1238,7 @@ Deno.serve(async (req: Request) => {
         distribution: articlesPerCountry,
         totalFetched,
         totalAdded,
+        skippedLowQuality,
         indexNow,
         results,
       }),
