@@ -1300,7 +1300,11 @@ export function ArticleManagement() {
                   <span className="font-semibold">{enrichQueue.toLocaleString()}</span> article
                   {enrichQueue === 1 ? '' : 's'} left to rebuild — estimated cost{' '}
                   <span className="font-semibold">
-                    ${(enrichQueue * (enrichImages ? 0.044 : 0.005)).toFixed(2)}
+                    {/* Measured from real runs, not theoretical token maths.
+                        The old $0.005 figure came from a short-article era and
+                        badly understated the bill — it showed "$1.07" for work
+                        that actually cost far more. */}
+                    ${(enrichQueue * (enrichImages ? 0.059 : 0.02)).toFixed(2)}
                   </span>{' '}
                   {enrichImages ? 'with AI images' : 'text and SEO only'}.
                 </p>

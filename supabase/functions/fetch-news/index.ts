@@ -103,18 +103,39 @@ function isValidArticleImage(imageUrl: string): boolean {
 const MAX_SOURCE_LOOKUPS = 30;
 let sourceLookupsUsed = 0;
 
+// Capturing full articles is slower than reading a meta tag, so a count cap
+// alone is not enough: 30 lookups at the 9s timeout would be 270s against a
+// 150s ceiling, and the run would be killed part-way. This wall-clock guard
+// stops starting new lookups once the run is mostly spent, so whatever has
+// been imported is always saved and returned cleanly.
+const SOURCE_LOOKUP_DEADLINE_MS = 95_000;
+let runStartedAt = Date.now();
+
 interface SourcePreview {
   image: string;
   description: string;
+  /** Full text of the source article, kept as editorial reference. */
+  fullText: string;
+  /** Every usable picture found in the source article. */
+  images: Array<{ url: string; alt: string }>;
 }
 
+/**
+ * Captures the source article in full: its lead photo, its own summary, its
+ * complete text, and the pictures published with it.
+ *
+ * The full text and images are REFERENCE MATERIAL for the newsroom, shown in
+ * the editor so a reporter can read the whole story before writing about it.
+ * Reporting from a fragment is how stories get misreported. None of this is
+ * published as-is — the public page carries whatever the newsroom writes.
+ */
 async function fetchSourcePreview(url: string): Promise<SourcePreview> {
-  const empty: SourcePreview = { image: '', description: '' };
+  const empty: SourcePreview = { image: '', description: '', fullText: '', images: [] };
   if (sourceLookupsUsed >= MAX_SOURCE_LOOKUPS) return empty;
   sourceLookupsUsed++;
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
+    const timer = setTimeout(() => controller.abort(), 9000);
     const resp = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -126,8 +147,9 @@ async function fetchSourcePreview(url: string): Promise<SourcePreview> {
     clearTimeout(timer);
     if (!resp.ok) return empty;
 
-    // Only the <head> is needed, so stop reading once past it.
-    const html = (await resp.text()).slice(0, 60000);
+    // The whole document is needed now, not just <head> — the article body
+    // lives further down. Capped so one enormous page cannot stall the run.
+    const html = (await resp.text()).slice(0, 400000);
     const root = parseHTML(html);
 
     let img =
@@ -144,9 +166,75 @@ async function fetchSourcePreview(url: string): Promise<SourcePreview> {
       ''
     ).trim();
 
+    // Strip only tags that never hold prose. Class-based removal comes AFTER
+    // the article container is chosen — doing it first on the whole document
+    // deletes the story, because publishers routinely wrap article bodies in
+    // containers whose class contains "share", "social" or "related".
+    for (const sel of ['script', 'style', 'noscript', 'iframe', 'svg', 'nav', 'footer', 'aside', 'form']) {
+      try { root.querySelectorAll(sel).forEach((el) => el.remove()); } catch { /* skip */ }
+    }
+
+    const paraLength = (el: typeof root) =>
+      el.querySelectorAll('p').map((p) => p.text.trim()).filter((t) => t.length > 30).join(' ').length;
+
+    let body = root;
+    for (const sel of [
+      '[itemprop="articleBody"]', '.article-body', '.article-content',
+      '.post-content', '.entry-content', '.story-body', '.story-content',
+      '.td-post-content', '.article__body', '#article-body', 'article', 'main',
+    ]) {
+      try {
+        const el = root.querySelector(sel);
+        if (el && paraLength(el) > 150) { body = el; break; }
+      } catch { /* skip */ }
+    }
+
+    // Now it is safe to drop clutter, and only when the node is a fragment
+    // rather than a wrapper holding most of the prose.
+    const totalLen = Math.max(paraLength(body), 1);
+    for (const sel of [
+      '[class*="comment"]', '[class*="sidebar"]', '[class*="widget"]',
+      '[class*="advert"]', '[class*="banner"]', '[class*="newsletter"]',
+      '[class*="related"]', '[class*="popup"]', '[class*="cookie"]',
+    ]) {
+      try {
+        body.querySelectorAll(sel).forEach((el) => {
+          if (paraLength(el) < totalLen / 3) el.remove();
+        });
+      } catch { /* skip */ }
+    }
+
+    const seen = new Set<string>();
+    const paragraphs: string[] = [];
+    for (const p of body.querySelectorAll('p')) {
+      const text = p.text.trim();
+      if (text.length < 25) continue;
+      const key = text.toLowerCase().slice(0, 80);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      paragraphs.push(text);
+    }
+
+    // Pictures published with the story, for the editor to choose from.
+    const seenImg = new Set<string>();
+    const images: Array<{ url: string; alt: string }> = [];
+    for (const el of body.querySelectorAll('img')) {
+      let src = el.getAttribute('src') || el.getAttribute('data-src') || el.getAttribute('data-lazy-src') || '';
+      if (!src || src.includes('data:image') || src.includes('base64')) continue;
+      if (!src.startsWith('http')) {
+        try { src = new URL(src, url).href; } catch { continue; }
+      }
+      if (!isValidArticleImage(src) || seenImg.has(src)) continue;
+      seenImg.add(src);
+      images.push({ url: src, alt: (el.getAttribute('alt') || '').trim().slice(0, 200) });
+      if (images.length >= 12) break;
+    }
+
     return {
       image: img && isValidArticleImage(img) ? img : '',
       description,
+      fullText: paragraphs.join('\n\n').slice(0, 20000),
+      images,
     };
   } catch {
     return empty;
@@ -1035,11 +1123,15 @@ Deno.serve(async (req: Request) => {
             // gives us the publisher's lead photo, so it costs one round-trip
             // for both. Raising the character cap alone could never fix a
             // 160-character feed — there was simply nothing more to keep.
-            let sourcePreview: SourcePreview = { image: '', description: '' };
-            const feedIsThin = richest.length < 600;
-            const needsPhoto = !(item.thumbnail && isValidArticleImage(item.thumbnail));
+            // Always capture the source in full now, not just when the feed
+            // looks thin. A reporter needs the whole story in front of them to
+            // write about it accurately — working from a fragment is how
+            // stories get misreported, which is a worse risk than any other
+            // here. The full text and pictures are stored as reference
+            // material for the editor; only the short excerpt is published.
+            let sourcePreview: SourcePreview = { image: '', description: '', fullText: '', images: [] };
 
-            if (item.link && (feedIsThin || needsPhoto)) {
+            if (item.link) {
               sourcePreview = await fetchSourcePreview(item.link);
               if (sourcePreview.description.length > richest.length) {
                 richest = sourcePreview.description;
@@ -1164,6 +1256,12 @@ Deno.serve(async (req: Request) => {
               thumbnail_url: finalThumbnail,
               seo_title: seoTitle,
               seo_keywords: seoKeywords,
+              // Editorial reference material — the full source article and its
+              // pictures, shown only in the editor so a reporter can read the
+              // whole story before writing about it. Never published as-is.
+              source_text: sourcePreview.fullText || null,
+              source_images: sourcePreview.images,
+              source_captured_at: sourcePreview.fullText ? new Date().toISOString() : null,
               external_url: item.link,
               source_id: source.id,
               source_published_at: item.pubDate,

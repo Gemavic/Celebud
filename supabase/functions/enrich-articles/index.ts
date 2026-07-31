@@ -84,6 +84,8 @@ interface ArticleRow {
   is_featured: boolean;
   is_trending: boolean;
   thumbnail_url: string | null;
+  /** Full source article captured at fetch time — free, richer research. */
+  source_text?: string | null;
   enrichment_attempts?: number;
 }
 
@@ -291,7 +293,7 @@ RULES for "content":
 - Use <p> for paragraphs, <strong> for key terms, <em> for emphasis, <ul>/<ol> with <li> for lists, <blockquote> for a genuine quote from the notes.
 - Include a <table> with <thead>/<tbody> ONLY when the story genuinely has comparable data (figures, timelines, before/after). Never fake a table.
 - COMPLETENESS IS THE PRIORITY. Carry over EVERY substantive fact from the notes: every name, place, figure, date, cause, consequence, official statement and quoted remark. Rewriting means changing the WORDING, never dropping the information. A reader must finish your article knowing everything the notes established — if anything material is missing, the article has failed.
-- LENGTH: at least 700 words, and 900-1200 for a substantial story. If the research notes alone cannot carry that, USE SEARCH to gather the missing context — background, how the situation developed, who the people and institutions involved are, what comparable events happened before, what the likely consequences are, and what happens next. A reader arriving knowing nothing must leave genuinely informed.
+- LENGTH: at least 700 words, and 900-1200 for a substantial story. If the research notes cannot carry that, draw out everything they DO establish — background, how the situation developed, who the people and institutions involved are, what comparable events happened before, what the likely consequences are, and what happens next. A reader arriving knowing nothing must leave genuinely informed.
 - Everything you add through search must be verifiable fact, attributed where it matters. Adding researched context is required; inventing detail is still forbidden. If you genuinely cannot verify enough to reach 700 words, write the most complete piece the facts support rather than padding it out.
 - Never restate the same point in different words to reach a length. Depth means new information, not repetition.
 - End with a <h2>Conclusion</h2> section that genuinely summarises what it means and what happens next.
@@ -320,11 +322,18 @@ ${sourceFacts || article.description || article.content || '(No detailed notes a
   const buildBody = (withThinkingDisabled: boolean) => JSON.stringify({
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-    // Live search. Without it the model can only use the snippet we hand it,
-    // which is exactly why thin sources produced 200-word articles — it was
-    // correctly refusing to invent the rest. With search it can add real
-    // background and context instead of padding.
-    tools: [{ google_search: {} }],
+    // NO google_search here, deliberately. Enabling it caused three problems
+    // at once, all of them billable:
+    //   * 52 articles failed outright with 400 INVALID_ARGUMENT — this model
+    //     would not accept the tool, and the request was charged anyway
+    //   * 42 more came back as prose with citations instead of clean JSON
+    //     ("malformed JSON from model"), so the work was paid for and thrown
+    //     away, then retried and paid for again
+    //   * grounded queries carry a separate per-request fee on top of tokens
+    //
+    // Depth now comes from the full source article captured at fetch time
+    // (media_content.source_text), which is real material rather than a paid
+    // search — cheaper, more reliable, and closer to what actually happened.
     generationConfig: withThinkingDisabled
       // Gemini 2.5 models "think" by default and bill those hidden reasoning
       // tokens at the OUTPUT rate — several times the cost of the article
@@ -516,7 +525,7 @@ Deno.serve(async (req: Request) => {
     let query = supabase
       .from('media_content')
       .select(
-        'id, title, slug, description, content, thumbnail_url, external_url, category_id, source_id, is_featured, is_trending, enrichment_attempts, categories!inner(slug)'
+        'id, title, slug, description, content, thumbnail_url, external_url, category_id, source_id, is_featured, is_trending, enrichment_attempts, source_text, categories!inner(slug)'
       )
       .eq('media_type', 'article')
       .or('is_manual.is.null,is_manual.eq.false')
@@ -595,9 +604,18 @@ Deno.serve(async (req: Request) => {
       // (including personal family articles) got turned into third-person
       // news copy and wrongly credited to an outside outlet. No source URL
       // means there is nothing to re-report, so the text is left untouched.
-      const scraped = article.external_url
-        ? await fetchSourceFacts(article.external_url)
-        : { text: '', image: '' };
+      // Prefer the full source article captured at fetch time. It is already
+      // stored, so it costs nothing, and it is far richer than a fresh scrape
+      // — typically several thousand characters of the actual reporting.
+      // Re-fetching is only a fallback for articles imported before capture
+      // existed, or where capture came back empty.
+      const captured = (article.source_text || '').trim();
+      const scraped = captured.length >= MIN_SOURCE_CHARS
+        ? { text: captured, image: '' }
+        : (article.external_url
+            ? await fetchSourceFacts(article.external_url)
+            : { text: '', image: '' });
+
       const facts = scraped.text;
       const canRewrite = Boolean(article.external_url) && facts.length >= MIN_SOURCE_CHARS;
 
