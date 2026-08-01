@@ -109,7 +109,25 @@ export function ArticleManagement() {
   // queue); 'all' rewrites everything including sports and celebrity wire.
   const [enrichScope, setEnrichScope] = useState<'high-value' | 'all'>('high-value');
   const [searchQuery, setSearchQuery] = useState('');
+  // Debounced value actually sent to the database, so a search does not fire
+  // a request per keystroke.
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [articlePage, setArticlePage] = useState(0);
+  const [hasMoreArticles, setHasMoreArticles] = useState(false);
+  // The real count across the whole table, independent of how many rows are
+  // currently loaded — the stat card used to show articles.length, which is
+  // just the page size, not the actual total.
+  const [totalArticleCount, setTotalArticleCount] = useState<number | null>(null);
+  const ARTICLES_PAGE_SIZE = 50;
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearchTerm(searchQuery.trim());
+      setArticlePage(0);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
   const [bioProfiles, setBioProfiles] = useState<BioProfile[]>([]);
@@ -173,9 +191,17 @@ export function ArticleManagement() {
       fetchCategories();
       fetchAuthors();
       fetchBioProfiles();
-      fetchArticles();
     }
-  }, [profile, selectedCategory]);
+  }, [profile]);
+
+  // Category or search changing starts a fresh page-0 fetch; paging forward
+  // (articlePage incrementing via "Load more") fetches the next page and
+  // appends. Both are driven from this single effect so they can never
+  // race each other.
+  useEffect(() => {
+    if (profile?.is_admin) fetchArticles(articlePage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, selectedCategory, searchTerm, articlePage]);
 
   const fetchBioProfiles = async () => {
     try {
@@ -416,7 +442,17 @@ export function ArticleManagement() {
     }
   };
 
-  const fetchArticles = async () => {
+  /**
+   * Loads articles, searching and filtering server-side across the WHOLE
+   * table rather than the currently-loaded page.
+   *
+   * Previously this fetched only the newest 50 rows, and the search box
+   * filtered that same array client-side — so anything outside the newest
+   * 50 (i.e. almost everything, with 1,900+ articles on the site) could
+   * never be found no matter what was typed. "Total Articles" also showed
+   * articles.length, which was really just the page size.
+   */
+  const fetchArticles = async (page = 0) => {
     setLoading(true);
     try {
       let query = supabase
@@ -448,10 +484,9 @@ export function ArticleManagement() {
             name,
             slug
           )
-        `)
+        `, { count: 'exact' })
         .in('media_type', ['article', 'video'])
-        .order('published_at', { ascending: false })
-        .limit(50);
+        .order('published_at', { ascending: false });
 
       if (selectedCategory !== 'all') {
         if (selectedCategory === 'uncategorized') {
@@ -461,10 +496,21 @@ export function ArticleManagement() {
         }
       }
 
-      const { data, error } = await query;
+      if (searchTerm) {
+        // Strip PostgREST delimiters so a comma or parenthesis typed into
+        // the search box cannot break out of the filter expression.
+        const safe = searchTerm.replace(/[,()\\]/g, ' ').trim();
+        if (safe) query = query.or(`title.ilike.%${safe}%,description.ilike.%${safe}%`);
+      }
+
+      const from = page * ARTICLES_PAGE_SIZE;
+      const { data, error, count } = await query.range(from, from + ARTICLES_PAGE_SIZE - 1);
 
       if (error) throw error;
-      setArticles(data || []);
+      const rows = data || [];
+      setArticles((prev) => (page === 0 ? rows : [...prev, ...rows]));
+      setTotalArticleCount(count ?? null);
+      setHasMoreArticles(rows.length === ARTICLES_PAGE_SIZE);
     } catch (err) {
       console.error('Error fetching articles:', err);
     } finally {
@@ -1105,9 +1151,10 @@ export function ArticleManagement() {
     await fetchArticles();
   };
 
-  const filteredArticles = articles.filter(article =>
-    article.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Search and category filtering now both happen server-side in
+  // fetchArticles, across the whole table — `articles` already reflects the
+  // current search/category/page. No client-side re-filter needed.
+  const filteredArticles = articles;
 
   const toggleSelect = (id: string) => {
     setSelectedArticles(prev => {
@@ -1238,8 +1285,12 @@ export function ArticleManagement() {
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm font-medium text-gray-600">Total Articles</p>
-          <p className="text-2xl font-bold text-gray-900 mt-2">{articles.length}</p>
+          <p className="text-sm font-medium text-gray-600">
+            {searchTerm || selectedCategory !== 'all' ? 'Matching Articles' : 'Total Articles'}
+          </p>
+          <p className="text-2xl font-bold text-gray-900 mt-2">
+            {totalArticleCount !== null ? totalArticleCount.toLocaleString() : '—'}
+          </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <p className="text-sm font-medium text-gray-600">Categories</p>
@@ -1399,7 +1450,7 @@ export function ArticleManagement() {
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              onChange={(e) => { setSelectedCategory(e.target.value); setArticlePage(0); }}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
             >
               <option value="all">All Categories</option>
@@ -1688,6 +1739,16 @@ export function ArticleManagement() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+        {hasMoreArticles && !loading && (
+          <div className="p-6 text-center border-t border-gray-100">
+            <button
+              onClick={() => setArticlePage((p) => p + 1)}
+              className="px-6 py-2.5 text-sm font-semibold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              Load more articles
+            </button>
           </div>
         )}
       </div>
