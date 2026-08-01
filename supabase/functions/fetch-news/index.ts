@@ -900,6 +900,48 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // ── Access control ────────────────────────────────────────────────
+    //
+    // Until now this function had NO authentication at all: any request from
+    // anywhere on the internet could trigger a full import run. Its only
+    // caller was a "Live" button shown to every anonymous visitor on the
+    // homepage, which also ran an unattended 6-hour auto-refresh per open
+    // browser tab. With real traffic, or even one long-lived tab, that adds
+    // up to far more than the intended daily volume — this is the actual
+    // cause of ~150-200 articles/day appearing despite a 30-per-run cap,
+    // since nothing capped how many times the run itself could fire.
+    //
+    // Now requires either a signed-in admin, or the scheduled job presenting
+    // the shared cron secret.
+    const cronSecret = Deno.env.get('FETCH_NEWS_CRON_SECRET');
+    const presentedSecret = req.headers.get('X-Cron-Secret');
+    const isCron = Boolean(cronSecret && presentedSecret && presentedSecret === cronSecret);
+
+    if (!isCron) {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const callerClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: userError } = await callerClient.auth.getUser();
+      if (userError || !user) {
+        return new Response(JSON.stringify({ error: 'Invalid or expired session' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { data: callerProfile } = await supabase
+        .from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
+      if (!callerProfile?.is_admin) {
+        return new Response(JSON.stringify({ error: 'Admin access required' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     const { data: sources } = await supabase
       .from('news_sources')
       .select('*')

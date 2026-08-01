@@ -5,7 +5,9 @@
 # (the site calls .../functions/v1/quick-task, so the live name must not change).
 #
 # JWT posture is preserved per function:
-#   fetch-news is called from the browser with no auth header -> --no-verify-jwt
+#   fetch-news checks auth INSIDE the function (admin session or cron
+#   secret), not at the platform level, so it deploys with --no-verify-jwt
+#   and rejects anything that doesn't pass its own check.
 #   quick-task requires a signed-in admin session -> default JWT verification
 #
 # Requires one repository secret: SUPABASE_ACCESS_TOKEN

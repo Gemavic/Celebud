@@ -184,6 +184,8 @@ export function ArticleManagement() {
   const [bulkWorking, setBulkWorking] = useState(false);
   // Which single article is being rewritten by hand right now.
   const [rewritingId, setRewritingId] = useState<string | null>(null);
+  const [fetchingNews, setFetchingNews] = useState(false);
+  const [fetchNewsResult, setFetchNewsResult] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -359,6 +361,46 @@ export function ArticleManagement() {
    * attributed teasers and stay that way until someone decides a particular
    * story is worth the cost. This is that decision, one article at a time.
    */
+  /**
+   * Manually triggers a news import, authenticated as the signed-in admin.
+   *
+   * fetch-news now requires either an admin session or the scheduled job's
+   * cron secret — this is the admin-session path, replacing the public
+   * homepage trigger that had no authentication at all.
+   */
+  const fetchNewsNow = async () => {
+    setFetchingNews(true);
+    setFetchNewsResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('You must be signed in as an admin.');
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-news`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Fetch failed (status ${res.status}).`);
+
+      setFetchNewsResult(
+        `Imported ${data.totalAdded ?? 0} article${(data.totalAdded ?? 0) === 1 ? '' : 's'}` +
+        (data.skippedLowQuality ? ` — ${data.skippedLowQuality} rejected by the quality gate` : '') +
+        '.'
+      );
+      await fetchArticles();
+    } catch (err) {
+      setFetchNewsResult(`Error: ${err instanceof Error ? err.message : 'Fetch failed'}`);
+    } finally {
+      setFetchingNews(false);
+    }
+  };
+
   const rewriteOne = async (article: Article) => {
     setRewritingId(article.id);
     setNotifyResult(null);
@@ -1308,6 +1350,36 @@ export function ArticleManagement() {
             {articles.reduce((sum, a) => sum + (a.comments_count || 0), 0).toLocaleString()}
           </p>
         </div>
+      </div>
+
+      {/* Manual news import — the only way to bring in new articles besides
+          the once-daily scheduled run, now that fetch-news requires
+          authentication and no longer accepts public/anonymous requests. */}
+      <div className="bg-white rounded-lg shadow p-6 mb-8 border border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-emerald-600" />
+              Fetch news now
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Runs once automatically every day. Use this to pull fresh articles on demand —
+              each run is quality-gated and targets around 30 articles.
+            </p>
+          </div>
+          <button
+            onClick={fetchNewsNow}
+            disabled={fetchingNews}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 transition-colors flex-shrink-0"
+          >
+            {fetchingNews
+              ? <><RefreshCw className="w-4 h-4 animate-spin" /> Fetching…</>
+              : <><RefreshCw className="w-4 h-4" /> Fetch news now</>}
+          </button>
+        </div>
+        {fetchNewsResult && (
+          <p className="mt-3 text-sm text-gray-700">{fetchNewsResult}</p>
+        )}
       </div>
 
       {/* Rebuild fetched articles into full stories with SEO + thumbnails */}
