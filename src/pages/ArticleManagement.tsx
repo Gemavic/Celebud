@@ -1066,11 +1066,14 @@ export function ArticleManagement() {
         is_trending: editForm.is_trending,
         seo_title: editForm.seo_title || null,
         seo_keywords: editForm.seo_keywords || null,
-        // Anything written or edited here is newsroom work. This flag is what
-        // keeps automated passes (the article rebuild) away from it — without
-        // it the rebuild rewrote hand-written pieces and replaced their
-        // photos. Also stamped as already-enriched so it can never be queued.
-        is_manual: true,
+        // Only a brand-new article (created here from scratch) is newsroom
+        // work. Editing an EXISTING fetched article — fixing its thumbnail,
+        // a typo — must not flip this on: is_manual also hides an article
+        // from the thin-content cleanup and the rewrite pipeline, so forcing
+        // it true on every save was silently protecting fetched junk from
+        // ever being cleaned up or properly rewritten just because someone
+        // opened it and touched one field. Preserve whatever it already was.
+        is_manual: isCreatingNew ? true : (editingArticle?.is_manual ?? false),
         enriched_at: new Date().toISOString(),
       };
 
