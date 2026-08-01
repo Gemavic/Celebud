@@ -157,6 +157,7 @@ export function ArticleManagement() {
   const [thumbnailUploading, setThumbnailUploading] = useState(false);
   const [thumbnailUploadError, setThumbnailUploadError] = useState<string | null>(null);
   const [thumbnailGenerating, setThumbnailGenerating] = useState(false);
+  const [thumbnailMatching, setThumbnailMatching] = useState(false);
   const [illustrating, setIllustrating] = useState(false);
   const [illustrateProgress, setIllustrateProgress] = useState<{ done: number; total: number } | null>(null);
   const [illustrateError, setIllustrateError] = useState<string | null>(null);
@@ -923,6 +924,55 @@ export function ArticleManagement() {
       setThumbnailUploadError(err instanceof Error ? err.message : 'Thumbnail generation failed');
     } finally {
       setThumbnailGenerating(false);
+    }
+  };
+
+  /**
+   * Finds a real, topically-matched photo for the article currently being
+   * written — the same subject-matching logic fetch-news and enrich-articles
+   * already use for imported stories (wildfire, courtroom, nuclear...),
+   * exposed here for hand-written articles. Uses Pexels (free, real photos)
+   * when PEXELS_API_KEY is configured in Supabase, otherwise falls back to
+   * CelebUD's own curated topic pools — never fails outright either way.
+   */
+  const matchThumbnail = async () => {
+    if (!editForm.title.trim()) {
+      setThumbnailUploadError('Add a title first so a photo can be matched to it.');
+      return;
+    }
+    setThumbnailMatching(true);
+    setThumbnailUploadError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setThumbnailUploadError('You must be signed in as an admin to do this.');
+        return;
+      }
+      const category = categories.find((c) => c.id === editForm.category_id);
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/match-thumbnail`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editForm.title,
+          description: editForm.description || undefined,
+          categorySlug: category?.slug,
+        }),
+      });
+      let data: { url?: string; error?: string };
+      try {
+        data = await resp.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (status ${resp.status}).`);
+      }
+      if (!resp.ok || !data.url) {
+        throw new Error(data.error || `Failed to match a photo (status ${resp.status}).`);
+      }
+      setEditForm((prev) => ({ ...prev, thumbnail_url: data.url as string }));
+    } catch (err: unknown) {
+      console.error('Error matching thumbnail:', err);
+      setThumbnailUploadError(err instanceof Error ? err.message : 'Photo matching failed');
+    } finally {
+      setThumbnailMatching(false);
     }
   };
 
@@ -2017,6 +2067,16 @@ export function ArticleManagement() {
                     >
                       <Sparkles className="w-4 h-4" />
                       {thumbnailGenerating ? 'Generating…' : 'Generate with AI'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={matchThumbnail}
+                      disabled={thumbnailMatching || !editForm.title.trim()}
+                      title="Find a real, topically-matched photo based on the title & description"
+                      className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition-colors flex-shrink-0"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      {thumbnailMatching ? 'Matching…' : 'Match a photo'}
                     </button>
                     <input
                       type="text"

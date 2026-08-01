@@ -58,6 +58,9 @@ jobs:
       - name: Deploy generate-thumbnail (AI thumbnails, JWT on)
         run: supabase functions deploy generate-thumbnail --project-ref "$PROJECT_REF"
 
+      - name: Deploy match-thumbnail (real-photo matching, JWT on)
+        run: supabase functions deploy match-thumbnail --project-ref "$PROJECT_REF"
+
       - name: Deploy generate-creator-audio (AI audio, JWT on)
         run: supabase functions deploy generate-creator-audio --project-ref "$PROJECT_REF"
 

@@ -98,9 +98,12 @@ function isValidArticleImage(imageUrl: string): boolean {
 // three times longer than the one-line teaser an RSS feed carries. Since we
 // pay the round-trip anyway, taking both is free.
 //
-// Still capped per run: unbounded fetches pushed the whole function past its
-// 150s ceiling, which cut short how many articles got imported at all.
-const MAX_SOURCE_LOOKUPS = 30;
+// Raised from 30: the stringent gate (real photo + 800+ word source) rejects
+// most stories it checks, so reaching the daily target needs many more
+// capture attempts per success than the old, much more permissive gate did.
+// The count itself is not the real safety limit — SOURCE_LOOKUP_DEADLINE_MS
+// below is — this just avoids stopping short on time still available.
+const MAX_SOURCE_LOOKUPS = 60;
 let sourceLookupsUsed = 0;
 
 // Capturing full articles is slower than reading a meta tag, so a count cap
@@ -249,13 +252,6 @@ async function fetchSourcePreview(url: string): Promise<SourcePreview> {
 
 // ── Quality gate ────────────────────────────────────────────────────
 //
-// Categories where a story stays useful for months and where readers search
-// deliberately. These get a slightly easier bar than sports scores.
-const HIGH_VALUE_CATEGORIES = new Set([
-  'fin-advisor', 'finance', 'business', 'immigration',
-  'health', 'legal', 'education', 'politics',
-]);
-
 // Titles that are advertising, listicle filler or aggregator noise rather
 // than news. These reliably attract no readers and no search interest.
 const LOW_VALUE_TITLE_PATTERNS = [
@@ -274,37 +270,59 @@ const LOW_VALUE_TITLE_PATTERNS = [
 const DATE_IN_TITLE =
   /\b\d{1,2}(st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+\d{4}\b/i;
 
-const MIN_SUMMARY_CHARS = 300;       // below this there is no article to build
-const MIN_SUMMARY_HIGH_VALUE = 220;  // slightly easier for evergreen sections
 const MIN_TITLE_WORDS = 4;
+
+// Stringent bar, at the newsroom's explicit request: a story is only worth
+// importing if the SOURCE it came from is genuinely substantial. Checked
+// against the full captured article body (sourcePreview.fullText), not the
+// short excerpt CelebUD publishes — the published version stays brief
+// regardless of how long the source is; this only asks "is there really an
+// 800-word story behind this headline, or just a caption and a wire blurb?"
+const MIN_SOURCE_WORDS = 800;
+
+function countWords(text: string): number {
+  return (text || '').trim().split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * A genuine photo must exist somewhere for this story — the feed's own
+ * image, or the source page's Open Graph photo. Deliberately no fallback
+ * check here for stock/AI images: those are a last resort applied AFTER
+ * this gate, for stories that already passed on their own merits, not a
+ * reason to let a picture-less story through.
+ */
+function hasRealPhoto(item: RSSItem, sourcePreview: SourcePreview): boolean {
+  if (item.thumbnail && isValidArticleImage(item.thumbnail)) return true;
+  if (sourcePreview.image && isValidArticleImage(sourcePreview.image)) return true;
+  return false;
+}
 
 /**
  * Decides whether a feed item deserves a page on the site.
  *
- * Rejects, in order: junk headlines, headlines too short to be a story, and
- * summaries too thin to rewrite into anything worth reading.
+ * Rejects, in order: junk headlines, headlines too short to be a story,
+ * stories with no genuine photo available, and stories too thin at the
+ * source to be worth 800 words of coverage.
  */
-function passesQualityGate(item: RSSItem, summary: string, categorySlug: string): boolean {
+function passesQualityGate(item: RSSItem, sourcePreview: SourcePreview): boolean {
   const title = (item.title || '').trim();
   if (!title) return false;
 
   if (LOW_VALUE_TITLE_PATTERNS.some((p) => p.test(title))) return false;
 
-  const words = title.split(/\s+/).filter(Boolean).length;
+  const titleWords = countWords(title);
 
   // A short headline built around a date is a paper's daily edition, not a
   // story. Long headlines may legitimately mention a date, so only short
   // ones are rejected.
-  if (DATE_IN_TITLE.test(title) && words <= 6) return false;
+  if (DATE_IN_TITLE.test(title) && titleWords <= 6) return false;
 
   // Headlines too short to describe anything never become real articles.
-  if (words < MIN_TITLE_WORDS) return false;
+  if (titleWords < MIN_TITLE_WORDS) return false;
 
-  const floor = HIGH_VALUE_CATEGORIES.has(categorySlug)
-    ? MIN_SUMMARY_HIGH_VALUE
-    : MIN_SUMMARY_CHARS;
+  if (!hasRealPhoto(item, sourcePreview)) return false;
 
-  return (summary || '').trim().length >= floor;
+  return countWords(sourcePreview.fullText) >= MIN_SOURCE_WORDS;
 }
 
 function parseRSS(xmlText: string): RSSItem[] {
@@ -1214,7 +1232,7 @@ Deno.serve(async (req: Request) => {
             // offers. Publishing thousands of thin items is what left ~4,000
             // articles sitting unindexed, so anything that cannot carry a
             // real page is rejected here rather than cleaned up later.
-            if (!passesQualityGate(item, richest, finalCategorySlug)) {
+            if (!passesQualityGate(item, sourcePreview)) {
               skippedLowQuality++;
               continue;
             }
