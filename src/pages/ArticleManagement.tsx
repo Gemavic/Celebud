@@ -1133,17 +1133,27 @@ export function ArticleManagement() {
 
   const deleteArticle = async (id: string) => {
     try {
-      const { error } = await supabase
+      // .select() is required to detect a silent no-op: if a row-level
+      // security policy blocks the delete, Supabase returns success with
+      // zero rows affected and NO error — without this, that looked
+      // identical to a real delete and the article just reappeared.
+      const { data, error } = await supabase
         .from('media_content')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select('id');
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error(
+          'Nothing was deleted — you may not have permission, or a database policy is blocking it.'
+        );
+      }
       setDeleteConfirmId(null);
       fetchArticles();
     } catch (err) {
       console.error('Error deleting article:', err);
-      alert('Failed to delete article.');
+      alert(err instanceof Error ? err.message : 'Failed to delete article.');
     }
   };
 
@@ -1229,8 +1239,15 @@ export function ArticleManagement() {
           .upsert({ ...row, archived_at: new Date().toISOString() });
         if (copyErr) throw new Error(`archive copy failed: ${copyErr.message}`);
 
-        const { error: delErr } = await supabase.from('media_content').delete().eq('id', id);
+        // .select() detects a silent no-op: an RLS policy blocking the
+        // delete returns success with zero rows and no error otherwise —
+        // which would report "Archived" while the article stays live too.
+        const { data: delRow, error: delErr } = await supabase
+          .from('media_content').delete().eq('id', id).select('id');
         if (delErr) throw new Error(`removal failed: ${delErr.message}`);
+        if (!delRow || delRow.length === 0) {
+          throw new Error('copied to archive, but removal from the live site was blocked — still visible on the site');
+        }
 
         results.push(`Archived: ${article?.title?.slice(0, 50) || id}`);
       } catch (err) {
@@ -1270,8 +1287,19 @@ export function ArticleManagement() {
     const CHUNK = 25;
     for (let i = 0; i < ids.length; i += CHUNK) {
       const chunk = ids.slice(i, i + CHUNK);
-      const { error } = await supabase.from('media_content').delete().in('id', chunk);
-      results.push(error ? `FAILED (${chunk.length}): ${error.message}` : `Deleted ${chunk.length}`);
+      // .select() detects a silent no-op: an RLS policy blocking the delete
+      // returns success with zero rows and no error otherwise.
+      const { data, error } = await supabase.from('media_content').delete().in('id', chunk).select('id');
+      const deletedCount = data?.length ?? 0;
+      results.push(
+        error
+          ? `FAILED (${chunk.length}): ${error.message}`
+          : deletedCount === 0
+            ? `FAILED (${chunk.length}): nothing deleted — a database policy may be blocking it`
+            : deletedCount < chunk.length
+              ? `Deleted ${deletedCount} of ${chunk.length} (rest blocked)`
+              : `Deleted ${deletedCount}`
+      );
       done += chunk.length;
       setBulkProgress({ done, total: ids.length, results: [...results] });
     }
