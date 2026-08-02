@@ -54,6 +54,7 @@ export function ArticleDetail() {
         .select('*, categories(*), authors(*)')
         .eq('category_id', article.category_id)
         .eq('media_type', 'article')
+        .eq('is_published', true)
         .neq('id', id)
         .order('published_at', { ascending: false })
         .limit(40);

@@ -52,7 +52,8 @@ export function OriginalsPage() {
         { count: 'exact' }
       )
       .eq('media_type', 'article')
-      .eq('is_pinned', true);
+      .eq('is_pinned', true)
+      .eq('is_published', true);
 
     if (q) {
       // Strip PostgREST delimiters so punctuation in the search box cannot

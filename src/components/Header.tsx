@@ -56,6 +56,7 @@ export function Header() {
       const { data } = await supabase
         .from('media_content')
         .select('id, title')
+        .eq('is_published', true)
         .ilike('title', `%${searchQuery.trim()}%`)
         .limit(5);
       if (data && data.length > 0) {

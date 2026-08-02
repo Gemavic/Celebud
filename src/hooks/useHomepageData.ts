@@ -36,6 +36,7 @@ async function fetchDirectFromSupabase(category: string, page: number, pageSize:
       .from('media_content')
       .select('*, categories(*), authors(*)')
       .eq('is_featured', true)
+      .eq('is_published', true)
       .gte('published_at', thirtyDaysAgo)
       .order('published_at', { ascending: false })
       .limit(3),
@@ -44,6 +45,7 @@ async function fetchDirectFromSupabase(category: string, page: number, pageSize:
       .from('media_content')
       .select('*, categories(*), authors(*)')
       .eq('is_trending', true)
+      .eq('is_published', true)
       .gte('published_at', thirtyDaysAgo)
       .order('views_count', { ascending: false })
       .limit(6),
@@ -53,6 +55,7 @@ async function fetchDirectFromSupabase(category: string, page: number, pageSize:
         return supabase
           .from('media_content')
           .select('*, categories(*), authors(*)')
+          .eq('is_published', true)
           .or(`title.ilike.%${search}%,description.ilike.%${search}%`)
           .order('published_at', { ascending: false })
           .limit(20);
@@ -63,6 +66,7 @@ async function fetchDirectFromSupabase(category: string, page: number, pageSize:
           category ? '*, categories!inner(*), authors(*)' : '*, categories(*), authors(*)',
           { count: 'exact' }
         )
+        .eq('is_published', true)
         .order('published_at', { ascending: false });
       if (category) {
         q = q.eq('categories.slug', category);

@@ -85,6 +85,7 @@ Deno.serve(async (req: Request) => {
       const { data: articles, error } = await supabase
         .from('media_content')
         .select('id, slug, title, description, updated_at, published_at')
+        .eq('is_published', true)
         .gte('published_at', cutoff)
         .order('published_at', { ascending: false })
         .limit(1000);
@@ -115,6 +116,7 @@ Deno.serve(async (req: Request) => {
       const { data: articles, error } = await supabase
         .from('media_content')
         .select('id, slug, title, description, updated_at, published_at, categories(name)')
+        .eq('is_published', true)
         .order('published_at', { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -155,6 +157,7 @@ Deno.serve(async (req: Request) => {
       const { data: page, error } = await supabase
         .from('media_content')
         .select('id, slug, title, updated_at, published_at')
+        .eq('is_published', true)
         .order('updated_at', { ascending: false })
         .range(from, from + PAGE - 1);
       if (error) throw error;

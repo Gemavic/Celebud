@@ -27,6 +27,7 @@ export function useArticles(options: UseArticlesOptions = {}) {
             : '*, categories(*), authors(*)',
           { count: 'exact' }
         )
+        .eq('is_published', true)
         .order('published_at', { ascending: false });
 
       if (category) {
@@ -64,6 +65,7 @@ export function useFeaturedArticles(limit = 5) {
         .from('media_content')
         .select('*, categories(*), authors(*)')
         .eq('is_featured', true)
+        .eq('is_published', true)
         .gte('published_at', thirtyDaysAgo)
         .order('published_at', { ascending: false })
         .limit(limit);
@@ -88,6 +90,7 @@ export function useTrendingArticles(limit = 5) {
         .from('media_content')
         .select('*, categories(*), authors(*)')
         .eq('is_trending', true)
+        .eq('is_published', true)
         .gte('published_at', thirtyDaysAgo)
         .order('views_count', { ascending: false })
         .limit(limit);
@@ -112,6 +115,7 @@ export function useArticle(id: string) {
         .from('media_content')
         .select('*, categories(*), authors(*)')
         .eq('id', id)
+        .eq('is_published', true)
         .maybeSingle()
         .then(({ data, error }) => {
           if (error) throw error;

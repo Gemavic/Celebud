@@ -2,6 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { parse as parseHTML } from 'npm:node-html-parser@6';
 import { buildSeoTitle, buildSeoDescription, buildSeoKeywords } from '../_shared/seo.ts';
 import { detectImageTopic, pickStockImage, searchPexelsImage } from '../_shared/articleImages.ts';
+import { submitToIndexNow } from '../_shared/indexnow.ts';
 
 // Turns thin, scraped RSS stubs into properly produced CelebUD articles.
 //
@@ -583,6 +584,9 @@ Deno.serve(async (req: Request) => {
     let billingStopped = false;
     const errors: string[] = [];
     let timedOut = false;
+    // Articles that go live for the first time this run — announced to
+    // search engines once, after every wave has finished.
+    const newlyPublishedUrls: string[] = [];
 
     const enrichOne = async (article: ArticleRow) => {
       const category = categories?.find((c: { id: string }) => c.id === article.category_id);
@@ -669,8 +673,17 @@ Deno.serve(async (req: Request) => {
         enriched_at: new Date().toISOString(),
       };
       // Only overwrite the body when we actually produced one — a thin
-      // source must never blank out the text that is already there.
-      if (contentHtml) update.content = contentHtml;
+      // source must never blank out the text that is already there. This is
+      // also the ONLY moment an article is allowed to go live: fetch-news
+      // saves everything unpublished, and it stays that way (a thin source
+      // that gave up still gets enriched_at stamped so it is never retried,
+      // but never is_published — it stays a hidden, permanent teaser rather
+      // than a visible thin one).
+      if (contentHtml) {
+        update.content = contentHtml;
+        update.is_published = true;
+        newlyPublishedUrls.push(`https://celebud.com/article/${article.id}/${article.slug}`);
+      }
 
       const { error: updateErr } = await supabase
         .from('media_content')
@@ -723,6 +736,10 @@ Deno.serve(async (req: Request) => {
 
     const remaining = await countRemaining();
 
+    // Tell search engines the moment an article actually goes live — never
+    // sooner. Never allowed to fail the run.
+    const indexNow = await submitToIndexNow(newlyPublishedUrls);
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -732,6 +749,7 @@ Deno.serve(async (req: Request) => {
         metadataOnly: skippedThin,
         realPhotosUsed,
         billingStopped,
+        indexNow,
         // Measured, not estimated: straight from Google's token counts.
         usage: {
           ...usage,

@@ -2,7 +2,6 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { parse as parseHTML } from 'npm:node-html-parser@6';
 import { buildSeoTitle, buildSeoKeywords } from '../_shared/seo.ts';
 import { detectImageTopic, pickStockImage, searchPexelsImage } from '../_shared/articleImages.ts';
-import { submitToIndexNow } from '../_shared/indexnow.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -901,8 +900,6 @@ Deno.serve(async (req: Request) => {
   // Must be stamped per request, not at module load: a warm instance would
   // otherwise measure from whenever it first started and skip every capture.
   runStartedAt = Date.now();
-  // URLs published this run, announced to search engines at the end.
-  const newArticleUrls: string[] = [];
   // How many feed items the quality gate turned away this run.
   let skippedLowQuality = 0;
 
@@ -1339,18 +1336,21 @@ Deno.serve(async (req: Request) => {
               is_trending: priority.isTrending,
               views_count: 0,
               comments_count: 0,
+              // Stays hidden — off the site, out of the sitemap, never sent
+              // to Google — until enrich-articles rewrites it into a real
+              // article. A short "Continue reading at X" teaser going live
+              // and staying that way indefinitely is exactly the thin
+              // content Google flagged; this is what stops that.
+              is_published: false,
             }).select('id').maybeSingle();
 
             if (!error) {
               addedCount++;
               totalAdded++;
               countryAddedCount[country]++;
-              // Queue for instant search-engine notification at the end of
-              // the run, so a new story gets crawled in minutes rather than
-              // waiting days for a search engine to come back on its own.
-              if (inserted?.id) {
-                newArticleUrls.push(`https://celebud.com/article/${inserted.id}/${slug}`);
-              }
+              // NOT queued for IndexNow here — the article is not published
+              // yet (see is_published above). enrich-articles submits it to
+              // IndexNow itself once the rewrite actually makes it live.
             }
           }
           if (countryAddedCount[country] >= targetArticles) break;
@@ -1393,11 +1393,6 @@ Deno.serve(async (req: Request) => {
     }
     }
 
-    // Announce everything published this run in one request, so new stories
-    // are crawled within minutes instead of whenever a search engine next
-    // decides to visit. Never allowed to fail the import.
-    const indexNow = await submitToIndexNow(newArticleUrls);
-
     return new Response(
       JSON.stringify({
         success: true,
@@ -1406,7 +1401,10 @@ Deno.serve(async (req: Request) => {
         totalFetched,
         totalAdded,
         skippedLowQuality,
-        indexNow,
+        // Nothing to announce to IndexNow here — everything imported by this
+        // run is saved unpublished (is_published: false) and stays invisible
+        // until enrich-articles rewrites it. That function submits the
+        // IndexNow notification itself once an article actually goes live.
         results,
       }),
       {

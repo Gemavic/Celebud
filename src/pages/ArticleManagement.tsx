@@ -81,6 +81,8 @@ interface Article {
   is_pinned?: boolean;
   /** Written in-house — never eligible for automated rewriting. */
   is_manual?: boolean | null;
+  /** False = a fetched teaser, hidden from the site/sitemap until rewritten. */
+  is_published?: boolean;
   seo_title: string | null;
   seo_keywords: string | null;
   categories: {
@@ -115,6 +117,10 @@ export function ArticleManagement() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [articlePage, setArticlePage] = useState(0);
   const [hasMoreArticles, setHasMoreArticles] = useState(false);
+  // Fetched teasers stay unpublished (hidden from the site/sitemap) until
+  // rewritten. This is how an admin finds and acts on that backlog.
+  const [showUnpublishedOnly, setShowUnpublishedOnly] = useState(false);
+  const [unpublishedCount, setUnpublishedCount] = useState<number | null>(null);
   // The real count across the whole table, independent of how many rows are
   // currently loaded — the stat card used to show articles.length, which is
   // just the page size, not the actual total.
@@ -204,7 +210,17 @@ export function ArticleManagement() {
   useEffect(() => {
     if (profile?.is_admin) fetchArticles(articlePage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, selectedCategory, searchTerm, articlePage]);
+  }, [profile, selectedCategory, searchTerm, articlePage, showUnpublishedOnly]);
+
+  useEffect(() => {
+    if (!profile?.is_admin) return;
+    supabase
+      .from('media_content')
+      .select('id', { count: 'exact', head: true })
+      .eq('media_type', 'article')
+      .eq('is_published', false)
+      .then(({ count }) => setUnpublishedCount(count ?? 0));
+  }, [profile, articles.length]);
 
   const fetchBioProfiles = async () => {
     try {
@@ -434,9 +450,19 @@ export function ArticleManagement() {
         );
       }
 
+      // processed can be true even when nothing publishable came out — the
+      // source was too thin to rewrite, so only metadata was touched and the
+      // article stays hidden (is_published stays false). Don't call that
+      // success, or the admin will think it's live when it still isn't.
+      if (data.metadataOnly) {
+        throw new Error(
+          'Source was too thin to rewrite into a real article — it stays unpublished. Consider deleting it instead.'
+        );
+      }
+
       const cost = data.usage?.costUsd;
       setNotifyResult(
-        `Rewritten${cost ? ` — cost $${cost.toFixed(3)}` : ''}. Refreshing…`
+        `Rewritten and published${cost ? ` — cost $${cost.toFixed(3)}` : ''}.`
       );
       await fetchArticles();
     } catch (err) {
@@ -520,6 +546,7 @@ export function ArticleManagement() {
           is_trending,
           is_pinned,
           is_manual,
+          is_published,
           seo_title,
           seo_keywords,
           categories:category_id (
@@ -537,6 +564,10 @@ export function ArticleManagement() {
         } else {
           query = query.eq('category_id', selectedCategory);
         }
+      }
+
+      if (showUnpublishedOnly) {
+        query = query.eq('is_published', false);
       }
 
       if (searchTerm) {
@@ -1075,6 +1106,10 @@ export function ArticleManagement() {
         // opened it and touched one field. Preserve whatever it already was.
         is_manual: isCreatingNew ? true : (editingArticle?.is_manual ?? false),
         enriched_at: new Date().toISOString(),
+        // Saving here — new or edited — is a deliberate editorial decision to
+        // make this live. This is also the only way to publish a fetched
+        // teaser by hand instead of through the AI "Rewrite" button.
+        is_published: true,
       };
 
       const { error } = editingArticle
@@ -1405,6 +1440,23 @@ export function ArticleManagement() {
         </div>
       </div>
 
+      {/* Fetched teasers stay hidden (off the site, out of the sitemap) until
+          rewritten — this is where an admin finds and clears that backlog. */}
+      {!!unpublishedCount && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8 flex items-center justify-between gap-4 flex-wrap">
+          <p className="text-sm text-amber-900">
+            <strong>{unpublishedCount.toLocaleString()}</strong> fetched article{unpublishedCount === 1 ? '' : 's'} {unpublishedCount === 1 ? 'is' : 'are'} hidden
+            from your site and the sitemap, waiting to be rewritten (or deleted).
+          </p>
+          <button
+            onClick={() => { setShowUnpublishedOnly((v) => !v); setArticlePage(0); }}
+            className="text-sm font-semibold text-amber-900 underline hover:no-underline flex-shrink-0"
+          >
+            {showUnpublishedOnly ? 'Show all articles' : 'Show only these'}
+          </button>
+        </div>
+      )}
+
       {/* Manual news import — the only way to bring in new articles besides
           the once-daily scheduled run, now that fetch-news requires
           authentication and no longer accepts public/anonymous requests. */}
@@ -1730,6 +1782,14 @@ export function ArticleManagement() {
                           title="Pinned — stays on the site until you unpin or archive it"
                         >
                           <Pin className="w-3 h-3" /> Pinned
+                        </span>
+                      )}
+                      {article.is_published === false && (
+                        <span
+                          className="flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-red-800 bg-red-100 rounded-full flex-shrink-0"
+                          title="Hidden from your site and the sitemap until rewritten"
+                        >
+                          Unpublished
                         </span>
                       )}
                       <span className="truncate">{article.title}</span>

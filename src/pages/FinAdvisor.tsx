@@ -336,6 +336,7 @@ export function FinAdvisor() {
           { count: 'exact' }
         )
         .eq('media_type', 'article')
+        .eq('is_published', true)
         .in('categories.slug', slugs);
 
       if (query) {

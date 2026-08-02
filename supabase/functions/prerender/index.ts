@@ -124,6 +124,7 @@ Deno.serve(async (req: Request) => {
         .from('media_content')
         .select('*, categories(name, slug), authors(name)')
         .eq('id', id)
+        .eq('is_published', true)
         .maybeSingle();
 
       if (!article) {
@@ -210,6 +211,7 @@ Deno.serve(async (req: Request) => {
     let query = supabase
       .from('media_content')
       .select('id, slug, title, description, thumbnail_url, published_at, categories(name, slug)')
+      .eq('is_published', true)
       .order('published_at', { ascending: false })
       .limit(30);
 

@@ -70,6 +70,7 @@ Deno.serve(async (req: Request) => {
     let query = supabase
       .from('media_content')
       .select('*, categories(*), authors(*)', { count: 'exact' })
+      .eq('is_published', true)
       .order('published_at', { ascending: false });
 
     if (category) {

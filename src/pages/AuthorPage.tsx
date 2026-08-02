@@ -42,6 +42,7 @@ export function AuthorPage() {
           .from('media_content')
           .select('id, slug, title, description, thumbnail_url, published_at, categories(name)')
           .eq('author_id', id)
+          .eq('is_published', true)
           .order('published_at', { ascending: false })
           .limit(30),
       ]);

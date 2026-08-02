@@ -27,6 +27,7 @@ export function useSearchArticles(searchQuery: string) {
       const { data, error } = await supabase
         .from('media_content')
         .select('*, categories(*), authors(*)')
+        .eq('is_published', true)
         .or(
           `title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`
         )
