@@ -991,7 +991,9 @@ function RegisterCreatorModal({ onClose, canOnboard }: { onClose: () => void; ca
         instagram_handle: instagram.replace(/^@/, '').trim() || null,
         twitter_handle: twitter.replace(/^@/, '').trim() || null,
         status,
-        revenue_share_pct: 50,
+        // House split: CelebUD 60 / creator 40, as advertised on the
+        // homepage creator panel. Editable per creator after approval.
+        revenue_share_pct: 40,
         admin_notes: adminNotes.trim() || null,
         reviewed_at: now,
         onboarded_at: status === 'onboarded' ? now : null,

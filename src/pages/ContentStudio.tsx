@@ -1015,14 +1015,30 @@ function ContentUploadModal({
       if (mine) {
         effectiveCreatorId = (mine as { id: string }).id;
       } else {
+        // A reporter who also shoots video is doing creator work and is paid
+        // for it like any other creator. This profile used to be created as
+        // "CelebUD Editorial" on 0% — so their clips lost their byline AND
+        // earned nothing, purely because they joined through the reporter
+        // form rather than the creator one. Same work, same name, same rate.
+        const [{ data: byline }, { data: application }] = await Promise.all([
+          supabase.from('authors').select('name').eq('user_id', uid).maybeSingle(),
+          supabase.from('reporter_applications').select('full_name').eq('user_id', uid).maybeSingle(),
+        ]);
+        const realName =
+          (byline as { name?: string } | null)?.name?.trim() ||
+          (application as { full_name?: string } | null)?.full_name?.trim() ||
+          userData.user?.email?.split('@')[0] ||
+          'CelebUD Editorial';
+
         const { data: created, error: createError } = await supabase
           .from('creator_applications')
           .insert({
             user_id: uid,
-            display_name: 'CelebUD Editorial',
+            display_name: realName,
             email: userData.user?.email || '',
             status: 'onboarded',
-            revenue_share_pct: 0,
+            // House creator split: CelebUD 60 / creator 40.
+            revenue_share_pct: 40,
             total_earnings: 0,
             total_views: 0,
             articles_count: 0,

@@ -105,17 +105,17 @@ export function CreatorRevShare() {
             </div>
             <h2 className="text-2xl lg:text-3xl font-bold text-white mb-4">
               Write for CelebUD.<br />
-              <span className="text-red-400">Earn 50% of ad revenue.</span>
+              <span className="text-red-400">Earn 40% of ad revenue.</span>
             </h2>
             <p className="text-gray-300 text-sm mb-8 leading-relaxed">
               Join our creator program and earn money from every article you publish.
-              We split ad revenue 50/50 — you write, we handle distribution, you get paid monthly.
+              We split ad revenue 60/40 — you write, we handle distribution, you get paid monthly.
             </p>
             <div className="grid grid-cols-3 gap-4 mb-8">
               <div className="text-center p-3 bg-white/5 rounded-xl">
                 <DollarSign className="w-5 h-5 text-green-400 mx-auto mb-1.5" />
-                <p className="text-white text-xs font-semibold">50/50 Split</p>
-                <p className="text-gray-400 text-[10px] mt-0.5">Fair revenue share</p>
+                <p className="text-white text-xs font-semibold">60/40 Split</p>
+                <p className="text-gray-400 text-[10px] mt-0.5">40% to you, monthly</p>
               </div>
               <div className="text-center p-3 bg-white/5 rounded-xl">
                 <BarChart3 className="w-5 h-5 text-blue-400 mx-auto mb-1.5" />
