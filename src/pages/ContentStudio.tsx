@@ -1016,10 +1016,12 @@ function ContentUploadModal({
         effectiveCreatorId = (mine as { id: string }).id;
       } else {
         // A reporter who also shoots video is doing creator work and is paid
-        // for it like any other creator. This profile used to be created as
-        // "CelebUD Editorial" on 0% — so their clips lost their byline AND
-        // earned nothing, purely because they joined through the reporter
-        // form rather than the creator one. Same work, same name, same rate.
+        // for it. This profile used to be created as "CelebUD Editorial" on
+        // 0% — so their clips lost their byline AND earned nothing, purely
+        // because they joined through the reporter form rather than the
+        // creator one. Created at the standard 40% here; the 60%
+        // reporter-creator premium is applied by sync_contributor_share()
+        // below, once the content actually exists to qualify for it.
         const [{ data: byline }, { data: application }] = await Promise.all([
           supabase.from('authors').select('name').eq('user_id', uid).maybeSingle(),
           supabase.from('reporter_applications').select('full_name').eq('user_id', uid).maybeSingle(),
@@ -1077,6 +1079,23 @@ function ContentUploadModal({
         const created = await createContent.mutateAsync(payload);
         setSavedId((created as { id?: string } | null)?.id ?? null);
       }
+
+      // Someone who both reports and produces studio content earns the 60%
+      // reporter-creator rate instead of the standard 40%. This works it out
+      // from what is already in the database, so nobody has to remember to
+      // change it by hand. It leaves a manually-set rate alone, and never
+      // blocks the save if it fails.
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData.user?.id) {
+          await supabase.rpc('sync_contributor_share' as never, {
+            p_user_id: userData.user.id,
+          } as never);
+        }
+      } catch {
+        // Rate sync is bookkeeping — never fail a publish over it.
+      }
+
       setSuccess(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save. Please try again.');

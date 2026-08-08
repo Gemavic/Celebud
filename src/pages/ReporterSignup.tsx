@@ -130,11 +130,23 @@ export function ReporterSignup() {
                 Join the CelebUD newsroom
               </h1>
             </div>
-            <p className="text-gray-500 mb-8">
+            <p className="text-gray-500 mb-4">
               Apply as a <strong className="text-gray-700">reporter</strong> or a{' '}
               <strong className="text-gray-700">curator</strong> — it is the same
               application, and our editor reviews every one personally.
             </p>
+            <div className="mb-8 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+              <p className="text-sm text-emerald-900">
+                <strong>You earn 40% of the ad revenue</strong> your published work
+                generates, paid monthly.
+              </p>
+              <p className="text-sm text-emerald-800 mt-1.5">
+                Also produce video, audio or social content for us? That raises your
+                share to <strong>60%</strong> — a premium for doing both jobs. It is
+                applied automatically once you publish your first piece in the
+                Content Studio; there is nothing extra to apply for.
+              </p>
+            </div>
 
             {!user && (
               <div className="text-center py-8 bg-gray-50 rounded-xl">

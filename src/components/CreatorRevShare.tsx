@@ -107,9 +107,13 @@ export function CreatorRevShare() {
               Write for CelebUD.<br />
               <span className="text-red-400">Earn 40% of ad revenue.</span>
             </h2>
-            <p className="text-gray-300 text-sm mb-8 leading-relaxed">
+            <p className="text-gray-300 text-sm mb-4 leading-relaxed">
               Join our creator program and earn money from every article you publish.
               We split ad revenue 60/40 — you write, we handle distribution, you get paid monthly.
+            </p>
+            <p className="text-gray-400 text-xs mb-8 leading-relaxed">
+              Report <em>and</em> produce video or audio for us? Your share rises to{' '}
+              <strong className="text-red-400">60%</strong> — a premium for doing both jobs.
             </p>
             <div className="grid grid-cols-3 gap-4 mb-8">
               <div className="text-center p-3 bg-white/5 rounded-xl">
