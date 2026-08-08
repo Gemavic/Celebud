@@ -76,6 +76,17 @@ jobs:
       - name: Deploy send-newsletter (email editions, JWT on)
         run: supabase functions deploy send-newsletter --project-ref "$PROJECT_REF"
 
+      # These two read articles for the public site. They were missing from
+      # this workflow, so edits to them never reached production — the live
+      # homepage kept serving unpublished articles that the article page then
+      # refused to open ("Article Not Found"). Called from the browser with
+      # the anon key as the bearer token, so default JWT verification passes.
+      - name: Deploy homepage-data (public homepage feed, JWT on)
+        run: supabase functions deploy homepage-data --project-ref "$PROJECT_REF"
+
+      - name: Deploy cached-articles (cached article list, JWT on)
+        run: supabase functions deploy cached-articles --project-ref "$PROJECT_REF"
+
       # The SEO functions are live under CAPITALISED names (vercel.json
       # rewrites point at /Prerender and /Generate-sitemap). Deploying the
       # lowercase folder name would create a second, unused function and
