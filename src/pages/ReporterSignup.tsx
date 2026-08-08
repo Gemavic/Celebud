@@ -1,14 +1,23 @@
 // src/pages/ReporterSignup.tsx
-// Public application form for new reporters at /reporters/apply.
-// Applicants must be signed in (so their application links to their
-// account); after submitting they see their status here, including the
-// editor's comment if rejected.
+// Public newsroom application, served at both /reporters/apply and
+// /curators/apply. Applicants must be signed in (so their application links
+// to their account); after submitting they see their status here, including
+// the editor's comment if rejected.
+//
+// One form covers both roles on purpose. "Curator" is not a separate job —
+// the byline is chosen per ARTICLE, not per person (ArticleDetail renders
+// {syndicationSource ? 'Curator' : 'Reporter'}), so the same person reads as
+// Curator on a curated story and Reporter on their own. People were still
+// being told to "register as a curator" and had nowhere to go, so the choice
+// is now an explicit field on the one application instead of a second system.
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Header } from '../components/Header';
 import { ArrowLeft, CheckCircle, Clock, PenLine, Send, XCircle } from 'lucide-react';
+
+type NewsroomRole = 'reporter' | 'curator';
 
 interface ReporterApplication {
   id: string;
@@ -21,10 +30,12 @@ interface ReporterApplication {
   status: 'pending' | 'approved' | 'rejected';
   review_comment: string | null;
   created_at: string;
+  role?: NewsroomRole | null;
 }
 
 export function ReporterSignup() {
   const { user } = useAuth();
+  const { pathname } = useLocation();
   const [application, setApplication] = useState<ReporterApplication | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -37,6 +48,11 @@ export function ReporterSignup() {
   const [coverage, setCoverage] = useState('');
   const [bio, setBio] = useState('');
   const [portfolio, setPortfolio] = useState('');
+  // Someone who followed a "become a curator" link should land on the form
+  // with that already chosen, not have to notice a radio button.
+  const [role, setRole] = useState<NewsroomRole>(
+    pathname.startsWith('/curators') ? 'curator' : 'reporter'
+  );
 
   const loadApplication = useCallback(async () => {
     if (!user) {
@@ -73,7 +89,8 @@ export function ReporterSignup() {
         p_bio: bio || null,
         p_coverage: coverage || null,
         p_portfolio_url: portfolio || null,
-      });
+        p_role: role,
+      } as never);
       if (rpcError) throw new Error(rpcError.message);
       const result = data as { success: boolean; error?: string; linked?: boolean };
       if (!result.success) {
@@ -109,10 +126,14 @@ export function ReporterSignup() {
               <div className="p-2.5 bg-red-50 rounded-xl">
                 <PenLine className="w-6 h-6 text-red-600" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">Become a CelebUD Reporter</h1>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Join the CelebUD newsroom
+              </h1>
             </div>
             <p className="text-gray-500 mb-8">
-              Apply to join the CelebUD editorial team. Our editor reviews every application personally.
+              Apply as a <strong className="text-gray-700">reporter</strong> or a{' '}
+              <strong className="text-gray-700">curator</strong> — it is the same
+              application, and our editor reviews every one personally.
             </p>
 
             {!user && (
@@ -192,6 +213,44 @@ export function ReporterSignup() {
 
             {user && !loading && (!application || showForm) && (
               <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Which role are you applying for? *
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {([
+                      {
+                        value: 'reporter' as const,
+                        title: 'Reporter',
+                        blurb: 'Write original stories and interviews of your own.',
+                      },
+                      {
+                        value: 'curator' as const,
+                        title: 'Curator',
+                        blurb: 'Select, verify and edit stories from other outlets for our readers.',
+                      },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setRole(opt.value)}
+                        aria-pressed={role === opt.value}
+                        className={`text-left p-4 rounded-xl border-2 transition-colors ${
+                          role === opt.value
+                            ? 'border-red-500 bg-red-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <span className="block font-semibold text-gray-900">{opt.title}</span>
+                        <span className="block text-xs text-gray-500 mt-1">{opt.blurb}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Either way you join the same newsroom — most of our team do both over time.
+                  </p>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Full name *</label>

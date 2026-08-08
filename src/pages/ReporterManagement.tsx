@@ -36,6 +36,8 @@ interface ReporterApplication {
   review_comment: string | null;
   reviewed_at: string | null;
   created_at: string;
+  /** Which kind of newsroom work they applied for. Older rows have none. */
+  role?: 'reporter' | 'curator' | null;
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -280,6 +282,15 @@ export function ReporterManagement() {
                       <h3 className="text-lg font-bold text-gray-900">{app.full_name}</h3>
                       <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${STATUS_BADGE[app.status]}`}>
                         {app.status}
+                      </span>
+                      <span
+                        className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${
+                          app.role === 'curator'
+                            ? 'bg-violet-100 text-violet-700 border-violet-200'
+                            : 'bg-blue-100 text-blue-700 border-blue-200'
+                        }`}
+                      >
+                        {app.role === 'curator' ? 'Curator' : 'Reporter'}
                       </span>
                       {!app.user_id && (
                         <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-500 border border-gray-200">

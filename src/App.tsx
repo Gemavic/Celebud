@@ -61,6 +61,10 @@ function App() {
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/admin/writers" element={<WritersDashboard />} />
             <Route path="/reporters/apply" element={<ReporterSignup />} />
+            {/* Same form. People are told to "register as a curator" because
+                Curator is a byline the site applies per article, so this
+                needs somewhere real to land — it just preselects the role. */}
+            <Route path="/curators/apply" element={<ReporterSignup />} />
             <Route path="/originals" element={<OriginalsPage />} />
             {/* Public page for a Studio video/audio clip — this is what the
                 share buttons post, so Facebook and X show a CelebUD card

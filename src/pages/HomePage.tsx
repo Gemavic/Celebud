@@ -351,6 +351,11 @@ function HomePage() {
                   </Link>
                 </li>
                 <li>
+                  <Link to="/curators/apply" className="hover:text-white transition-colors">
+                    Become a Curator
+                  </Link>
+                </li>
+                <li>
                   <Link to="/privacy" className="hover:text-white transition-colors">
                     Privacy Policy
                   </Link>
