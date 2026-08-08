@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { parse as parseHTML } from 'npm:node-html-parser@6';
 import { buildSeoTitle, buildSeoDescription, buildSeoKeywords } from '../_shared/seo.ts';
-import { detectImageTopic, pickStockImage, searchPexelsImage } from '../_shared/articleImages.ts';
+import { isDurableImageHost, resolvePublishableThumbnail } from '../_shared/articleImages.ts';
 import { submitToIndexNow } from '../_shared/indexnow.ts';
 
 // Turns thin, scraped RSS stubs into properly produced CelebUD articles.
@@ -653,30 +653,49 @@ Deno.serve(async (req: Request) => {
       const seoKeywords = (rewrite?.seo_keywords || '').trim()
         || buildSeoKeywords(article.title, description, categoryName);
 
-      // Image priority, cheapest and most authentic first:
-      //   1. A real photo the article already has — never overwritten.
-      //   2. The publisher's own lead photo for this exact story.
-      //   3. A matched topical stock photo.
-      //   4. A generated image, only if there is genuinely nothing else
-      //      and the caller opted in.
+      // Image priority, most authentic first. Anything kept must be served
+      // from a host that cannot revoke it: a photo left pointing at the
+      // publisher's own server looks fine here and then 403s in the reader's
+      // browser, which is what put broken image icons on live articles.
+      //   1. A real photo the article already has, if it is already durable.
+      //   2. The publisher's own lead photo for this story, copied into our
+      //      bucket (this also rescues an existing hotlinked thumbnail).
+      //   3. A real, on-subject Pexels photo.
+      //   4. A generated image, only if the caller opted in and paid for it.
       let thumbnail: string | null = null;
 
-      if (isRealPhoto(article.thumbnail_url)) {
+      if (isRealPhoto(article.thumbnail_url) && isDurableImageHost(article.thumbnail_url)) {
         thumbnail = article.thumbnail_url;
-      } else if (scraped.image) {
-        thumbnail = scraped.image;
-        realPhotosUsed++;
       } else {
-        const topic = detectImageTopic(article.title, description, categorySlug);
-        thumbnail = (await searchPexelsImage(topic.query, article.slug))
-          || pickStockImage(topic.pool, article.slug);
+        // Prefer the publisher's photo for this story; fall back to the one
+        // already on the article, which may be hotlinked and worth rescuing.
+        const candidate = scraped.image
+          || (isRealPhoto(article.thumbnail_url) ? article.thumbnail_url : null);
 
-        // Nothing genuine available — this is the only case worth paying
-        // to generate an image for.
-        if (!thumbnail && withImages) {
+        const resolved = await resolvePublishableThumbnail(supabase, {
+          sourceImage: candidate,
+          title: article.title,
+          description,
+          categorySlug,
+          seed: article.slug,
+        });
+
+        if (resolved) {
+          thumbnail = resolved.url;
+          if (resolved.source === 'publisher') realPhotosUsed++;
+        } else if (withImages) {
+          // Nothing genuine available — the only case worth paying to
+          // generate an image for.
           thumbnail = await generateAiImage(supabase, apiKey, article.title, description);
           if (thumbnail) imagesGenerated++;
         }
+      }
+
+      // An article may not go live without a picture. Publishing one with a
+      // broken or missing image is the presentation problem this whole path
+      // exists to prevent, so drop the rewrite rather than ship it that way.
+      if (contentHtml && !thumbnail) {
+        throw new Error('no usable image could be secured — not published');
       }
 
       const update: Record<string, unknown> = {

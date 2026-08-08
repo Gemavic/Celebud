@@ -73,6 +73,9 @@ jobs:
       - name: Deploy enrich-articles (AI article rewriting + SEO, JWT on)
         run: supabase functions deploy enrich-articles --project-ref "$PROJECT_REF"
 
+      - name: Deploy repair-thumbnails (re-host hotlinked images, JWT on)
+        run: supabase functions deploy repair-thumbnails --project-ref "$PROJECT_REF"
+
       - name: Deploy send-newsletter (email editions, JWT on)
         run: supabase functions deploy send-newsletter --project-ref "$PROJECT_REF"
 

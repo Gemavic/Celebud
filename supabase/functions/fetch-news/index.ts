@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { parse as parseHTML } from 'npm:node-html-parser@6';
 import { buildSeoTitle, buildSeoKeywords } from '../_shared/seo.ts';
-import { detectImageTopic, pickStockImage, searchPexelsImage } from '../_shared/articleImages.ts';
+import { resolvePublishableThumbnail } from '../_shared/articleImages.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,34 +9,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-const fifaWorldCupKeywords = [
-  'world cup', 'fifa', 'worldcup', 'qatar 2022', 'usa 2026', 'mexico 2026', 'canada 2026',
-  'world cup 2026', 'fifa world cup', 'group stage', 'round of 16', 'quarter-final',
-  'quarterfinal', 'semi-final', 'semifinal', 'world cup final', 'world cup qualifier',
-  'fifa ranking', 'ballon d\'or', 'golden boot', 'copa america', 'euro 2024', 'afcon',
-  'champions league', 'europa league', 'ucl', 'premier league', 'la liga', 'bundesliga',
-  'serie a', 'ligue 1', 'super eagles', 'three lions', 'les bleus',
-];
-
-const fifaWorldCupThumbnails = [
-  'https://digitalhub.fifa.com/transform/3603e5f0-14e8-4cd4-8a9e-273b3e7b4a58/FIFA-World-Cup-26-Official-Brand',
-  'https://digitalhub.fifa.com/transform/6a9e54e5-f498-4059-aa83-b3190f93f20f/FIFA+WC+2026+Brand+Key+Visual',
-  'https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?w=1200&q=80',
-  'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&q=80',
-  'https://images.unsplash.com/photo-1606925797300-0b35e9d1794e?w=1200&q=80',
-  'https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?w=1200&q=80',
-  'https://images.unsplash.com/photo-1522778119026-d647f0596c20?w=1200&q=80',
-  'https://images.unsplash.com/photo-1551958219-acbc608c6377?w=1200&q=80',
-];
-
-function isWorldCupContent(title: string, description: string): boolean {
-  const text = `${title} ${description}`;
-  return fifaWorldCupKeywords.some(kw => wordMatch(text, kw));
-}
-
-function getWorldCupThumbnail(): string {
-  return fifaWorldCupThumbnails[Math.floor(Math.random() * fifaWorldCupThumbnails.length)];
-}
+// The FIFA World Cup thumbnail pool was removed with the switch to
+// re-hosted publisher photos. It picked at RANDOM, so the same match report
+// changed picture on every run, and two of its entries hotlinked FIFA's own
+// brand assets. Football stories now take the publisher's real match photo,
+// or an on-subject Pexels football photo, both deterministic on the slug.
 
 interface RSSItem {
   title: string;
@@ -902,6 +879,9 @@ Deno.serve(async (req: Request) => {
   runStartedAt = Date.now();
   // How many feed items the quality gate turned away this run.
   let skippedLowQuality = 0;
+  // Turned away because no usable picture could be secured — neither the
+  // publisher's own photo nor a Pexels match. Never published without one.
+  let skippedNoImage = 0;
 
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -1234,40 +1214,38 @@ Deno.serve(async (req: Request) => {
               continue;
             }
 
-            // Thumbnails: never hotlink a third-party article's own photo
-            // (breaks when they block it, and it isn't ours to republish).
-            // Instead match on the story's actual SUBJECT — wildfire,
-            // earthquake, courtroom — rather than only its broad category,
-            // and pick deterministically from the article's slug so the same
-            // article always keeps the same image instead of similar stories
-            // randomly clustering on one photo.
-            // Image priority, most authentic first:
-            //   1. The photo the RSS feed itself supplied for this story
-            //      (media:content / media:thumbnail / enclosure). This is the
-            //      publisher's own picture of the actual event — it was being
-            //      parsed and then thrown away in favour of stock.
-            //   2. The article page's own Open Graph photo.
-            //   3. A topical stock photo, only when the story has no real
-            //      picture available at all.
-            let finalThumbnail = '';
+            // Thumbnails: the publisher's own photo of the actual event is
+            // always the best picture, but it must never be HOTLINKED. Left
+            // pointing at the publisher's server it silently breaks — Tribune
+            // Online, Premium Times, Blueprint and Leadership all answer 403
+            // Forbidden once the browser says the request came from
+            // celebud.com, which is what left live articles showing a broken
+            // image icon. So the photo is downloaded once here and stored in
+            // CelebUD's own bucket, where it cannot be revoked.
+            //
+            // Order: publisher's photo (re-hosted) -> a real, on-subject
+            // Pexels photo -> nothing, in which case the story is NOT
+            // imported at all. No generic category stock art: a picture that
+            // has nothing to do with the story is worse than not running it.
+            const publisherImage =
+              (item.thumbnail && isValidArticleImage(item.thumbnail))
+                ? item.thumbnail
+                // Reuses the page already fetched above — no second round-trip.
+                : sourcePreview.image;
 
-            if (item.thumbnail && isValidArticleImage(item.thumbnail)) {
-              finalThumbnail = item.thumbnail;
-            } else {
-              // Reuses the page already fetched above — no second round-trip.
-              finalThumbnail = sourcePreview.image;
-            }
+            const resolved = await resolvePublishableThumbnail(supabase, {
+              sourceImage: publisherImage,
+              title: item.title,
+              description: item.description,
+              categorySlug: finalCategorySlug,
+              seed: slug,
+            });
 
-            if (!finalThumbnail) {
-              const isWorldCup = isWorldCupContent(item.title, item.description);
-              if (isWorldCup) {
-                finalThumbnail = getWorldCupThumbnail();
-              } else {
-                const topic = detectImageTopic(item.title, item.description, finalCategorySlug);
-                finalThumbnail = (await searchPexelsImage(topic.query, slug))
-                  || pickStockImage(topic.pool, slug);
-              }
+            if (!resolved) {
+              skippedNoImage++;
+              continue;
             }
+            const finalThumbnail = resolved.url;
 
             // Every article gets usable SEO metadata at ingest. enrich-articles
             // later replaces these with AI-written versions, but nothing is
@@ -1401,6 +1379,7 @@ Deno.serve(async (req: Request) => {
         totalFetched,
         totalAdded,
         skippedLowQuality,
+        skippedNoImage,
         // Nothing to announce to IndexNow here — everything imported by this
         // run is saved unpublished (is_published: false) and stays invisible
         // until enrich-articles rewrites it. That function submits the

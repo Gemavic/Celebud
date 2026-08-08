@@ -121,6 +121,9 @@ export function ArticleManagement() {
   // rewritten. This is how an admin finds and acts on that backlog.
   const [showUnpublishedOnly, setShowUnpublishedOnly] = useState(false);
   const [unpublishedCount, setUnpublishedCount] = useState<number | null>(null);
+  // Repairs articles still pointing at a publisher's own image server.
+  const [repairingThumbs, setRepairingThumbs] = useState(false);
+  const [repairResult, setRepairResult] = useState<string | null>(null);
   // The real count across the whole table, independent of how many rows are
   // currently loaded — the stat card used to show articles.length, which is
   // just the page size, not the actual total.
@@ -470,6 +473,64 @@ export function ArticleManagement() {
     } finally {
       setRewritingId(null);
       setTimeout(() => setNotifyResult(null), 6000);
+    }
+  };
+
+  /**
+   * Fixes articles whose picture still points at the publisher's own server.
+   * Those load fine for us but return 403 to a reader's browser, which is
+   * what shows a broken image icon on the live article. Each one is copied
+   * into CelebUD's own storage, or replaced with a real Pexels photo, and
+   * unpublished if neither can be secured. Batched — keeps going until the
+   * backlog reaches zero.
+   */
+  const repairThumbnails = async () => {
+    setRepairingThumbs(true);
+    setRepairResult('Checking…');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('You must be signed in as an admin.');
+
+      let rehosted = 0, pexels = 0, unpub = 0, failed = 0, rounds = 0;
+      for (;;) {
+        rounds++;
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/repair-thumbnails`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ limit: 25 }),
+          }
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Repair failed (${res.status}).`);
+
+        rehosted += data.rehosted || 0;
+        pexels += data.replacedWithPexels || 0;
+        unpub += data.unpublished || 0;
+        failed += data.failed || 0;
+
+        setRepairResult(
+          `Repaired ${rehosted + pexels} so far — ${data.remaining ?? 0} to go…`
+        );
+
+        if (!data.processed || !data.remaining || rounds > 60) break;
+      }
+
+      setRepairResult(
+        `Done. ${rehosted} original photo${rehosted === 1 ? '' : 's'} saved to your own storage, ` +
+        `${pexels} replaced with a Pexels photo` +
+        (unpub ? `, ${unpub} unpublished (no picture available)` : '') +
+        (failed ? `, ${failed} failed` : '') + '.'
+      );
+      await fetchArticles();
+    } catch (err) {
+      setRepairResult(`Error: ${err instanceof Error ? err.message : 'Repair failed'}`);
+    } finally {
+      setRepairingThumbs(false);
     }
   };
 
@@ -1466,6 +1527,39 @@ export function ArticleManagement() {
             {articles.reduce((sum, a) => sum + (a.comments_count || 0), 0).toLocaleString()}
           </p>
         </div>
+      </div>
+
+      {/* Broken pictures: articles still pointing at a publisher's own image
+          server. They load for us but 403 for readers, showing a broken icon. */}
+      <div className="bg-white rounded-lg shadow p-6 mb-8 border border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-indigo-600" />
+              Fix broken article pictures
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Some articles still show the publisher's photo straight from their server.
+              Those sites block outside use, so readers see a broken image. This saves each
+              original photo into your own storage, or swaps in a real Pexels photo, and
+              unpublishes anything that cannot get a picture at all.
+            </p>
+          </div>
+          <button
+            onClick={repairThumbnails}
+            disabled={repairingThumbs}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex-shrink-0"
+          >
+            {repairingThumbs
+              ? <><RefreshCw className="w-4 h-4 animate-spin" /> Repairing…</>
+              : <><ImageIcon className="w-4 h-4" /> Fix pictures</>}
+          </button>
+        </div>
+        {repairResult && (
+          <p className={`mt-3 text-sm ${repairResult.startsWith('Error') ? 'text-red-700' : 'text-gray-700'}`}>
+            {repairResult}
+          </p>
+        )}
       </div>
 
       {/* Fetched teasers stay hidden (off the site, out of the sitemap) until

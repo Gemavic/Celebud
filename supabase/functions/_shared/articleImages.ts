@@ -295,3 +295,125 @@ export async function resolveArticleImage(
   const fromApi = await searchPexelsImage(topic.query, seed);
   return fromApi || pickStockImage(topic.pool, seed);
 }
+
+// ── Re-hosting ──────────────────────────────────────────────────────────
+//
+// Pointing an <img> straight at a publisher's own server ("hotlinking") is
+// what left 60 live articles showing a broken image icon. The file is fine —
+// the publisher simply refuses to serve it to anyone else. Tribune Online,
+// Premium Times, Blueprint and Leadership all return 403 Forbidden when the
+// browser says the request came from celebud.com, even though the identical
+// URL returns the image normally when fetched server-side.
+//
+// So: fetch it once from the edge function (which sends no browser Referer,
+// and is the request the publisher allows), store the bytes in CelebUD's own
+// bucket, and point the article at that copy. It cannot break afterwards.
+
+/** Hosts we serve from ourselves or that are built for third-party embedding. */
+export function isDurableImageHost(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return (
+      host.endsWith('.supabase.co') ||
+      host === 'images.pexels.com' ||
+      host === 'images.unsplash.com'
+    );
+  } catch {
+    return false;
+  }
+}
+
+const MIN_IMAGE_BYTES = 1024;              // smaller than this is a spacer/tracking pixel
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;   // guard the function's memory
+
+/**
+ * Downloads an image and stores it in CelebUD's own `media` bucket.
+ * Returns the public URL, or null if it could not be fetched or stored —
+ * callers must treat null as "no usable image".
+ */
+export async function rehostImage(
+  // Loosely typed so this module stays free of a supabase-js import.
+  supabase: { storage: { from: (bucket: string) => any } },
+  sourceUrl: string,
+  seed: string
+): Promise<string | null> {
+  if (!sourceUrl) return null;
+  // Already durable — copying it again would just waste storage.
+  if (isDurableImageHost(sourceUrl)) return sourceUrl;
+
+  try {
+    const resp = await fetch(sourceUrl, {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(15_000),
+      // Deliberately NO Referer. That header is exactly what the publishers
+      // block on, and server-side fetches are the request they do allow.
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; CelebUD/1.0; +https://celebud.com)',
+        Accept: 'image/avif,image/webp,image/jpeg,image/png,*/*',
+      },
+    });
+    if (!resp.ok) return null;
+
+    const contentType = (resp.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    if (!contentType.startsWith('image/') || contentType === 'image/svg+xml') return null;
+
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    if (bytes.byteLength < MIN_IMAGE_BYTES || bytes.byteLength > MAX_IMAGE_BYTES) return null;
+
+    const ext = contentType.includes('png') ? 'png'
+      : contentType.includes('webp') ? 'webp'
+      : contentType.includes('avif') ? 'avif'
+      : contentType.includes('gif') ? 'gif'
+      : 'jpg';
+
+    // Deterministic on the source URL, so re-running a repair pass over the
+    // same article reuses the stored copy instead of piling up duplicates.
+    const path = `article-thumbnails/src-${hashString(sourceUrl)}-${hashString(seed || sourceUrl)}.${ext}`;
+
+    const { error } = await supabase.storage.from('media').upload(path, bytes, {
+      contentType,
+      cacheControl: '31536000',
+      upsert: true,
+    });
+    if (error) return null;
+
+    return supabase.storage.from('media').getPublicUrl(path).data.publicUrl as string;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The image an article must have before it may be published, in order of
+ * preference:
+ *   1. the publisher's own photo for this story, copied to our bucket
+ *   2. a genuinely on-subject real photo from Pexels
+ * Returns null when neither is available — the caller must then refuse to
+ * publish rather than ship a story with a broken or missing picture.
+ *
+ * The curated Unsplash pools are deliberately NOT used here: they are generic
+ * category art, and falling back to them is what made unrelated stories share
+ * the same stock photo.
+ */
+export async function resolvePublishableThumbnail(
+  supabase: { storage: { from: (bucket: string) => any } },
+  opts: {
+    sourceImage?: string | null;
+    title: string;
+    description?: string | null;
+    categorySlug?: string | null;
+    seed: string;
+  }
+): Promise<{ url: string; source: 'publisher' | 'pexels' } | null> {
+  if (opts.sourceImage) {
+    const rehosted = await rehostImage(supabase, opts.sourceImage, opts.seed);
+    if (rehosted) return { url: rehosted, source: 'publisher' };
+  }
+
+  const topic = detectImageTopic(opts.title, opts.description || '', opts.categorySlug);
+  const pexels = await searchPexelsImage(topic.query, opts.seed);
+  if (pexels) return { url: pexels, source: 'pexels' };
+
+  return null;
+}
