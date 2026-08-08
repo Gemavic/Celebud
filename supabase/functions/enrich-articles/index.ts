@@ -516,17 +516,33 @@ Deno.serve(async (req: Request) => {
     // scope:'high-value' rewrites only the categories worth paying for;
     // 'all' rewrites everything. Defaults to high-value so an accidental
     // call cannot spend money on stale sports scores.
-    const scope: string = body.scope === 'all' ? 'all' : 'high-value';
-    const scopeSlugs: string[] | null = Array.isArray(body.categories) && body.categories.length
-      ? body.categories
-      : (scope === 'high-value' ? HIGH_VALUE_CATEGORIES : null);
+    //
+    // Explicit ids override the scope entirely. The scope exists to stop a
+    // BULK run spending money on low-value categories — but naming one
+    // article by id IS the deliberate decision it was protecting against,
+    // and applying it there silently filtered the chosen article out of the
+    // query, so the per-article "Rewrite" button failed with "nothing was
+    // rewritten" on every Technology/Sports/Entertainment story.
+    const scope: string = ids ? 'all' : (body.scope === 'all' ? 'all' : 'high-value');
+    const scopeSlugs: string[] | null = ids
+      ? null
+      : (Array.isArray(body.categories) && body.categories.length
+          ? body.categories
+          : (scope === 'high-value' ? HIGH_VALUE_CATEGORIES : null));
 
     // is_manual articles are hand-written by the newsroom and must never be
     // touched by any automated pass.
+    // The categories join exists ONLY so the scope filter can match on slug.
+    // Forcing it to be an INNER join when there is no scope silently drops
+    // every article that has no category at all — including ones named
+    // explicitly by id. Use a plain left join in that case.
+    const baseColumns =
+      'id, title, slug, description, content, thumbnail_url, external_url, category_id, source_id, is_featured, is_trending, enrichment_attempts, source_text';
+
     let query = supabase
       .from('media_content')
       .select(
-        'id, title, slug, description, content, thumbnail_url, external_url, category_id, source_id, is_featured, is_trending, enrichment_attempts, source_text, categories!inner(slug)'
+        scopeSlugs ? `${baseColumns}, categories!inner(slug)` : `${baseColumns}, categories(slug)`
       )
       .eq('media_type', 'article')
       .or('is_manual.is.null,is_manual.eq.false')
@@ -682,6 +698,13 @@ Deno.serve(async (req: Request) => {
       if (contentHtml) {
         update.content = contentHtml;
         update.is_published = true;
+        // These Gemini failures are transient (a 400 or malformed JSON on one
+        // attempt, then a clean result on the next), so a success must clear
+        // the old error and the attempt count — otherwise the article stays
+        // at MAX_ATTEMPTS and is permanently skipped by every future bulk run
+        // despite now being perfectly fine.
+        update.enrichment_error = null;
+        update.enrichment_attempts = 0;
         newlyPublishedUrls.push(`https://celebud.com/article/${article.id}/${article.slug}`);
       }
 
