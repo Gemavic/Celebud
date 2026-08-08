@@ -1,20 +1,36 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { isDurableImageHost, resolvePublishableThumbnail } from '../_shared/articleImages.ts';
+import {
+  detectImageTopic,
+  isDurableImageHost,
+  isGenericStockImage,
+  isPexelsRateLimited,
+  resetPexelsRateLimit,
+  resolvePublishableThumbnail,
+  searchPexelsImage,
+} from '../_shared/articleImages.ts';
 
-// Repairs articles whose thumbnail points at a publisher's own server.
+// Fixes the two ways an article's picture can be wrong.
 //
-// Those images look fine in the database and load fine when fetched from a
-// server, but the publisher refuses to serve them to a browser that says it
-// came from celebud.com — Tribune Online, Premium Times, Blueprint and
-// Leadership all answer 403 Forbidden — so the reader sees a broken image
-// icon. Measured on the live site: 497 published articles hotlinked a
-// third-party image and 60 of them were already broken this way.
+// BROKEN (mode 'broken') — the thumbnail points at the publisher's own
+// server. It loads fine when fetched server-side but the publisher refuses
+// to serve it to a browser that says it came from celebud.com: Tribune
+// Online, Premium Times, Blueprint and Leadership all answer 403 Forbidden,
+// so the reader sees a broken image icon. The photo is downloaded once (the
+// request they do allow), stored in CelebUD's own bucket, and the article
+// repointed at that copy. Failing that, a real on-subject Pexels photo.
+// Failing both, the article is unpublished rather than left visibly broken.
 //
-// For each article this downloads the publisher's photo once (the request
-// they do allow), stores it in CelebUD's own bucket and repoints the
-// article at that copy. If the photo cannot be retrieved at all it falls
-// back to a real, on-subject Pexels photo. If neither can be secured the
-// article is unpublished rather than left showing a broken picture.
+// GENERIC (mode 'generic') — the thumbnail is one of the old curated
+// category photos. Those load perfectly, so the broken-image pass ignored
+// them, but each pool held only 3-6 images: measured live, 1,323 of 1,981
+// published articles shared a duplicate picture, with 59 unrelated stories
+// on a single stadium photo. Each one is upgraded to a real photo of its
+// own subject.
+//
+// The two are handled differently on purpose. A generic image is not broken,
+// so if no replacement can be found the article KEEPS it and stays live —
+// only a genuinely broken picture can ever cause an unpublish. Without that
+// split, a Pexels outage would have unpublished a thousand good articles.
 //
 // Runs in batches so a long archive cannot time out. Call it repeatedly
 // until `remaining` reaches 0.
@@ -90,33 +106,78 @@ Deno.serve(async (req: Request) => {
     const batchSize: number = Math.min(Math.max(Number(body.limit) || DEFAULT_BATCH, 1), 100);
     // dryRun reports what would change without writing anything.
     const dryRun: boolean = body.dryRun === true;
+    // 'broken'  — hotlinked images the reader cannot load (can unpublish)
+    // 'generic' — duplicate category stock art (never unpublishes)
+    const mode: 'broken' | 'generic' =
+      body.mode === 'generic' ? 'generic' : 'broken';
 
-    // Pull a working set and filter in code: "hostname is not one of ours"
-    // is not something PostgREST can express as a single clean filter.
-    const { data, error } = await supabase
+    // Module state survives between warm invocations; a fresh call deserves
+    // a fresh attempt at Pexels rather than inheriting an old 429.
+    resetPexelsRateLimit();
+
+    // Pull a working set and filter in code: "which host is this on" is not
+    // something PostgREST can express as a single clean filter.
+    // Generic-mode only touches LIVE articles — there is no point spending a
+    // Pexels lookup on something readers cannot see.
+    let query = supabase
       .from('media_content')
       .select('id, title, slug, description, thumbnail_url, is_published, categories(slug)')
       .eq('media_type', 'article')
-      .not('thumbnail_url', 'is', null)
+      .not('thumbnail_url', 'is', null);
+    if (mode === 'generic') query = query.eq('is_published', true);
+
+    const { data, error } = await query
       .order('published_at', { ascending: false })
       .limit(1000);
 
     if (error) throw new Error(`Could not load articles: ${error.message}`);
 
     const rows = (data as unknown as Row[]) || [];
-    const needsRepair = rows.filter((r) => !isDurableImageHost(r.thumbnail_url));
+    const needsRepair = rows.filter((r) =>
+      mode === 'generic'
+        ? isGenericStockImage(r.thumbnail_url)
+        : !isDurableImageHost(r.thumbnail_url)
+    );
     const batch = needsRepair.slice(0, batchSize);
 
     let rehosted = 0;
     let replacedWithPexels = 0;
     let unpublished = 0;
     let failed = 0;
+    let leftAsIs = 0;
+    let stoppedOnRateLimit = false;
     const examples: string[] = [];
 
     if (!dryRun) {
       for (const row of batch) {
         if (Date.now() - started > TIME_BUDGET_MS) break;
+        // Pexels free tier is rate limited. Once it says 429 every further
+        // lookup is wasted, so stop and let the caller resume later.
+        if (isPexelsRateLimited()) { stoppedOnRateLimit = true; break; }
+
         try {
+          if (mode === 'generic') {
+            // The picture works, it is just not about this story. Find a
+            // real photo of the actual subject; if none, keep what is there.
+            const topic = detectImageTopic(
+              row.title,
+              row.description || '',
+              row.categories?.slug ?? null
+            );
+            const better = await searchPexelsImage(topic.query, row.slug || row.id);
+            if (!better) { leftAsIs++; continue; }
+
+            const { error: upErr } = await supabase
+              .from('media_content')
+              .update({ thumbnail_url: better })
+              .eq('id', row.id);
+            if (upErr) throw new Error(upErr.message);
+
+            replacedWithPexels++;
+            if (examples.length < 8) examples.push(`upgraded: ${row.title.slice(0, 60)}`);
+            continue;
+          }
+
           const resolved = await resolvePublishableThumbnail(supabase, {
             sourceImage: row.thumbnail_url,
             title: row.title,
@@ -155,17 +216,23 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const processed = dryRun ? 0 : rehosted + replacedWithPexels + unpublished + failed;
+    const processed = dryRun
+      ? 0
+      : rehosted + replacedWithPexels + unpublished + failed + leftAsIs;
 
     return new Response(JSON.stringify({
       success: true,
       dryRun,
-      // How many still carry a non-durable thumbnail after this batch.
+      mode,
+      // Pexels hourly limit hit — everything done so far is saved; resume later.
+      stoppedOnRateLimit,
+      // How many still need this kind of repair after this batch.
       remaining: Math.max(0, needsRepair.length - processed),
       needingRepairInWindow: needsRepair.length,
       processed,
       rehosted,
       replacedWithPexels,
+      leftAsIs,
       unpublished,
       failed,
       examples,

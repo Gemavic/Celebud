@@ -269,8 +269,18 @@ export async function searchPexelsImage(query: string, seed: string): Promise<st
   const apiKey = Deno.env.get('PEXELS_API_KEY');
   if (!apiKey) return null;
   try {
-    const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=15&orientation=landscape`;
+    // 80 (the API maximum) rather than 15. With only 15 candidates per
+    // topic, the 59 football stories on the site could only ever land on 15
+    // different photos — and the curated pools they came from held just 4,
+    // which is how 59 unrelated articles ended up sharing one picture.
+    const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=80&orientation=landscape`;
     const resp = await fetch(url, { headers: { Authorization: apiKey } });
+    if (resp.status === 429) {
+      // Free tier is rate limited. Flag it so a bulk repair can stop
+      // cleanly instead of grinding through thousands of failed lookups.
+      pexelsRateLimited = true;
+      return null;
+    }
     if (!resp.ok) return null;
     const data = await resp.json();
     const photos: Array<{ src?: { large2x?: string; large?: string } }> = data?.photos || [];
@@ -282,6 +292,15 @@ export async function searchPexelsImage(query: string, seed: string): Promise<st
   } catch {
     return null;
   }
+}
+
+/** Set when Pexels answers 429; lets a bulk job stop rather than churn. */
+let pexelsRateLimited = false;
+export function isPexelsRateLimited(): boolean {
+  return pexelsRateLimited;
+}
+export function resetPexelsRateLimit(): void {
+  pexelsRateLimited = false;
 }
 
 /** One call for the common case: best available image for an article. */
@@ -322,6 +341,21 @@ export function isDurableImageHost(url: string | null | undefined): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * A generic category photo from the curated pools above, rather than a
+ * picture of the actual story.
+ *
+ * These are the reason unrelated articles looked identical: each pool holds
+ * only 3-6 images, so with ~1,300 articles drawing from them, 59 different
+ * football stories ended up on the same stadium photo. They are not broken —
+ * they load perfectly — they are simply not about the story, so they get
+ * upgraded to a real on-subject photo when one can be found.
+ */
+export function isGenericStockImage(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return url.includes('images.unsplash.com');
 }
 
 const MIN_IMAGE_BYTES = 1024;              // smaller than this is a spacer/tracking pixel

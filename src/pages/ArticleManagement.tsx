@@ -477,12 +477,19 @@ export function ArticleManagement() {
   };
 
   /**
-   * Fixes articles whose picture still points at the publisher's own server.
-   * Those load fine for us but return 403 to a reader's browser, which is
-   * what shows a broken image icon on the live article. Each one is copied
-   * into CelebUD's own storage, or replaced with a real Pexels photo, and
-   * unpublished if neither can be secured. Batched — keeps going until the
-   * backlog reaches zero.
+   * Fixes both ways an article's picture can be wrong, in two passes.
+   *
+   * 'broken'  — the image points at the publisher's own server. It loads for
+   *             us but returns 403 to a reader, so they see a broken icon.
+   *             Copied into our storage, or replaced, or unpublished.
+   * 'generic' — the image is one of the old category stock photos. It loads
+   *             fine but says nothing about the story, which is why hundreds
+   *             of unrelated articles looked identical. Upgraded to a real
+   *             photo of the actual subject; if none is found the article
+   *             simply keeps what it has and stays live.
+   *
+   * Pexels' free tier is hourly-rate-limited, so a full sweep of a large
+   * archive takes several runs. Stopping early is normal, not a failure.
    */
   const repairThumbnails = async () => {
     setRepairingThumbs(true);
@@ -491,40 +498,53 @@ export function ArticleManagement() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('You must be signed in as an admin.');
 
-      let rehosted = 0, pexels = 0, unpub = 0, failed = 0, rounds = 0;
-      for (;;) {
-        rounds++;
-        const res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/repair-thumbnails`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ limit: 25 }),
-          }
-        );
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `Repair failed (${res.status}).`);
+      const totals = { rehosted: 0, pexels: 0, unpub: 0, failed: 0, kept: 0 };
+      let rateLimited = false;
+      let remainingAtEnd = 0;
 
-        rehosted += data.rehosted || 0;
-        pexels += data.replacedWithPexels || 0;
-        unpub += data.unpublished || 0;
-        failed += data.failed || 0;
+      for (const mode of ['broken', 'generic'] as const) {
+        for (let round = 0; round < 80; round++) {
+          const res = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/repair-thumbnails`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ limit: 25, mode }),
+            }
+          );
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || `Repair failed (${res.status}).`);
 
-        setRepairResult(
-          `Repaired ${rehosted + pexels} so far — ${data.remaining ?? 0} to go…`
-        );
+          totals.rehosted += data.rehosted || 0;
+          totals.pexels += data.replacedWithPexels || 0;
+          totals.unpub += data.unpublished || 0;
+          totals.failed += data.failed || 0;
+          totals.kept += data.leftAsIs || 0;
+          remainingAtEnd = data.remaining ?? 0;
 
-        if (!data.processed || !data.remaining || rounds > 60) break;
+          setRepairResult(
+            `${mode === 'broken' ? 'Fixing broken pictures' : 'Replacing duplicate pictures'} — ` +
+            `${totals.rehosted + totals.pexels} done, ${remainingAtEnd} to go…`
+          );
+
+          if (data.stoppedOnRateLimit) { rateLimited = true; break; }
+          if (!data.processed || !data.remaining) break;
+        }
+        if (rateLimited) break;
       }
 
       setRepairResult(
-        `Done. ${rehosted} original photo${rehosted === 1 ? '' : 's'} saved to your own storage, ` +
-        `${pexels} replaced with a Pexels photo` +
-        (unpub ? `, ${unpub} unpublished (no picture available)` : '') +
-        (failed ? `, ${failed} failed` : '') + '.'
+        `${totals.rehosted} original photo${totals.rehosted === 1 ? '' : 's'} saved to your storage, ` +
+        `${totals.pexels} given a real matching photo` +
+        (totals.kept ? `, ${totals.kept} left unchanged (no better photo found)` : '') +
+        (totals.unpub ? `, ${totals.unpub} unpublished (no picture at all)` : '') +
+        (totals.failed ? `, ${totals.failed} failed` : '') + '. ' +
+        (rateLimited
+          ? `Pexels' free hourly limit was reached with ${remainingAtEnd} still to go — everything above is saved. Press the button again in about an hour to continue.`
+          : 'All done.')
       );
       await fetchArticles();
     } catch (err) {
@@ -1536,13 +1556,19 @@ export function ArticleManagement() {
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <ImageIcon className="w-5 h-5 text-indigo-600" />
-              Fix broken article pictures
+              Fix article pictures
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              Some articles still show the publisher's photo straight from their server.
-              Those sites block outside use, so readers see a broken image. This saves each
-              original photo into your own storage, or swaps in a real Pexels photo, and
-              unpublishes anything that cannot get a picture at all.
+              Fixes two problems in one go. <strong>Broken pictures</strong> — the publisher's
+              photo loaded straight from their server, which they block, so readers see a broken
+              image. <strong>Duplicate pictures</strong> — the old generic category photos, which
+              is why unrelated articles kept showing the same image. Each article gets its own
+              real photo of its actual subject. An article is only ever unpublished if its picture
+              is genuinely broken and nothing can replace it.
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              A large archive takes several runs — the free photo service limits how many
+              lookups are allowed per hour. Progress is saved each time.
             </p>
           </div>
           <button
