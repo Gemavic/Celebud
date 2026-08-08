@@ -59,6 +59,7 @@ function baseHtml({
   bodyHtml,
   keywords,
   extraJsonLd,
+  extraHead,
 }: {
   title: string;
   description: string;
@@ -70,6 +71,8 @@ function baseHtml({
   keywords?: string;
   /** Optional second JSON-LD block, e.g. BreadcrumbList. */
   extraJsonLd?: Record<string, unknown>;
+  /** Extra <head> tags, e.g. og:video / og:audio for a media page. */
+  extraHead?: string;
 }) {
   return `<!doctype html>
 <html lang="en">
@@ -93,6 +96,7 @@ ${image ? `<meta property="og:image" content="${image}" />` : ''}
 <meta name="twitter:description" content="${escapeHtml(description)}" />
 ${image ? `<meta name="twitter:image" content="${image}" />` : ''}
 
+${extraHead || ''}
 <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
 ${extraJsonLd ? `<script type="application/ld+json">${JSON.stringify(extraJsonLd)}</script>` : ''}
 </head>
@@ -116,6 +120,91 @@ Deno.serve(async (req: Request) => {
   const path = searchParams.get('path') || '/';
 
   try {
+    // --- Creator video / audio page: /watch/:id ---
+    //
+    // Before this existed, the Content Studio share buttons had no CelebUD
+    // page to point at, so they shared the raw storage file instead. Facebook
+    // and X then showed "bwtrtzvlqvykobmlfjcl.supabase.co" as the source with
+    // a blank preview, because an .mp4/.mp3 file carries no title, no
+    // description and no image. This gives every clip a real page on
+    // celebud.com with proper preview tags.
+    const watchMatch = path.match(/^\/watch\/([^/?#]+)/);
+    if (watchMatch) {
+      const id = watchMatch[1];
+      const { data: item } = await supabase
+        .from('creator_content')
+        .select('id, title, description, content_type, media_url, thumbnail_url, external_url, created_at, status')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!item || item.status !== 'published') {
+        return new Response('Not found', { status: 404, headers: corsHeaders });
+      }
+
+      const url = `${SITE_URL}/watch/${item.id}`;
+      const isAudio = item.content_type === 'audio';
+      const description =
+        (item.description || '').trim() ||
+        `${isAudio ? 'Listen' : 'Watch'} "${item.title}" on ${SITE_NAME}.`;
+      // A video with no poster gets no og:image, which is what produced the
+      // blank grey preview box. Fall back to the site logo so the card always
+      // renders as CelebUD rather than an empty rectangle.
+      const image = item.thumbnail_url || `${SITE_URL}/icon-512.png`;
+
+      // Only OUR OWN hosted files may be declared as playable media. A link
+      // to someone's X/YouTube post is a link, not a file we can stream.
+      const ownFile =
+        typeof item.media_url === 'string' &&
+        item.media_url.includes('/storage/v1/object/public/');
+
+      const mediaTags = ownFile
+        ? (isAudio
+            ? `<meta property="og:audio" content="${item.media_url}" />
+<meta property="og:audio:type" content="audio/mpeg" />`
+            : `<meta property="og:video" content="${item.media_url}" />
+<meta property="og:video:secure_url" content="${item.media_url}" />
+<meta property="og:video:type" content="video/mp4" />
+<meta property="og:video:width" content="1280" />
+<meta property="og:video:height" content="720" />
+<meta name="twitter:player" content="${url}" />`)
+        : '';
+
+      const html = baseHtml({
+        title: `${item.title} | ${SITE_NAME}`,
+        description,
+        image,
+        url,
+        type: 'website',
+        // Large image card unless we can actually stream the file.
+        extraHead: mediaTags,
+        jsonLd: {
+          '@context': 'https://schema.org',
+          '@type': isAudio ? 'AudioObject' : 'VideoObject',
+          name: item.title,
+          description,
+          thumbnailUrl: image,
+          uploadDate: item.created_at,
+          contentUrl: item.media_url || undefined,
+          embedUrl: url,
+          publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+        },
+        bodyHtml: `<h1>${escapeHtml(item.title)}</h1>
+<p>${escapeHtml(description)}</p>
+${ownFile
+  ? (isAudio
+      ? `<audio controls src="${item.media_url}"></audio>`
+      : `<video controls poster="${image}" src="${item.media_url}"></video>`)
+  : (item.external_url || item.media_url
+      ? `<p><a href="${item.external_url || item.media_url}">View the original</a></p>`
+      : '')}
+<p><a href="${SITE_URL}">More from ${SITE_NAME}</a></p>`,
+      });
+
+      return new Response(html, {
+        headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    }
+
     // --- Article page: /article/:id ---
     const articleMatch = path.match(/^\/article\/([^/]+)/);
     if (articleMatch) {

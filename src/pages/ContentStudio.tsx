@@ -49,6 +49,20 @@ function detectPlatform(url: string): Platform {
   return null;
 }
 
+/**
+ * The public CelebUD page for a clip — always what gets shared.
+ *
+ * Sharing media_url posted the raw Supabase storage file, so Facebook and X
+ * displayed "bwtrtzvlqvykobmlfjcl.supabase.co" with an empty preview box: an
+ * .mp4/.mp3 has no title, description or image for a link scraper to read.
+ * /watch/:id is a real page and the prerender function serves crawlers the
+ * matching Open Graph tags.
+ *
+ * Hard-coded to the live domain rather than window.location.origin so a link
+ * copied while working on localhost or a Vercel preview is still shareable.
+ */
+const watchUrl = (id: string) => `https://celebud.com/watch/${id}`;
+
 // One-click share targets; each takes the content URL + title and returns
 // the app's share intent URL.
 const SHARE_TARGETS: { key: string; label: string; bg: string; href: (url: string, title: string) => string }[] = [
@@ -599,32 +613,35 @@ function ContentPanel({
                             <ExternalLink className="w-4 h-4" /> View Source
                           </a>
                         )}
-                        {(item.external_url || item.media_url) && (
-                          <div className="px-4 py-2 border-t border-gray-100">
-                            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Share with one click</p>
-                            <div className="flex items-center gap-1.5">
-                              {SHARE_TARGETS.map(t => (
-                                <a
-                                  key={t.key}
-                                  href={t.href((item.external_url || item.media_url)!, item.title)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  title={`Share to ${t.label}`}
-                                  className={`flex-1 py-1.5 text-center text-[11px] font-bold text-white rounded-md ${t.bg}`}
-                                >
-                                  {t.label === 'WhatsApp' ? 'WA' : t.label === 'Telegram' ? 'TG' : t.label === 'Facebook' ? 'FB' : 'X'}
-                                </a>
-                              ))}
-                              <button
-                                title="Copy link"
-                                onClick={() => navigator.clipboard.writeText((item.external_url || item.media_url)!)}
-                                className="p-1.5 border border-gray-200 rounded-md text-gray-500 hover:bg-gray-50"
+                        {/* Always share the CelebUD page, never the raw file.
+                            Posting the storage URL made Facebook and X show
+                            "bwtrtzvlqvykobmlfjcl.supabase.co" with a blank
+                            preview, because an .mp4 carries no title, no
+                            description and no image for a scraper to read. */}
+                        <div className="px-4 py-2 border-t border-gray-100">
+                          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Share with one click</p>
+                          <div className="flex items-center gap-1.5">
+                            {SHARE_TARGETS.map(t => (
+                              <a
+                                key={t.key}
+                                href={t.href(watchUrl(item.id), item.title)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={`Share to ${t.label}`}
+                                className={`flex-1 py-1.5 text-center text-[11px] font-bold text-white rounded-md ${t.bg}`}
                               >
-                                <Copy className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                                {t.label === 'WhatsApp' ? 'WA' : t.label === 'Telegram' ? 'TG' : t.label === 'Facebook' ? 'FB' : 'X'}
+                              </a>
+                            ))}
+                            <button
+                              title="Copy link"
+                              onClick={() => navigator.clipboard.writeText(watchUrl(item.id))}
+                              className="p-1.5 border border-gray-200 rounded-md text-gray-500 hover:bg-gray-50"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
                           </div>
-                        )}
+                        </div>
                         <button
                           onClick={() => { deleteContent.mutate(item.id); setMenuOpenId(null); }}
                           className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-700 hover:bg-red-50"
@@ -712,6 +729,9 @@ function ContentUploadModal({
   const [error, setError] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [success, setSuccess] = useState(false);
+  // Id of the row just saved, so the share buttons below can link to its
+  // public /watch page rather than the raw media file.
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [thumbnailUploading, setThumbnailUploading] = useState(false);
   const [uploadedName, setUploadedName] = useState('');
@@ -1036,8 +1056,10 @@ function ContentUploadModal({
     try {
       if (isEditing) {
         await updateContent.mutateAsync({ id: editingItem.id, ...payload });
+        setSavedId(editingItem.id);
       } else {
-        await createContent.mutateAsync(payload);
+        const created = await createContent.mutateAsync(payload);
+        setSavedId((created as { id?: string } | null)?.id ?? null);
       }
       setSuccess(true);
     } catch (err: unknown) {
@@ -1046,7 +1068,8 @@ function ContentUploadModal({
   };
 
   if (success) {
-    const shareUrl = form.external_url.trim() || form.media_url.trim();
+    // The public CelebUD page, never the raw storage file — see watchUrl().
+    const shareUrl = savedId ? watchUrl(savedId) : '';
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />

@@ -21,6 +21,7 @@ const SubscribersPage = lazy(() => import('./pages/SubscribersPage').then(m => (
 const UnsubscribePage = lazy(() => import('./pages/UnsubscribePage').then(m => ({ default: m.UnsubscribePage })));
 const OriginalsPage = lazy(() => import('./pages/OriginalsPage').then(m => ({ default: m.OriginalsPage })));
 const FinAdvisor = lazy(() => import('./pages/FinAdvisor').then(module => ({ default: module.FinAdvisor })));
+const WatchPage = lazy(() => import('./pages/WatchPage').then(m => ({ default: m.WatchPage })));
 const AuthorPage = lazy(() => import('./pages/AuthorPage').then(module => ({ default: module.AuthorPage })));
 const AboutPage = lazy(() => import('./pages/TrustPages').then(module => ({ default: module.AboutPage })));
 const ContactPage = lazy(() => import('./pages/TrustPages').then(module => ({ default: module.ContactPage })));
@@ -61,6 +62,10 @@ function App() {
             <Route path="/admin/writers" element={<WritersDashboard />} />
             <Route path="/reporters/apply" element={<ReporterSignup />} />
             <Route path="/originals" element={<OriginalsPage />} />
+            {/* Public page for a Studio video/audio clip — this is what the
+                share buttons post, so Facebook and X show a CelebUD card
+                instead of the raw storage file. */}
+            <Route path="/watch/:id" element={<WatchPage />} />
             <Route path="/fin-advisor" element={<FinAdvisor />} />
             <Route path="/author/:id" element={<AuthorPage />} />
             <Route path="/about" element={<AboutPage />} />
