@@ -137,12 +137,12 @@ export function ReporterSignup() {
             </p>
             <div className="mb-8 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
               <p className="text-sm text-emerald-900">
-                <strong>You earn 40% of the ad revenue</strong> your published work
+                <strong>You earn 30% of the ad revenue</strong> your published work
                 generates, paid monthly.
               </p>
               <p className="text-sm text-emerald-800 mt-1.5">
                 Also produce video, audio or social content for us? That raises your
-                share to <strong>60%</strong> — a premium for doing both jobs. It is
+                share to <strong>45%</strong> — a premium for doing both jobs. It is
                 applied automatically once you publish your first piece in the
                 Content Studio; there is nothing extra to apply for.
               </p>

@@ -1019,7 +1019,7 @@ function ContentUploadModal({
         // for it. This profile used to be created as "CelebUD Editorial" on
         // 0% — so their clips lost their byline AND earned nothing, purely
         // because they joined through the reporter form rather than the
-        // creator one. Created at the standard 40% here; the 60%
+        // creator one. Created at the standard 30% here; the 45%
         // reporter-creator premium is applied by sync_contributor_share()
         // below, once the content actually exists to qualify for it.
         const [{ data: byline }, { data: application }] = await Promise.all([
@@ -1039,8 +1039,8 @@ function ContentUploadModal({
             display_name: realName,
             email: userData.user?.email || '',
             status: 'onboarded',
-            // House creator split: CelebUD 60 / creator 40.
-            revenue_share_pct: 40,
+            // House creator split: CelebUD 70 / creator 30.
+            revenue_share_pct: 30,
             total_earnings: 0,
             total_views: 0,
             articles_count: 0,
@@ -1080,8 +1080,8 @@ function ContentUploadModal({
         setSavedId((created as { id?: string } | null)?.id ?? null);
       }
 
-      // Someone who both reports and produces studio content earns the 60%
-      // reporter-creator rate instead of the standard 40%. This works it out
+      // Someone who both reports and produces studio content earns the 45%
+      // reporter-creator rate instead of the standard 30%. This works it out
       // from what is already in the database, so nobody has to remember to
       // change it by hand. It leaves a manually-set rate alone, and never
       // blocks the save if it fails.
