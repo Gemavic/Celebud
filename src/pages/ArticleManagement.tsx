@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { toEditableHtml } from '../utils/articleContent';
+import { checkArticleCompliance, type ComplianceViolation } from '../utils/articleCompliance';
 import { getVideoEmbedUrl, getVideoThumbnail, isEmbeddableVideoUrl } from '../utils/videoEmbed';
 import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle, Image as ImageIcon, Video, FileText, Pin, Archive } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
@@ -124,6 +125,8 @@ export function ArticleManagement() {
   // Repairs articles still pointing at a publisher's own image server.
   const [repairingThumbs, setRepairingThumbs] = useState(false);
   const [repairResult, setRepairResult] = useState<string | null>(null);
+  const [auditingCompliance, setAuditingCompliance] = useState(false);
+  const [complianceAuditResult, setComplianceAuditResult] = useState<string | null>(null);
   // The real count across the whole table, independent of how many rows are
   // currently loaded — the stat card used to show articles.length, which is
   // just the page size, not the actual total.
@@ -170,6 +173,10 @@ export function ArticleManagement() {
   const [illustrating, setIllustrating] = useState(false);
   const [illustrateProgress, setIllustrateProgress] = useState<{ done: number; total: number } | null>(null);
   const [illustrateError, setIllustrateError] = useState<string | null>(null);
+  // Set only after a failed Save attempt, so the banner doesn't nag while
+  // someone is still mid-draft — it appears the moment publishing is
+  // actually blocked, with the exact reasons.
+  const [publishBlockedBy, setPublishBlockedBy] = useState<ComplianceViolation[] | null>(null);
   const [selectedBioProfileId, setSelectedBioProfileId] = useState('');
   const [articleBioForm, setArticleBioForm] = useState({ bio: '', disclaimer: '' });
   const [bioGenerating, setBioGenerating] = useState(false);
@@ -477,6 +484,61 @@ export function ArticleManagement() {
   };
 
   /**
+   * Sweeps every hand-written article already live against the same
+   * structure gate saveArticle() applies going forward, and unpublishes
+   * whichever ones fail it. New edits are caught automatically now — this
+   * is for the backlog that published before the gate existed. Uses the
+   * exact same checkArticleCompliance() the Save button uses, so the rule
+   * can never drift between "what gets caught on save" and "what gets
+   * caught on audit."
+   *
+   * Nothing is deleted — unpublishing only hides the article (same
+   * reversible switch fetched teasers use); Save it again once fixed.
+   */
+  const auditCompliance = async () => {
+    setAuditingCompliance(true);
+    setComplianceAuditResult('Checking hand-written articles…');
+    try {
+      const { data, error } = await supabase
+        .from('media_content')
+        .select('id, title, content, is_published')
+        .eq('media_type', 'article')
+        .eq('is_manual', true);
+      if (error) throw error;
+
+      const rows = (data as { id: string; title: string; content: string | null; is_published: boolean }[]) || [];
+      const failing = rows.filter((r) => !checkArticleCompliance(r.content || '').passed);
+      const toUnpublish = failing.filter((r) => r.is_published);
+
+      if (toUnpublish.length > 0) {
+        const CHUNK = 50;
+        for (let i = 0; i < toUnpublish.length; i += CHUNK) {
+          const chunk = toUnpublish.slice(i, i + CHUNK).map((r) => r.id);
+          const { error: upErr } = await supabase
+            .from('media_content')
+            .update({ is_published: false })
+            .in('id', chunk);
+          if (upErr) throw upErr;
+        }
+      }
+
+      setComplianceAuditResult(
+        `Checked ${rows.length} hand-written article${rows.length === 1 ? '' : 's'}. ` +
+        `${failing.length} fail${failing.length === 1 ? 's' : ''} the house structure` +
+        (toUnpublish.length > 0
+          ? ` — ${toUnpublish.length} unpublished just now (still saved, nothing lost).`
+          : failing.length > 0 ? ' — already unpublished.' : '.') +
+        (failing.length > 0 ? ' Use "Show only unpublished" below, fix each one, and save to republish.' : '')
+      );
+      await fetchArticles();
+    } catch (err) {
+      setComplianceAuditResult(`Error: ${err instanceof Error ? err.message : 'Audit failed'}`);
+    } finally {
+      setAuditingCompliance(false);
+    }
+  };
+
+  /**
    * Fixes both ways an article's picture can be wrong, in two passes.
    *
    * 'broken'  — the image points at the publisher's own server. It loads for
@@ -720,6 +782,7 @@ export function ArticleManagement() {
 
   const openEditor = (article: Article) => {
     setEditingArticle(article);
+    setPublishBlockedBy(null);
     setEditForm({
       title: article.title || '',
       description: article.description || '',
@@ -757,6 +820,7 @@ export function ArticleManagement() {
 
   const openNewArticle = () => {
     setIsCreatingNew(true);
+    setPublishBlockedBy(null);
     setAiTopic('');
     setAiNotes('');
     setAiError(null);
@@ -1154,12 +1218,29 @@ export function ArticleManagement() {
   const saveArticle = async () => {
     if (!editingArticle && !isCreatingNew) return;
     setSaving(true);
+    setPublishBlockedBy(null);
     try {
       const slug = editForm.title
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '')
         .slice(0, 180);
+
+      const isManual = isCreatingNew ? true : (editingArticle?.is_manual ?? false);
+
+      // Hand-written/edited work is checked against the house structure
+      // before it can go live — real example that made this necessary:
+      // Tunde Ibrahim Amusa's "Future of Nigerian Technology" was pasted
+      // straight from Word (148KB of Office markup, zero <h2> sections, no
+      // disclaimer) and published exactly as pasted. Fetched/AI-rewritten
+      // articles are exempt: they already go through their own 800-word +
+      // real-photo gate and are generated with this structure built in.
+      const compliance = isManual ? checkArticleCompliance(editForm.content) : null;
+      const willPublish = !compliance || compliance.passed;
+
+      if (compliance && !compliance.passed) {
+        setPublishBlockedBy(compliance.violations.filter((v) => v.severity === 'blocking'));
+      }
 
       const payload = {
         title: editForm.title,
@@ -1185,19 +1266,34 @@ export function ArticleManagement() {
         // it true on every save was silently protecting fetched junk from
         // ever being cleaned up or properly rewritten just because someone
         // opened it and touched one field. Preserve whatever it already was.
-        is_manual: isCreatingNew ? true : (editingArticle?.is_manual ?? false),
+        is_manual: isManual,
         enriched_at: new Date().toISOString(),
-        // Saving here — new or edited — is a deliberate editorial decision to
-        // make this live. This is also the only way to publish a fetched
-        // teaser by hand instead of through the AI "Rewrite" button.
-        is_published: true,
+        // Saving is always a deliberate editorial decision to make this
+        // live — UNLESS it fails the structure gate above, in which case it
+        // saves (nothing is lost) but stays hidden until fixed, the same
+        // is_published mechanism already used to hold back fetched teasers.
+        is_published: willPublish,
       };
 
-      const { error } = editingArticle
-        ? await supabase.from('media_content').update(payload).eq('id', editingArticle.id)
-        : await supabase.from('media_content').insert(payload);
+      const { data: savedRow, error } = editingArticle
+        ? await supabase.from('media_content').update(payload).eq('id', editingArticle.id).select('id').maybeSingle()
+        : await supabase.from('media_content').insert(payload).select('id').maybeSingle();
 
       if (error) throw error;
+
+      // A blocked save stays open with the violation list visible, so it
+      // reads as "fix these and try again" rather than a normal success.
+      if (compliance && !compliance.passed) {
+        // The row now exists (saved, just hidden) — switch a brand-new
+        // article into edit mode so retrying updates that same draft
+        // instead of inserting a second copy on every attempt.
+        if (!editingArticle && savedRow?.id) {
+          setIsCreatingNew(false);
+          setEditingArticle({ ...(editingArticle as Article | null), id: savedRow.id, is_manual: isManual } as Article);
+        }
+        await fetchArticles();
+        return;
+      }
 
       setEditingArticle(null);
       setIsCreatingNew(false);
@@ -1584,6 +1680,44 @@ export function ArticleManagement() {
         {repairResult && (
           <p className={`mt-3 text-sm ${repairResult.startsWith('Error') ? 'text-red-700' : 'text-gray-700'}`}>
             {repairResult}
+          </p>
+        )}
+      </div>
+
+      {/* House-style compliance: 4-6 <h2> sections, a Q&A block, a
+          disclaimer, no Word/Docs paste junk. Enforced automatically on
+          every new save; this sweeps what already published before that
+          existed — real example: an article pasted straight from Word,
+          148KB of Office markup, zero section headings, went live exactly
+          as pasted. */}
+      <div className="bg-white rounded-lg shadow p-6 mb-8 border border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-rose-600" />
+              Check article standards
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Checks every hand-written article against the house structure — section headings,
+              a Q&amp;A block, a disclaimer, and no leftover Word/Docs paste formatting. Anything
+              that fails is unpublished (saved, just hidden) until it's fixed and saved again.
+              Fetched and AI-rewritten articles are not affected — they already go through their
+              own quality gate.
+            </p>
+          </div>
+          <button
+            onClick={auditCompliance}
+            disabled={auditingCompliance}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 transition-colors disabled:opacity-50 flex-shrink-0"
+          >
+            {auditingCompliance
+              ? <><RefreshCw className="w-4 h-4 animate-spin" /> Checking…</>
+              : <><FileText className="w-4 h-4" /> Check standards</>}
+          </button>
+        </div>
+        {complianceAuditResult && (
+          <p className={`mt-3 text-sm ${complianceAuditResult.startsWith('Error') ? 'text-red-700' : 'text-gray-700'}`}>
+            {complianceAuditResult}
           </p>
         )}
       </div>
@@ -2230,6 +2364,22 @@ export function ArticleManagement() {
                   onChange={(html) => setEditForm((f) => ({ ...f, content: html }))}
                   placeholder="Write or paste your article here..."
                 />
+                {publishBlockedBy && publishBlockedBy.length > 0 && (
+                  <div className="mt-2 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm font-semibold text-red-800 mb-2 flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                      Saved, but not published — {publishBlockedBy.length} issue{publishBlockedBy.length === 1 ? '' : 's'} must be fixed first:
+                    </p>
+                    <ul className="space-y-1.5">
+                      {publishBlockedBy.map((v) => (
+                        <li key={v.code} className="text-sm text-red-700 pl-4 -indent-4">• {v.message}</li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-red-500 mt-2">
+                      Your work is saved as a hidden draft — nothing is lost. Fix these and save again to publish.
+                    </p>
+                  </div>
+                )}
                 {suggestedImageCount > 0 && (
                   <div className="mt-2 flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
                     <button

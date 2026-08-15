@@ -5,6 +5,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { sanitizeHtml } from '../utils/htmlSanitizer';
 
 interface RichTextEditorProps {
   value: string;
@@ -151,7 +152,17 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     e.preventDefault();
     const html = e.clipboardData.getData('text/html');
     const text = e.clipboardData.getData('text/plain');
-    document.execCommand('insertHTML', false, html || text);
+    // Word, Google Docs and chat apps put a fully-formatted HTML fragment on
+    // the clipboard — fonts, spans, and for Word specifically pages of
+    // <?xml?>/<o:p>/<w:...> markup describing the document, not the article.
+    // Inserting that verbatim was exactly how a 148KB Word paste (real
+    // example: Tunde Ibrahim Amusa's "Future of Nigerian Technology" piece)
+    // ended up live with zero <h2> structure buried inside it. Running it
+    // through the same sanitizer the live site applies at render time keeps
+    // real formatting (bold, links, a genuine table) and drops everything
+    // the site would have stripped anyway.
+    const clean = html ? sanitizeHtml(html) : text;
+    document.execCommand('insertHTML', false, clean);
     handleInput();
   }, [handleInput]);
 
@@ -169,7 +180,9 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         data-placeholder={placeholder || 'Write or paste your article here...'}
       />
       <p className="px-4 py-2 text-xs text-gray-400 border-t border-gray-100 bg-gray-50">
-        Tables paste in correctly from Word. Photos usually don't survive copy-paste — use the image button above instead.
+        Pasting from Word or Google Docs keeps bold, links and real tables — everything else
+        (fonts, colours, page formatting) is cleaned up automatically. Photos usually don't
+        survive copy-paste — use the image button above instead.
       </p>
     </div>
   );
