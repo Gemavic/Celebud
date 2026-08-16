@@ -149,6 +149,8 @@ export function ArticleManagement() {
   const [complianceAuditResult, setComplianceAuditResult] = useState<string | null>(null);
   const [repairingUnpublish, setRepairingUnpublish] = useState(false);
   const [repairUnpublishResult, setRepairUnpublishResult] = useState<string | null>(null);
+  const [repairingBrokenImages, setRepairingBrokenImages] = useState(false);
+  const [repairBrokenImagesResult, setRepairBrokenImagesResult] = useState<string | null>(null);
   // The real count across the whole table, independent of how many rows are
   // currently loaded — the stat card used to show articles.length, which is
   // just the page size, not the actual total.
@@ -634,6 +636,78 @@ export function ArticleManagement() {
       setRepairUnpublishResult(`Error: ${err instanceof Error ? err.message : 'Repair failed'}`);
     } finally {
       setRepairingUnpublish(false);
+    }
+  };
+
+  /**
+   * Strips inline images that can never load — src="blob:..." (a browser-
+   * local reference from copying an image straight out of an AI chat tool
+   * like Gemini or ChatGPT; only ever resolves in the tab that made it) or
+   * src="data:..." (the whole image embedded as text, bloating the row
+   * instead of using the real upload path). Real example this fixes: an
+   * article with two <img src="blob:https://gemini.google.com/..."> tags,
+   * each rendering as a broken icon with ", AI generated" floating next to
+   * it as visible text.
+   *
+   * Paste and drag-drop are both fixed at the source now, so this is a
+   * one-time cleanup for articles saved before that fix, not an ongoing
+   * tool. Only the broken <img> is removed — the rest of the article, and
+   * its publish state, is untouched. Scans every article, not just
+   * hand-written ones: a broken image could have been pasted into any
+   * article that was hand-edited at some point.
+   */
+  const repairBrokenInlineImages = async () => {
+    setRepairingBrokenImages(true);
+    setRepairBrokenImagesResult('Scanning articles for broken inline images…');
+    try {
+      // Serialized DOM content (editorRef.current.innerHTML) always
+      // double-quotes attributes, so a single ilike pattern per scheme
+      // covers every real row — no need for a compound .or() filter and
+      // the escaping risk that comes with cramming multiple patterns
+      // (quotes, colons) into one PostgREST filter string.
+      const BROKEN_IMG_RE = /<img[^>]*\ssrc=["']?(?:blob:|data:)[^"'>]*["']?[^>]*>/gi;
+
+      const [blobRows, dataRows] = await Promise.all([
+        supabase.from('media_content').select('id, title, content').eq('media_type', 'article').ilike('content', '%src="blob:%'),
+        supabase.from('media_content').select('id, title, content').eq('media_type', 'article').ilike('content', '%src="data:%'),
+      ]);
+      if (blobRows.error) throw blobRows.error;
+      if (dataRows.error) throw dataRows.error;
+
+      const byId = new Map<string, { id: string; title: string; content: string }>();
+      for (const r of [...(blobRows.data || []), ...(dataRows.data || [])]) {
+        byId.set(r.id, r as { id: string; title: string; content: string });
+      }
+      const rows = [...byId.values()];
+      let articlesFixed = 0;
+      let imagesRemoved = 0;
+
+      for (const row of rows) {
+        const matches = row.content.match(BROKEN_IMG_RE);
+        if (!matches || matches.length === 0) continue;
+
+        const cleaned = row.content.replace(BROKEN_IMG_RE, '');
+        const { error: upErr } = await supabase
+          .from('media_content')
+          .update({ content: cleaned })
+          .eq('id', row.id);
+        if (upErr) throw upErr;
+
+        articlesFixed++;
+        imagesRemoved += matches.length;
+      }
+
+      setRepairBrokenImagesResult(
+        articlesFixed > 0
+          ? `Removed ${imagesRemoved} broken image${imagesRemoved === 1 ? '' : 's'} from ${articlesFixed} article${articlesFixed === 1 ? '' : 's'}. ` +
+            `Nothing else in those articles changed — open one from Edit if you'd like to add a real photo in its place.`
+          : 'No broken inline images found.'
+      );
+      await fetchArticles();
+    } catch (err) {
+      setRepairBrokenImagesResult(`Error: ${err instanceof Error ? err.message : 'Repair failed'}`);
+    } finally {
+      setRepairingBrokenImages(false);
     }
   };
 
@@ -1835,6 +1909,43 @@ export function ArticleManagement() {
         {repairUnpublishResult && (
           <p className={`mt-3 text-sm ${repairUnpublishResult.startsWith('Error') ? 'text-red-700' : 'text-emerald-900'}`}>
             {repairUnpublishResult}
+          </p>
+        )}
+      </div>
+
+      {/* One-time cleanup: copying an image straight out of Gemini, ChatGPT
+          or another AI tool inserts a blob: URL that only ever resolves in
+          that tool's own tab — permanently broken for every reader. Fixed
+          at the source (paste and drag-drop) for new content; this removes
+          it from anything saved before that fix. */}
+      <div className="bg-white rounded-lg shadow p-6 mb-8 border border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-amber-600" />
+              Fix broken inline images
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Copying an image straight out of Gemini, ChatGPT or another AI tool's page inserts a
+              link that only works inside that tool's own browser tab — never for a reader. This
+              finds and removes any of those (they show as a broken icon with stray text like
+              ", AI generated" next to it) from inside article text. Nothing else in the article
+              changes; add a real photo back in afterward using the toolbar's image button.
+            </p>
+          </div>
+          <button
+            onClick={repairBrokenInlineImages}
+            disabled={repairingBrokenImages}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 flex-shrink-0"
+          >
+            {repairingBrokenImages
+              ? <><RefreshCw className="w-4 h-4 animate-spin" /> Scanning…</>
+              : <><ImageIcon className="w-4 h-4" /> Fix broken images</>}
+          </button>
+        </div>
+        {repairBrokenImagesResult && (
+          <p className={`mt-3 text-sm ${repairBrokenImagesResult.startsWith('Error') ? 'text-red-700' : 'text-gray-700'}`}>
+            {repairBrokenImagesResult}
           </p>
         )}
       </div>

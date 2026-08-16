@@ -92,6 +92,26 @@ export function checkArticleCompliance(
     };
   }
 
+  // ── Broken inline images ─────────────────────────────────────────
+  // blob: is a browser-local reference — it only ever resolves inside the
+  // exact tab that created it, never for a reader. Real example: an image
+  // copied straight out of a Gemini chat carries a URL like
+  // blob:https://gemini.google.com/<id>, looks like a normal URL when
+  // pasted, and renders as a permanently broken icon for every reader.
+  // data: embeds the whole image as text in the row instead of using the
+  // real upload path this site already has. Both should have been stopped
+  // at paste time (fixed separately) — this is the backstop.
+  if (/<img[^>]*\ssrc=["']?(blob:|data:)/i.test(content)) {
+    violations.push({
+      code: 'broken-inline-image',
+      severity: 'blocking',
+      message:
+        'Contains an image that will never load for readers — copied straight from an AI ' +
+        'chat tool (Gemini, ChatGPT) or another app instead of uploaded. Remove it and use ' +
+        'the image button in the toolbar, which uploads a real, working copy.',
+    });
+  }
+
   // ── Word/Docs/chat-app paste artifacts ────────────────────────────
   const tags = tagsPresent(content);
   const junkTags = [...tags].filter((t) => !ALLOWED_TAGS.has(t));
