@@ -37,6 +37,18 @@ function isAllowedIframeSrc(val: string): boolean {
   }
 }
 
+// Tags whose *content* is never real article text — a stylesheet, a
+// script, or (via the colon check below) a Word-paste namespace block —
+// get dropped whole, tag and children together. The generic "unknown tag"
+// path below unwraps and keeps a tag's children, which is right for
+// something like a stray <div> wrapping real paragraphs, but wrong here:
+// a <style> tag's "child" is a text node full of CSS, and unwrapping it
+// would dump that CSS onto the page as visible text. Real example this
+// closes: a Word paste that arrives with a multi-KB <style> block and a
+// <xml> block full of <o:...>/<w:...>/<m:...> config elements — Word's
+// own namespaced markup, never article content.
+const DROP_WHOLE_TAGS = new Set(['style', 'script', 'head', 'title', 'meta', 'link', 'xml']);
+
 function sanitizeNode(node: Node, doc: Document): Node | null {
   if (node.nodeType === Node.TEXT_NODE) {
     return doc.createTextNode(node.textContent || '');
@@ -46,6 +58,12 @@ function sanitizeNode(node: Node, doc: Document): Node | null {
 
   const el = node as Element;
   const tagName = el.tagName.toLowerCase();
+
+  // Namespaced elements (o:p, w:worddocument, m:mathpr, …) — the HTML
+  // parser doesn't understand XML namespaces, so these arrive as literal
+  // tag names containing a colon. Always Word-paste metadata, never
+  // content a reader should see.
+  if (tagName.includes(':') || DROP_WHOLE_TAGS.has(tagName)) return null;
 
   if (!ALLOWED_TAGS.has(tagName)) {
     const fragment = doc.createDocumentFragment();

@@ -6,6 +6,7 @@ import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { toEditableHtml } from '../utils/articleContent';
 import { checkArticleCompliance, type ComplianceViolation } from '../utils/articleCompliance';
+import { sanitizeHtml } from '../utils/htmlSanitizer';
 import { getVideoEmbedUrl, getVideoThumbnail, isEmbeddableVideoUrl } from '../utils/videoEmbed';
 import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle, Image as ImageIcon, Video, FileText, Pin, Archive } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
@@ -596,6 +597,31 @@ export function ArticleManagement() {
    * passes. Genuinely non-compliant work (an actual Word-paste article)
    * still fails the corrected check too and stays hidden, correctly.
    */
+  /**
+   * Restores articles that were only ever hidden by the compliance gate
+   * itself — never a human choice. Two distinct causes have shipped
+   * wrongly-hidden articles, and this repairs both in one pass:
+   *
+   *  1. The pinned-genre bug: the gate used to grade tribute/celebration
+   *     pieces against the informational-guide template. Fixed by the
+   *     isPinned exemption in checkArticleCompliance — re-checking as-is
+   *     catches these.
+   *  2. Word-paste leftovers: several guide articles (NOC TEER Code,
+   *     Spousal Sponsorship, French Language Bonus, and others) were
+   *     saved before paste-time sanitizing existed, so they still carry
+   *     the full Word clipboard payload — <div>/<span> wrappers, a
+   *     <style> block, and a <xml> block of <o:.../<w:.../<m:...>
+   *     Office config elements — inflating a real ~1,400-word article to
+   *     50KB and tripping both the disallowed-tags and oversized checks.
+   *     The visible article underneath was already house-style compliant
+   *     (h2 sections, blockquote, Q&A, Key Takeaways, Conclusion all
+   *     present); only the invisible cruft was the problem. Running the
+   *     same sanitizeHtml() that paste/drop already use strips it back
+   *     out to ~11KB. Content is only overwritten when the CLEANED
+   *     version is what makes it pass — an article that fails even after
+   *     cleaning is left untouched and reported, not silently forced
+   *     through.
+   */
   const repairWrongfulUnpublish = async () => {
     setRepairingUnpublish(true);
     setRepairUnpublishResult('Checking previously-hidden articles…');
@@ -609,27 +635,48 @@ export function ArticleManagement() {
       if (error) throw error;
 
       const rows = (data as { id: string; title: string; content: string | null; is_pinned: boolean | null }[]) || [];
-      const toRestore = rows.filter(
-        (r) => checkArticleCompliance(r.content || '', { isPinned: !!r.is_pinned }).passed
-      );
+
+      const toRestore: { id: string; content?: string }[] = [];
+      const stillFailing: string[] = [];
+      let cleanedCount = 0;
+
+      for (const r of rows) {
+        const original = r.content || '';
+        const opts = { isPinned: !!r.is_pinned };
+        if (checkArticleCompliance(original, opts).passed) {
+          toRestore.push({ id: r.id });
+          continue;
+        }
+        const cleaned = sanitizeHtml(original);
+        if (checkArticleCompliance(cleaned, opts).passed) {
+          toRestore.push({ id: r.id, content: cleaned });
+          cleanedCount++;
+        } else {
+          stillFailing.push(r.title);
+        }
+      }
 
       if (toRestore.length > 0) {
         const CHUNK = 50;
         for (let i = 0; i < toRestore.length; i += CHUNK) {
-          const chunk = toRestore.slice(i, i + CHUNK).map((r) => r.id);
-          const { error: upErr } = await supabase
-            .from('media_content')
-            .update({ is_published: true })
-            .in('id', chunk);
-          if (upErr) throw upErr;
+          const chunk = toRestore.slice(i, i + CHUNK);
+          for (const r of chunk) {
+            const update: { is_published: boolean; content?: string } = { is_published: true };
+            if (r.content !== undefined) update.content = r.content;
+            const { error: upErr } = await supabase.from('media_content').update(update).eq('id', r.id);
+            if (upErr) throw upErr;
+          }
         }
       }
 
-      const stillHidden = rows.length - toRestore.length;
       setRepairUnpublishResult(
         `Checked ${rows.length} hidden article${rows.length === 1 ? '' : 's'} against the corrected rule. ` +
         `${toRestore.length} republished just now` +
-        (stillHidden > 0 ? `; ${stillHidden} genuinely fail and stay hidden — open those from "Show only unpublished" to fix them.` : '.')
+        (cleanedCount > 0 ? ` (${cleanedCount} needed leftover Word-paste formatting cleaned out first)` : '') +
+        (stillFailing.length > 0
+          ? `; ${stillFailing.length} genuinely fail and stay hidden: ${stillFailing.slice(0, 5).join(', ')}` +
+            (stillFailing.length > 5 ? `, and ${stillFailing.length - 5} more` : '') + '.'
+          : '.')
       );
       await fetchArticles();
     } catch (err) {
@@ -1877,10 +1924,14 @@ export function ArticleManagement() {
         )}
       </div>
 
-      {/* One-time repair: the first version of the compliance gate applied
-          the informational-guide template to pinned tribute/celebration
-          pieces and wrongly unpublished 62 of them before the genre gap
-          and reporter-scoping were fixed. This undoes that specific damage. */}
+      {/* One-time repair, now covering two distinct causes of wrongly-hidden
+          articles: (1) the first version of the compliance gate applied the
+          informational-guide template to pinned tribute/celebration pieces
+          and wrongly unpublished 62 of them; (2) several guide articles were
+          saved before paste-time sanitizing existed and still carry their
+          full Word clipboard payload (a <style> block, an <xml> block of
+          Office config elements) — the visible article underneath was
+          already compliant, only the invisible cruft tripped the gate. */}
       <div className="bg-emerald-50 rounded-lg shadow p-6 mb-8 border border-emerald-200">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="min-w-0">
@@ -1889,11 +1940,12 @@ export function ArticleManagement() {
               Restore wrongly-hidden articles
             </h2>
             <p className="text-sm text-emerald-800 mt-1">
-              An earlier version of the standards check below applied the wrong template to pinned
-              tribute/celebration pieces and hid 62 of them by mistake — they were never actually
-              broken. This re-checks every currently-hidden article with the corrected rule and
-              republishes anything that now passes. A genuinely non-compliant article (real
-              Word-paste junk) still fails the corrected check too and stays hidden.
+              Re-checks every currently-hidden article against the corrected rule and republishes
+              anything that now passes. If an article only fails because of leftover Word/Docs
+              paste formatting (invisible on the page but still in the stored HTML), that
+              formatting is cleaned out first — the visible article itself is not changed. An
+              article that's still genuinely incomplete (missing sections, no readable content)
+              stays hidden and is listed by name.
             </p>
           </div>
           <button
