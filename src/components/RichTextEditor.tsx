@@ -2,10 +2,11 @@ import { useRef, useState, useCallback } from 'react';
 import {
   Bold, Italic, List, ListOrdered, Heading2, Heading3,
   Table as TableIcon, Image as ImageIcon, Link as LinkIcon,
-  Trash2,
+  Trash2, Video as VideoIcon, Music,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { sanitizeHtml } from '../utils/htmlSanitizer';
+import { getVideoEmbedUrl } from '../utils/videoEmbed';
 
 interface RichTextEditorProps {
   value: string;
@@ -43,6 +44,8 @@ function ToolbarButton({
 
 function Toolbar({ editorRef, folder, onContentChange }: { editorRef: React.RefObject<HTMLDivElement | null>; folder: string; onContentChange: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -72,6 +75,60 @@ function Toolbar({ editorRef, folder, onContentChange }: { editorRef: React.RefO
     } finally {
       setUploading(false);
     }
+  };
+
+  /**
+   * Shared by the video and audio file buttons — uploads to the same
+   * durable Supabase storage the image button already uses (never a
+   * blob:/data: reference), then inserts a native, playable tag.
+   */
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>, kind: 'video' | 'audio') => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${folder}/${Date.now()}-${safeName}`;
+      const { error } = await supabase.storage
+        .from('media')
+        .upload(path, file, { cacheControl: '3600', upsert: false });
+      if (error) throw new Error(error.message);
+      const { data } = supabase.storage.from('media').getPublicUrl(path);
+      const tag = kind === 'video'
+        ? `<p><video controls src="${data.publicUrl}" class="w-full rounded-lg"></video></p><p></p>`
+        : `<p><audio controls src="${data.publicUrl}" class="w-full"></audio></p><p></p>`;
+      exec('insertHTML', tag);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : `${kind === 'video' ? 'Video' : 'Audio'} upload failed`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  /**
+   * Embeds a YouTube/Vimeo/TikTok link inline as a real player, instead of
+   * it just sitting in the text as a plain clickable link. getVideoEmbedUrl
+   * is the ONLY source an <iframe> src is ever allowed to come from — the
+   * sanitizer re-checks that at save time too, so this can't be worked
+   * around by editing the HTML directly.
+   */
+  const insertVideoLink = () => {
+    const url = window.prompt('Paste a YouTube, Vimeo or TikTok link:');
+    if (url === null) return; // Cancelled.
+    if (!url.trim()) { videoFileInputRef.current?.click(); return; }
+
+    const embedUrl = getVideoEmbedUrl(url.trim());
+    if (!embedUrl) {
+      setUploadError("That link isn't from YouTube, Vimeo or TikTok — upload a video file instead, or paste it as a plain link.");
+      return;
+    }
+    setUploadError(null);
+    exec(
+      'insertHTML',
+      `<p><iframe src="${embedUrl}" width="100%" height="360" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="Embedded video"></iframe></p><p></p>`
+    );
   };
 
   const insertLink = () => {
@@ -130,6 +187,29 @@ function Toolbar({ editorRef, folder, onContentChange }: { editorRef: React.RefO
           <ImageIcon className="w-4 h-4" />
         </ToolbarButton>
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+
+        <ToolbarButton title="Insert video (YouTube/Vimeo/TikTok link, or upload a file)" disabled={uploading} onClick={insertVideoLink}>
+          <VideoIcon className="w-4 h-4" />
+        </ToolbarButton>
+        <input
+          ref={videoFileInputRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={(e) => handleMediaUpload(e, 'video')}
+        />
+
+        <ToolbarButton title="Insert audio file" disabled={uploading} onClick={() => audioFileInputRef.current?.click()}>
+          <Music className="w-4 h-4" />
+        </ToolbarButton>
+        <input
+          ref={audioFileInputRef}
+          type="file"
+          accept="audio/*"
+          className="hidden"
+          onChange={(e) => handleMediaUpload(e, 'audio')}
+        />
+
         {uploading && <span className="text-xs text-gray-500 ml-1">Uploading...</span>}
       </div>
       {uploadError && <p className="px-2 pb-1.5 text-xs text-red-600">{uploadError}</p>}

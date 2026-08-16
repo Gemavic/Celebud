@@ -13,6 +13,8 @@
 // (so nothing is lost) but stays unpublished — same is_published mechanism
 // already used to hold back fetched articles until they meet the bar.
 
+import { ALLOWED_TAGS } from './contentSchema';
+
 export interface ComplianceViolation {
   /** Short id so callers can group/filter without string-matching prose. */
   code: string;
@@ -27,12 +29,6 @@ export interface ComplianceResult {
   violations: ComplianceViolation[];
   wordCount: number;
 }
-
-const ALLOWED_TAGS = new Set([
-  'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'a',
-  'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'blockquote', 'hr',
-  'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
-]);
 
 function wordCount(html: string): number {
   const text = (html || '')

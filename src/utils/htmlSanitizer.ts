@@ -1,10 +1,4 @@
-const ALLOWED_TAGS = new Set([
-  'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'a',
-  'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'blockquote', 'hr',
-  'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
-]);
-
-const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'target', 'rel', 'class']);
+import { ALLOWED_TAGS, ALLOWED_ATTRS, ALLOWED_IFRAME_HOSTS } from './contentSchema';
 
 // Schemes that can never be a real, shareable image or link — kept as a list
 // so the reason for rejecting each is explicit, not inferred from a pattern.
@@ -27,6 +21,22 @@ function isBlockedUrl(val: string): boolean {
   return BLOCKED_URL_SCHEMES.some((scheme) => normalized.startsWith(scheme));
 }
 
+/**
+ * An <iframe> can load any page, not just an image — a much bigger risk
+ * than the other tags here, so it doesn't get the general "any http(s) URL
+ * is fine" treatment. Only a src matching getVideoEmbedUrl()'s own output
+ * (youtube.com/player.vimeo.com/tiktok.com) is accepted; anything else,
+ * including a scheme-valid https:// URL to some other site, is rejected.
+ */
+function isAllowedIframeSrc(val: string): boolean {
+  try {
+    const url = new URL(val, 'https://placeholder.invalid');
+    return url.protocol === 'https:' && ALLOWED_IFRAME_HOSTS.has(url.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 function sanitizeNode(node: Node, doc: Document): Node | null {
   if (node.nodeType === Node.TEXT_NODE) {
     return doc.createTextNode(node.textContent || '');
@@ -46,13 +56,17 @@ function sanitizeNode(node: Node, doc: Document): Node | null {
     return fragment;
   }
 
-  // An <img> is nothing but its src — a blocked/missing one means there is
-  // no image, so the tag is dropped entirely rather than kept empty (which
-  // rendered as a bare broken-image icon with its alt text floating next to
-  // it, exactly what showed up in the reported article).
-  if (tagName === 'img') {
+  // A media tag is nothing but its src — a blocked/missing one means there
+  // is no media, so the tag is dropped entirely rather than kept empty
+  // (which for <img> rendered as a bare broken-image icon with its alt text
+  // floating next to it, exactly what showed up in a reported article).
+  if (tagName === 'img' || tagName === 'video' || tagName === 'audio' || tagName === 'source') {
     const src = el.getAttribute('src') || '';
     if (!src || isBlockedUrl(src)) return null;
+  }
+  if (tagName === 'iframe') {
+    const src = el.getAttribute('src') || '';
+    if (!isAllowedIframeSrc(src)) return null;
   }
 
   const newEl = doc.createElement(tagName);
@@ -65,6 +79,13 @@ function sanitizeNode(node: Node, doc: Document): Node | null {
     // not disappear along with it.
     if ((attr.name === 'href' || attr.name === 'src') && isBlockedUrl(val)) continue;
     newEl.setAttribute(attr.name, val);
+  }
+
+  // video/audio need controls to be playable at all, and only ever come
+  // from this site's own upload — always on, not left to whatever the
+  // pasted/dragged markup happened to include.
+  if (tagName === 'video' || tagName === 'audio') {
+    newEl.setAttribute('controls', '');
   }
 
   for (const child of Array.from(el.childNodes)) {
