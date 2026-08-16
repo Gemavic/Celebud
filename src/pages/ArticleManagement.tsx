@@ -147,6 +147,8 @@ export function ArticleManagement() {
   const [repairResult, setRepairResult] = useState<string | null>(null);
   const [auditingCompliance, setAuditingCompliance] = useState(false);
   const [complianceAuditResult, setComplianceAuditResult] = useState<string | null>(null);
+  const [repairingUnpublish, setRepairingUnpublish] = useState(false);
+  const [repairUnpublishResult, setRepairUnpublishResult] = useState<string | null>(null);
   // The real count across the whole table, independent of how many rows are
   // currently loaded — the stat card used to show articles.length, which is
   // just the page size, not the actual total.
@@ -540,14 +542,14 @@ export function ArticleManagement() {
 
       const { data, error } = await supabase
         .from('media_content')
-        .select('id, title, content, is_published')
+        .select('id, title, content, is_published, is_pinned')
         .eq('media_type', 'article')
         .eq('is_manual', true)
         .in('saved_by', reporterIds);
       if (error) throw error;
 
-      const rows = (data as { id: string; title: string; content: string | null; is_published: boolean }[]) || [];
-      const failing = rows.filter((r) => !checkArticleCompliance(r.content || '').passed);
+      const rows = (data as { id: string; title: string; content: string | null; is_published: boolean; is_pinned: boolean | null }[]) || [];
+      const failing = rows.filter((r) => !checkArticleCompliance(r.content || '', { isPinned: !!r.is_pinned }).passed);
       const toUnpublish = failing.filter((r) => r.is_published);
 
       if (toUnpublish.length > 0) {
@@ -579,6 +581,63 @@ export function ArticleManagement() {
   };
 
   /**
+   * One-time repair, not an ongoing tool. The FIRST version of the
+   * compliance gate checked every is_manual article regardless of who
+   * wrote it, and applied the informational-guide template (Q&A, Key
+   * Takeaways, a comparison table) to pinned tribute/celebration pieces —
+   * a genre that was never going to have any of that. Running it
+   * unpublished 62 pinned Originals that were perfectly fine. Both bugs
+   * (missing genre awareness, missing reporter scoping) are fixed now, but
+   * fixing the code doesn't undo what it already did to the data — this
+   * does that: re-checks every currently-unpublished hand-written article
+   * with the CORRECTED, genre-aware rule and republishes anything that now
+   * passes. Genuinely non-compliant work (an actual Word-paste article)
+   * still fails the corrected check too and stays hidden, correctly.
+   */
+  const repairWrongfulUnpublish = async () => {
+    setRepairingUnpublish(true);
+    setRepairUnpublishResult('Checking previously-hidden articles…');
+    try {
+      const { data, error } = await supabase
+        .from('media_content')
+        .select('id, title, content, is_pinned')
+        .eq('media_type', 'article')
+        .eq('is_manual', true)
+        .eq('is_published', false);
+      if (error) throw error;
+
+      const rows = (data as { id: string; title: string; content: string | null; is_pinned: boolean | null }[]) || [];
+      const toRestore = rows.filter(
+        (r) => checkArticleCompliance(r.content || '', { isPinned: !!r.is_pinned }).passed
+      );
+
+      if (toRestore.length > 0) {
+        const CHUNK = 50;
+        for (let i = 0; i < toRestore.length; i += CHUNK) {
+          const chunk = toRestore.slice(i, i + CHUNK).map((r) => r.id);
+          const { error: upErr } = await supabase
+            .from('media_content')
+            .update({ is_published: true })
+            .in('id', chunk);
+          if (upErr) throw upErr;
+        }
+      }
+
+      const stillHidden = rows.length - toRestore.length;
+      setRepairUnpublishResult(
+        `Checked ${rows.length} hidden article${rows.length === 1 ? '' : 's'} against the corrected rule. ` +
+        `${toRestore.length} republished just now` +
+        (stillHidden > 0 ? `; ${stillHidden} genuinely fail and stay hidden — open those from "Show only unpublished" to fix them.` : '.')
+      );
+      await fetchArticles();
+    } catch (err) {
+      setRepairUnpublishResult(`Error: ${err instanceof Error ? err.message : 'Repair failed'}`);
+    } finally {
+      setRepairingUnpublish(false);
+    }
+  };
+
+  /**
    * Fixes both ways an article's picture can be wrong, in two passes.
    *
    * 'broken'  — the image points at the publisher's own server. It loads for
@@ -600,7 +659,7 @@ export function ArticleManagement() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('You must be signed in as an admin.');
 
-      const totals = { rehosted: 0, pexels: 0, unpub: 0, failed: 0, kept: 0 };
+      const totals = { rehosted: 0, pexels: 0, unpub: 0, needsPhoto: 0, failed: 0, kept: 0 };
       let rateLimited = false;
       let remainingAtEnd = 0;
 
@@ -623,6 +682,7 @@ export function ArticleManagement() {
           totals.rehosted += data.rehosted || 0;
           totals.pexels += data.replacedWithPexels || 0;
           totals.unpub += data.unpublished || 0;
+          totals.needsPhoto += data.needsManualPhoto || 0;
           totals.failed += data.failed || 0;
           totals.kept += data.leftAsIs || 0;
           remainingAtEnd = data.remaining ?? 0;
@@ -643,6 +703,7 @@ export function ArticleManagement() {
         `${totals.pexels} given a real matching photo` +
         (totals.kept ? `, ${totals.kept} left unchanged (no better photo found)` : '') +
         (totals.unpub ? `, ${totals.unpub} unpublished (no picture at all)` : '') +
+        (totals.needsPhoto ? `, ${totals.needsPhoto} pinned article${totals.needsPhoto === 1 ? '' : 's'} need${totals.needsPhoto === 1 ? 's' : ''} a photo added by hand (left live, never auto-hidden)` : '') +
         (totals.failed ? `, ${totals.failed} failed` : '') + '. ' +
         (rateLimited
           ? `Pexels' free hourly limit was reached with ${remainingAtEnd} still to go — everything above is saved. Press the button again in about an hour to continue.`
@@ -1284,7 +1345,9 @@ export function ArticleManagement() {
       // pasted. Fetched/AI-rewritten articles are separately exempt: they
       // already pass their own 800-word + real-photo gate and are generated
       // with this structure built in.
-      const compliance = applyGate ? checkArticleCompliance(editForm.content) : null;
+      const compliance = applyGate
+        ? checkArticleCompliance(editForm.content, { isPinned: editForm.is_pinned })
+        : null;
       const willPublish = !compliance || compliance.passed;
 
       if (compliance && !compliance.passed) {
@@ -1714,7 +1777,9 @@ export function ArticleManagement() {
               image. <strong>Duplicate pictures</strong> — the old generic category photos, which
               is why unrelated articles kept showing the same image. Each article gets its own
               real photo of its actual subject. An article is only ever unpublished if its picture
-              is genuinely broken and nothing can replace it.
+              is genuinely broken and nothing can replace it — and never a <strong>pinned</strong>{' '}
+              one; those get reported for you to add a photo by hand instead, since pinning is a
+              deliberate editorial decision this tool shouldn't override on its own.
             </p>
             <p className="text-xs text-gray-400 mt-2">
               A large archive takes several runs — the free photo service limits how many
@@ -1734,6 +1799,42 @@ export function ArticleManagement() {
         {repairResult && (
           <p className={`mt-3 text-sm ${repairResult.startsWith('Error') ? 'text-red-700' : 'text-gray-700'}`}>
             {repairResult}
+          </p>
+        )}
+      </div>
+
+      {/* One-time repair: the first version of the compliance gate applied
+          the informational-guide template to pinned tribute/celebration
+          pieces and wrongly unpublished 62 of them before the genre gap
+          and reporter-scoping were fixed. This undoes that specific damage. */}
+      <div className="bg-emerald-50 rounded-lg shadow p-6 mb-8 border border-emerald-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-emerald-900 flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-emerald-700" />
+              Restore wrongly-hidden articles
+            </h2>
+            <p className="text-sm text-emerald-800 mt-1">
+              An earlier version of the standards check below applied the wrong template to pinned
+              tribute/celebration pieces and hid 62 of them by mistake — they were never actually
+              broken. This re-checks every currently-hidden article with the corrected rule and
+              republishes anything that now passes. A genuinely non-compliant article (real
+              Word-paste junk) still fails the corrected check too and stays hidden.
+            </p>
+          </div>
+          <button
+            onClick={repairWrongfulUnpublish}
+            disabled={repairingUnpublish}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 flex-shrink-0"
+          >
+            {repairingUnpublish
+              ? <><RefreshCw className="w-4 h-4 animate-spin" /> Restoring…</>
+              : <><RefreshCw className="w-4 h-4" /> Restore now</>}
+          </button>
+        </div>
+        {repairUnpublishResult && (
+          <p className={`mt-3 text-sm ${repairUnpublishResult.startsWith('Error') ? 'text-red-700' : 'text-emerald-900'}`}>
+            {repairUnpublishResult}
           </p>
         )}
       </div>

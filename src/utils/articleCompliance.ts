@@ -65,8 +65,21 @@ function h2Texts(html: string): string[] {
  * that keeps recurring: content pasted from Word or a chat app, arriving
  * with no real structure and a pile of markup the site was never going to
  * use anyway.
+ *
+ * @param opts.isPinned — Pinned/Originals content includes tribute and
+ * celebration pieces (birthdays, anniversaries, memorials), which are a
+ * genuinely different genre from an informational guide and were never
+ * going to have a "Questions & Answers" or "Key Takeaways" section — a
+ * flowing narrative isn't a defect in that genre. A first version of this
+ * gate didn't know that and unpublished 62 pinned articles that were
+ * perfectly fine. Hygiene problems (Word/Docs paste junk, a stray <h1>,
+ * wildly oversized content) still block regardless of genre; only the
+ * informational-guide-specific structure is skipped for pinned content.
  */
-export function checkArticleCompliance(html: string): ComplianceResult {
+export function checkArticleCompliance(
+  html: string,
+  opts: { isPinned?: boolean } = {}
+): ComplianceResult {
   const violations: ComplianceViolation[] = [];
   const content = html || '';
   const words = wordCount(content);
@@ -117,75 +130,81 @@ export function checkArticleCompliance(html: string): ComplianceResult {
     });
   }
 
-  // ── Required structure ─────────────────────────────────────────────
+  // ── Required structure — informational-guide articles only ──────────
+  // Pinned/Originals tribute and celebration pieces are a different genre
+  // and are exempt from all of this; a flowing narrative is correct there,
+  // not a defect. Hygiene checks above (junk tags, oversized, <h1>) still
+  // applied regardless — those are real problems in any genre.
   const h2s = h2Texts(content);
-  if (h2s.length < 4) {
-    violations.push({
-      code: 'too-few-h2',
-      severity: 'blocking',
-      message: `Only ${h2s.length} section heading${h2s.length === 1 ? '' : 's'} (<h2>) — the house style needs 4-6 clearly-labelled sections, not one long unbroken piece.`,
-    });
-  }
-
-  if (!content.includes('<blockquote')) {
-    violations.push({
-      code: 'no-blockquote',
-      severity: 'blocking',
-      message: 'No <blockquote> — every article needs one pull-quote or key-takeaway callout.',
-    });
-  }
-
-  if (!content.includes('<hr')) {
-    violations.push({
-      code: 'no-disclaimer',
-      severity: 'blocking',
-      message: 'No closing disclaimer/divider (<hr />) — every article ends with one.',
-    });
-  }
-
-  const qaHeading = h2s.find((t) => /questions?\s*(&|and)\s*answers|frequently asked questions|faq/i.test(t));
-  if (!qaHeading) {
-    violations.push({
-      code: 'no-qa',
-      severity: 'blocking',
-      message: 'No "Questions & Answers" section — the house style needs 5-7 reader questions as <h3> under a labelled <h2>.',
-    });
-  } else {
-    const h3Count = (content.match(/<h3/g) || []).length;
-    if (h3Count < 5) {
+  if (!opts.isPinned) {
+    if (h2s.length < 4) {
       violations.push({
-        code: 'too-few-qa',
-        severity: 'warning',
-        message: `Only ${h3Count} question${h3Count === 1 ? '' : 's'} in the Q&A section — aim for 5-7.`,
+        code: 'too-few-h2',
+        severity: 'blocking',
+        message: `Only ${h2s.length} section heading${h2s.length === 1 ? '' : 's'} (<h2>) — the house style needs 4-6 clearly-labelled sections, not one long unbroken piece.`,
+      });
+    }
+
+    if (!content.includes('<blockquote')) {
+      violations.push({
+        code: 'no-blockquote',
+        severity: 'blocking',
+        message: 'No <blockquote> — every article needs one pull-quote or key-takeaway callout.',
+      });
+    }
+
+    if (!content.includes('<hr')) {
+      violations.push({
+        code: 'no-disclaimer',
+        severity: 'blocking',
+        message: 'No closing disclaimer/divider (<hr />) — every article ends with one.',
+      });
+    }
+
+    const qaHeading = h2s.find((t) => /questions?\s*(&|and)\s*answers|frequently asked questions|faq/i.test(t));
+    if (!qaHeading) {
+      violations.push({
+        code: 'no-qa',
+        severity: 'blocking',
+        message: 'No "Questions & Answers" section — the house style needs 5-7 reader questions as <h3> under a labelled <h2>.',
+      });
+    } else {
+      const h3Count = (content.match(/<h3/g) || []).length;
+      if (h3Count < 5) {
+        violations.push({
+          code: 'too-few-qa',
+          severity: 'warning',
+          message: `Only ${h3Count} question${h3Count === 1 ? '' : 's'} in the Q&A section — aim for 5-7.`,
+        });
+      }
+    }
+
+    if (!h2s.some((t) => /key takeaways/i.test(t))) {
+      violations.push({
+        code: 'no-takeaways',
+        severity: 'blocking',
+        message: 'No "Key Takeaways" section.',
+      });
+    }
+
+    if (!h2s.some((t) => /conclusion/i.test(t))) {
+      violations.push({
+        code: 'no-conclusion',
+        severity: 'blocking',
+        message: 'No "Conclusion" section.',
       });
     }
   }
 
-  if (!h2s.some((t) => /key takeaways/i.test(t))) {
-    violations.push({
-      code: 'no-takeaways',
-      severity: 'blocking',
-      message: 'No "Key Takeaways" section.',
-    });
-  }
-
-  if (!h2s.some((t) => /conclusion/i.test(t))) {
-    violations.push({
-      code: 'no-conclusion',
-      severity: 'blocking',
-      message: 'No "Conclusion" section.',
-    });
-  }
-
   // ── Soft guidance — shown, never blocks ─────────────────────────────
-  if (words < 900 || words > 1600) {
+  if (!opts.isPinned && (words < 900 || words > 1600)) {
     violations.push({
       code: 'word-count',
       severity: 'warning',
       message: `${words.toLocaleString()} words — house target is 1,000-1,400.`,
     });
   }
-  if (!content.includes('<table')) {
+  if (!opts.isPinned && !content.includes('<table')) {
     violations.push({
       code: 'no-table',
       severity: 'warning',

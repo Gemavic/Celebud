@@ -53,6 +53,7 @@ interface Row {
   description: string | null;
   thumbnail_url: string | null;
   is_published: boolean | null;
+  is_pinned: boolean | null;
   categories: { slug: string } | null;
 }
 
@@ -121,7 +122,7 @@ Deno.serve(async (req: Request) => {
     // Pexels lookup on something readers cannot see.
     let query = supabase
       .from('media_content')
-      .select('id, title, slug, description, thumbnail_url, is_published, categories(slug)')
+      .select('id, title, slug, description, thumbnail_url, is_published, is_pinned, categories(slug)')
       .eq('media_type', 'article')
       .not('thumbnail_url', 'is', null);
     if (mode === 'generic') query = query.eq('is_published', true);
@@ -143,6 +144,7 @@ Deno.serve(async (req: Request) => {
     let rehosted = 0;
     let replacedWithPexels = 0;
     let unpublished = 0;
+    let needsManualPhoto = 0;
     let failed = 0;
     let leftAsIs = 0;
     let stoppedOnRateLimit = false;
@@ -199,6 +201,17 @@ Deno.serve(async (req: Request) => {
             if (examples.length < 8) {
               examples.push(`${resolved.source === 'publisher' ? 're-hosted' : 'pexels'}: ${row.title.slice(0, 60)}`);
             }
+          } else if (row.is_pinned) {
+            // Pinned = deliberately curated Originals content — an editor
+            // chose to keep it live permanently. A missing photo is a real
+            // problem, but this tool must never silently make that decision
+            // for a pinned article; it stays live and gets reported instead,
+            // for a human to add a photo by hand. The compliance gate
+            // learned this same lesson the same way: an earlier version had
+            // no pinned exemption and unpublished 62 Originals that were
+            // otherwise perfectly fine.
+            needsManualPhoto++;
+            if (examples.length < 8) examples.push(`needs a manual photo (pinned, left live): ${row.title.slice(0, 60)}`);
           } else {
             // No picture can be secured — an article must not stay live
             // showing a broken image.
@@ -218,7 +231,7 @@ Deno.serve(async (req: Request) => {
 
     const processed = dryRun
       ? 0
-      : rehosted + replacedWithPexels + unpublished + failed + leftAsIs;
+      : rehosted + replacedWithPexels + unpublished + needsManualPhoto + failed + leftAsIs;
 
     return new Response(JSON.stringify({
       success: true,
@@ -234,6 +247,8 @@ Deno.serve(async (req: Request) => {
       replacedWithPexels,
       leftAsIs,
       unpublished,
+      // Pinned articles with no resolvable photo — left live on purpose.
+      needsManualPhoto,
       failed,
       examples,
     }), {
