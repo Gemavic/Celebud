@@ -94,8 +94,28 @@ interface Article {
 }
 
 export function ArticleManagement() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { canApportionArticles } = usePermissions();
+  // Whether the SIGNED-IN account is an approved reporter, checked once per
+  // session. Reporters get is_admin too (Article Management access), so
+  // is_admin alone can't tell them apart from the owner. This is what lets
+  // the compliance gate apply to a reporter's own drafts while never
+  // touching the owner's — regardless of which byline or tool the article
+  // came from. null while unknown; the gate treats null as "not a reporter"
+  // so nothing is blocked before this resolves.
+  const [isReporterAccount, setIsReporterAccount] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!user) { setIsReporterAccount(null); return; }
+    let cancelled = false;
+    supabase
+      .from('reporter_applications')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('status', 'approved')
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setIsReporterAccount(!!data); });
+    return () => { cancelled = true; };
+  }, [user]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   // Article rebuild (AI re-reporting + SEO + thumbnails), run in batches.
@@ -484,26 +504,46 @@ export function ArticleManagement() {
   };
 
   /**
-   * Sweeps every hand-written article already live against the same
+   * Sweeps hand-written articles SAVED BY A REPORTER against the same
    * structure gate saveArticle() applies going forward, and unpublishes
-   * whichever ones fail it. New edits are caught automatically now — this
-   * is for the backlog that published before the gate existed. Uses the
-   * exact same checkArticleCompliance() the Save button uses, so the rule
-   * can never drift between "what gets caught on save" and "what gets
-   * caught on audit."
+   * whichever ones fail it. New saves are caught automatically now — this
+   * is for the backlog that published before the gate existed.
    *
+   * Deliberately scoped to saved_by, not just is_manual: an article with
+   * saved_by = NULL (everything saved before that column existed — this
+   * includes the owner's own Editorial-drafted work) or saved_by = the
+   * owner's own account is left alone regardless of its structure. This is
+   * an editorial decision, not a formatting one — only a reporter's own
+   * work is swept, on purpose.
+   *
+   * Uses the exact same checkArticleCompliance() the Save button uses, so
+   * the rule can never drift between what's caught on save and on audit.
    * Nothing is deleted — unpublishing only hides the article (same
    * reversible switch fetched teasers use); Save it again once fixed.
    */
   const auditCompliance = async () => {
     setAuditingCompliance(true);
-    setComplianceAuditResult('Checking hand-written articles…');
+    setComplianceAuditResult('Checking reporter-submitted articles…');
     try {
+      const { data: reporterRows, error: repErr } = await supabase
+        .from('reporter_applications')
+        .select('user_id')
+        .eq('status', 'approved')
+        .not('user_id', 'is', null);
+      if (repErr) throw repErr;
+
+      const reporterIds = [...new Set((reporterRows || []).map((r) => r.user_id as string))];
+      if (reporterIds.length === 0) {
+        setComplianceAuditResult('No approved reporters with a linked account yet — nothing to check.');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('media_content')
         .select('id, title, content, is_published')
         .eq('media_type', 'article')
-        .eq('is_manual', true);
+        .eq('is_manual', true)
+        .in('saved_by', reporterIds);
       if (error) throw error;
 
       const rows = (data as { id: string; title: string; content: string | null; is_published: boolean }[]) || [];
@@ -523,12 +563,12 @@ export function ArticleManagement() {
       }
 
       setComplianceAuditResult(
-        `Checked ${rows.length} hand-written article${rows.length === 1 ? '' : 's'}. ` +
+        `Checked ${rows.length} reporter-submitted article${rows.length === 1 ? '' : 's'}. ` +
         `${failing.length} fail${failing.length === 1 ? 's' : ''} the house structure` +
         (toUnpublish.length > 0
           ? ` — ${toUnpublish.length} unpublished just now (still saved, nothing lost).`
           : failing.length > 0 ? ' — already unpublished.' : '.') +
-        (failing.length > 0 ? ' Use "Show only unpublished" below, fix each one, and save to republish.' : '')
+        (failing.length > 0 ? ' Use "Show only unpublished" below to find and rewrite them.' : '')
       );
       await fetchArticles();
     } catch (err) {
@@ -1228,14 +1268,23 @@ export function ArticleManagement() {
 
       const isManual = isCreatingNew ? true : (editingArticle?.is_manual ?? false);
 
-      // Hand-written/edited work is checked against the house structure
-      // before it can go live — real example that made this necessary:
-      // Tunde Ibrahim Amusa's "Future of Nigerian Technology" was pasted
-      // straight from Word (148KB of Office markup, zero <h2> sections, no
-      // disclaimer) and published exactly as pasted. Fetched/AI-rewritten
-      // articles are exempt: they already go through their own 800-word +
-      // real-photo gate and are generated with this structure built in.
-      const compliance = isManual ? checkArticleCompliance(editForm.content) : null;
+      // Gated on WHO IS SAVING, not on is_manual alone. Reporters get the
+      // same is_admin access the owner has (that's what lets them use this
+      // page), so is_admin can't tell them apart — but reporter_applications
+      // can. This is a deliberate editorial decision, not a formatting rule:
+      // the owner's own work — Editorial AI drafts, direct edits, rewriting
+      // a reporter's draft personally — is never blocked, on any byline,
+      // through any tool. isReporterAccount === null (still resolving) is
+      // treated as "not a reporter" so nothing is ever blocked prematurely.
+      const applyGate = isManual && isReporterAccount === true;
+
+      // Real example that made this necessary: a reporter's "Future of
+      // Nigerian Technology" was pasted straight from Word (148KB of Office
+      // markup, zero <h2> sections, no disclaimer) and published exactly as
+      // pasted. Fetched/AI-rewritten articles are separately exempt: they
+      // already pass their own 800-word + real-photo gate and are generated
+      // with this structure built in.
+      const compliance = applyGate ? checkArticleCompliance(editForm.content) : null;
       const willPublish = !compliance || compliance.passed;
 
       if (compliance && !compliance.passed) {
@@ -1250,6 +1299,11 @@ export function ArticleManagement() {
         thumbnail_url: editForm.thumbnail_url || null,
         category_id: editForm.category_id || null,
         author_id: editForm.author_id || null,
+        // Who actually saved this — separate from author_id, which is just
+        // the byline. This is what lets future audits, and the gate above,
+        // tell a reporter's own save apart from the owner fixing something
+        // under any byline.
+        saved_by: user?.id || null,
         author_bio_snapshot: articleBioForm.bio || null,
         author_disclaimer_snapshot: articleBioForm.disclaimer || null,
         media_type: editForm.media_type,
@@ -1698,11 +1752,12 @@ export function ArticleManagement() {
               Check article standards
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              Checks every hand-written article against the house structure — section headings,
-              a Q&amp;A block, a disclaimer, and no leftover Word/Docs paste formatting. Anything
-              that fails is unpublished (saved, just hidden) until it's fixed and saved again.
-              Fetched and AI-rewritten articles are not affected — they already go through their
-              own quality gate.
+              Checks every article a reporter has submitted against the house structure — section
+              headings, a Q&amp;A block, a disclaimer, and no leftover Word/Docs paste formatting.
+              Anything that fails is unpublished (saved, just hidden) so you can find and rewrite
+              it here. Your own writing is never affected, on any byline — this only looks at
+              what a reporter account actually saved. Fetched and AI-rewritten articles aren't
+              affected either; they already go through their own quality gate.
             </p>
           </div>
           <button
@@ -1722,13 +1777,15 @@ export function ArticleManagement() {
         )}
       </div>
 
-      {/* Fetched teasers stay hidden (off the site, out of the sitemap) until
-          rewritten — this is where an admin finds and clears that backlog. */}
+      {/* Two things share this flag: fetched teasers awaiting an AI rewrite,
+          and reporter drafts that failed the house structure check — this
+          is where an admin finds and clears either kind of backlog. */}
       {!!unpublishedCount && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8 flex items-center justify-between gap-4 flex-wrap">
           <p className="text-sm text-amber-900">
-            <strong>{unpublishedCount.toLocaleString()}</strong> fetched article{unpublishedCount === 1 ? '' : 's'} {unpublishedCount === 1 ? 'is' : 'are'} hidden
-            from your site and the sitemap, waiting to be rewritten (or deleted).
+            <strong>{unpublishedCount.toLocaleString()}</strong> article{unpublishedCount === 1 ? '' : 's'} {unpublishedCount === 1 ? 'is' : 'are'} hidden
+            from your site and the sitemap — either a fetched story waiting to be rewritten, or a
+            reporter's draft that needs a fix before it can go live.
           </p>
           <button
             onClick={() => { setShowUnpublishedOnly((v) => !v); setArticlePage(0); }}
