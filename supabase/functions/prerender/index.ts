@@ -75,7 +75,7 @@ const STATIC_PAGES: Record<string, { title: string; description: string; bodyHtm
 <p>Want to join our reporting team? <a href="/reporters/apply">Apply here</a>. For everything else, see our <a href="/contact">Contact page</a> or read our <a href="/editorial-standards">Editorial Standards</a>.</p>`,
   },
   '/contact': {
-    title: `Contact Us — Tips, Corrections &amp; Partnerships | ${SITE_NAME}`,
+    title: `Contact Us — Tips, Corrections & Partnerships | ${SITE_NAME}`,
     description:
       'Contact the CelebUD newsroom: editorial enquiries at info@celebud.com, SMS/WhatsApp +1 (437) 788-8011, news tips, corrections, advertising and partnerships. Based in Ontario, Canada.',
     bodyHtml: `
@@ -91,7 +91,7 @@ const STATIC_PAGES: Record<string, { title: string; description: string; bodyHtm
 <p><strong>Advertising &amp; partnerships:</strong> reach a fast-growing audience across Africa and North America — email us with "Advertising" in the subject line.</p>`,
   },
   '/editorial-standards': {
-    title: `Editorial Standards — Accuracy, Attribution &amp; Corrections | ${SITE_NAME}`,
+    title: `Editorial Standards — Accuracy, Attribution & Corrections | ${SITE_NAME}`,
     description:
       'How CelebUD reports, curates, attributes and corrects: standards for accuracy and verification, attribution of curated stories, corrections policy, editorial independence and sponsored content labelling.',
     bodyHtml: `
@@ -303,7 +303,7 @@ Deno.serve(async (req: Request) => {
           'Features, tributes, interviews and analysis written by our own newsroom — the work our reporters produce first-hand, not curated from other outlets.',
       },
       '/fin-advisor': {
-        title: `Fin-Advisor — Financial &amp; Insurance Education Center | ${SITE_NAME}`,
+        title: `Fin-Advisor — Financial & Insurance Education Center | ${SITE_NAME}`,
         description:
           'Plain-English guides to insurance, personal finance and business for readers in Canada and Nigeria, plus free planning calculators.',
         heading: 'Financial & Insurance Education Center',
