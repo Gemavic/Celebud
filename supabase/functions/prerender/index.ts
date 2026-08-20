@@ -199,6 +199,7 @@ function baseHtml({
   keywords,
   extraJsonLd,
   extraHead,
+  robots,
 }: {
   title: string;
   description: string;
@@ -212,6 +213,13 @@ function baseHtml({
   extraJsonLd?: Record<string, unknown>;
   /** Extra <head> tags, e.g. og:video / og:audio for a media page. */
   extraHead?: string;
+  /**
+   * Overrides the default robots directive. Emitting a second robots tag
+   * alongside the default would leave two conflicting tags on the page;
+   * Google resolves that to the most restrictive one, so it happens to
+   * work, but one unambiguous tag is what we actually mean.
+   */
+  robots?: string;
 }) {
   return `<!doctype html>
 <html lang="en">
@@ -221,7 +229,7 @@ function baseHtml({
 <meta name="description" content="${escapeHtml(description)}" />
 ${keywords ? `<meta name="keywords" content="${escapeHtml(keywords)}" />` : ''}
 <link rel="canonical" href="${url}" />
-<meta name="robots" content="index, follow, max-image-preview:large" />
+<meta name="robots" content="${robots || 'index, follow, max-image-preview:large'}" />
 
 <meta property="og:type" content="${type}" />
 <meta property="og:title" content="${escapeHtml(title)}" />
@@ -606,9 +614,9 @@ ${ownFile
         // passing link equity to the fuller articles it points at, it just
         // stops asking to be indexed itself. Nothing is hidden from
         // readers — the article stays exactly as published.
-        extraHead:
+        robots:
           countWords(article.content || article.description || '') < THIN_ARTICLE_WORDS
-            ? '<meta name="robots" content="noindex,follow" />'
+            ? 'noindex,follow'
             : undefined,
       });
 
