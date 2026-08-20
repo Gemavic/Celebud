@@ -3,13 +3,13 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { formatDistanceToNow } from '../utils/date';
 import { 
-import { FALLBACK_AVATAR, FALLBACK_THUMBNAIL, handleImageError } from '../utils/imageFallback';
   MessageSquare, 
   TrendingUp, 
   AlertCircle,
   Users,
   ArrowRight
 } from 'lucide-react';
+import { FALLBACK_THUMBNAIL, handleImageError } from '../utils/imageFallback';
 
 interface EditorialFeature {
   id: string;
