@@ -26,6 +26,145 @@ const corsHeaders = {
 const SITE_URL = 'https://celebud.com';
 const SITE_NAME = 'CelebUD';
 
+// An article this short is a headline and a couple of paragraphs — a wire
+// summary, not a piece worth ranking on its own. Google calls these "thin"
+// and a site carrying enough of them reads as low-value in review. There
+// are 98 of them published here, and they were all being submitted in
+// sitemap.xml. They stay readable on the site; they just stop asking to be
+// indexed. Raise or lower this and the sitemap follows automatically —
+// generate-sitemap applies the same number.
+const THIN_ARTICLE_WORDS = 300;
+
+function countWords(html: string): number {
+  const text = (html || '').replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ');
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+// --- Static trust pages -------------------------------------------------
+//
+// /about, /contact, /editorial-standards and /privacy are plain React
+// components with no data behind them, so nothing ever routed a crawler to
+// them: they returned the empty SPA shell carrying the HOMEPAGE's title
+// tag. That matters more than an ordinary missing page, because these are
+// precisely the pages a reviewer opens to check a site is a real
+// publication — and three of them were being advertised in sitemap.xml at
+// the same time, so Google was being invited to crawl pages that rendered
+// blank.
+//
+// KEEP IN SYNC with src/pages/TrustPages.tsx and src/pages/PrivacyPolicy.tsx.
+// This must stay a faithful copy of what a reader sees. Serving a crawler
+// something different from the human page is cloaking — a considerably
+// worse problem than the one being fixed here.
+const STATIC_PAGES: Record<string, { title: string; description: string; bodyHtml: string }> = {
+  '/about': {
+    title: `About CelebUD — Who We Are | ${SITE_NAME}`,
+    description:
+      'CelebUD is a digital magazine covering celebrity news, entertainment, politics, society, lifestyle, business and financial education, operated by Gemavic Media in Ontario, Canada.',
+    bodyHtml: `
+<h1>About CelebUD</h1>
+<p>Who we are and what we stand for</p>
+<p><strong>CelebUD</strong> is a digital magazine covering celebrity news, entertainment, politics, society, lifestyle, business, and financial education for readers in Africa, North America, and beyond. We publish around the clock — combining original reporting from our editorial team with curated coverage of the stories shaping our readers' world.</p>
+<p>CelebUD is operated by <strong>Gemavic Media</strong>, based in Ontario, Canada, with a reporting network across Nigeria and the diaspora. Our newsroom is led by our Editor-in-Chief and staffed by named, accountable reporters — every article on CelebUD carries a byline you can click to see who wrote or curated it.</p>
+<h2>What we cover</h2>
+<ul>
+  <li><strong>News &amp; Politics</strong> — Nigeria, Canada, and world affairs</li>
+  <li><strong>Entertainment &amp; Society</strong> — celebrity culture, film, music, and events</li>
+  <li><strong>Fin-Advisor</strong> — our dedicated financial &amp; insurance education hub with free planning calculators</li>
+  <li><strong>Lifestyle &amp; Videos</strong> — original creator content from our Content Studio</li>
+</ul>
+<p>Want to join our reporting team? <a href="/reporters/apply">Apply here</a>. For everything else, see our <a href="/contact">Contact page</a> or read our <a href="/editorial-standards">Editorial Standards</a>.</p>`,
+  },
+  '/contact': {
+    title: `Contact Us — Tips, Corrections &amp; Partnerships | ${SITE_NAME}`,
+    description:
+      'Contact the CelebUD newsroom: editorial enquiries at info@celebud.com, SMS/WhatsApp +1 (437) 788-8011, news tips, corrections, advertising and partnerships. Based in Ontario, Canada.',
+    bodyHtml: `
+<h1>Contact Us</h1>
+<p>We read everything — questions, tips, corrections, and partnerships</p>
+<ul>
+  <li><strong>Editorial &amp; General:</strong> <a href="mailto:info@celebud.com">info@celebud.com</a></li>
+  <li><strong>SMS / WhatsApp:</strong> <a href="tel:+14377888011">+1 (437) 788-8011</a></li>
+  <li><strong>News tips &amp; corrections:</strong> <a href="mailto:info@celebud.com?subject=News%20tip%20or%20correction">Send story tips or request a correction</a></li>
+  <li><strong>Location:</strong> Ontario, Canada</li>
+</ul>
+<p><strong>Corrections:</strong> if we got something wrong, tell us. Verified corrections are made promptly and noted on the article. See our <a href="/editorial-standards">Editorial Standards</a> for how we handle accuracy.</p>
+<p><strong>Advertising &amp; partnerships:</strong> reach a fast-growing audience across Africa and North America — email us with "Advertising" in the subject line.</p>`,
+  },
+  '/editorial-standards': {
+    title: `Editorial Standards — Accuracy, Attribution &amp; Corrections | ${SITE_NAME}`,
+    description:
+      'How CelebUD reports, curates, attributes and corrects: standards for accuracy and verification, attribution of curated stories, corrections policy, editorial independence and sponsored content labelling.',
+    bodyHtml: `
+<h1>Editorial Standards</h1>
+<p>How CelebUD reports, curates, attributes, and corrects</p>
+<p>Our credibility is our product. These standards apply to every story published on CelebUD, whether originally reported or curated from other outlets.</p>
+<h2>Accuracy &amp; verification</h2>
+<p>We verify facts before publishing. Where a story is developing, we say so plainly and update it as facts emerge. Headlines must reflect the substance of the story.</p>
+<h2>Attribution &amp; curation</h2>
+<p>Some CelebUD stories are curated from other news organizations. Curated stories always identify the original publisher, and the CelebUD staff member shown on such stories is credited as the <em>curator</em>, not the original author. Original reporting is bylined by the reporter who wrote it.</p>
+<h2>Corrections</h2>
+<p>When we publish an error, we correct the article promptly. Material corrections are noted within the article. To request a correction, use our <a href="/contact">Contact page</a>.</p>
+<h2>Independence &amp; sponsored content</h2>
+<p>Advertising never dictates editorial coverage. Sponsored or affiliate content is labeled as such wherever it appears.</p>
+<h2>Our team</h2>
+<p>Every byline links to an author profile listing that reporter's coverage. Reporters join through a vetted <a href="/reporters/apply">application process</a> reviewed by our Editor-in-Chief.</p>`,
+  },
+  '/privacy': {
+    title: `Privacy Policy | ${SITE_NAME}`,
+    description:
+      'How CelebUD collects, uses, shares and retains your information, including Google AdSense advertising cookies, analytics, your rights, and how to opt out of personalised advertising.',
+    bodyHtml: `
+<h1>Privacy Policy</h1>
+<p>Effective date: June 13, 2026</p>
+<h2>1. Information We Collect</h2>
+<p>We collect several types of information in connection with the operation of our site:</p>
+<ul>
+  <li><strong>Account information:</strong> When you register, we collect your email address and a username of your choosing.</li>
+  <li><strong>Usage data:</strong> We automatically collect information about how you interact with the site, including pages visited, articles read, time spent on pages, and referring URLs.</li>
+  <li><strong>Device information:</strong> Browser type, operating system, IP address, and device identifiers are logged as part of standard web server operation.</li>
+  <li><strong>Comments and submissions:</strong> Any content you voluntarily submit — comments, creator applications, newsletter sign-ups — is collected and stored.</li>
+  <li><strong>Cookies:</strong> We and our advertising partners use cookies and similar tracking technologies.</li>
+</ul>
+<h2>2. How We Use Your Information</h2>
+<ul>
+  <li>Provide, maintain, and improve the website and its features</li>
+  <li>Authenticate users and manage accounts</li>
+  <li>Send newsletters and editorial updates you have subscribed to</li>
+  <li>Analyze traffic and usage patterns to understand and improve our content</li>
+  <li>Display relevant advertising through Google AdSense and other ad networks</li>
+  <li>Comply with legal obligations and enforce our terms</li>
+</ul>
+<h2>3. Google AdSense and Third-Party Advertising</h2>
+<p>CelebUD uses Google AdSense to display advertisements. Google AdSense uses cookies to serve ads based on your prior visits to this website and other websites on the internet. Google's use of advertising cookies enables it and its partners to serve ads to you based on your visit to our site and/or other sites on the Internet.</p>
+<p>You may opt out of personalised advertising by visiting <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener noreferrer">Google Ads Settings</a> or <a href="https://www.aboutads.info/choices/" target="_blank" rel="noopener noreferrer">www.aboutads.info/choices</a>.</p>
+<p>Third-party vendors, including Google, use cookies to serve ads based on a user's prior visits to our website or other websites. For more information on how Google uses data when you use our site, visit <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer">Google's Privacy &amp; Terms</a>.</p>
+<h2>4. Analytics</h2>
+<p>We may use analytics services (such as Google Analytics) to collect and analyze traffic data. These services use cookies and similar technologies to collect information about your use of the site and report website trends without identifying individual visitors. You can opt out of Google Analytics by installing the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer">Google Analytics opt-out browser add-on</a>.</p>
+<h2>5. Cookies</h2>
+<p>Cookies are small text files stored on your device when you visit a website. We use cookies to keep you signed in to your account, remember your preferences, understand how you navigate the site, and deliver and measure personalised advertisements via Google AdSense.</p>
+<p>You can instruct your browser to refuse all cookies or to indicate when a cookie is being sent. However, if you do not accept cookies, some portions of our service may not function properly.</p>
+<h2>6. Sharing of Information</h2>
+<p>We do not sell your personal information. We may share information with:</p>
+<ul>
+  <li><strong>Service providers:</strong> Supabase (database and authentication), Vercel (hosting), Stripe (payments), and Google (advertising and analytics) as necessary to operate the site.</li>
+  <li><strong>Legal requirements:</strong> We may disclose information if required by law, court order, or governmental authority.</li>
+  <li><strong>Business transfers:</strong> In connection with a merger, acquisition, or sale of assets, your information may be transferred as part of the transaction.</li>
+</ul>
+<h2>7. Data Retention</h2>
+<p>We retain your information for as long as your account is active or as needed to provide the service, comply with legal obligations, resolve disputes, and enforce our agreements.</p>
+<h2>8. Children's Privacy</h2>
+<p>Our service is not directed to children under 13, and we do not knowingly collect personal information from children under 13.</p>
+<h2>9. Your Rights</h2>
+<p>Depending on where you live, you may have the right to access, correct, or delete the personal information we hold about you, and to object to or restrict certain processing. Contact us to exercise these rights.</p>
+<h2>10. External Links</h2>
+<p>Our site contains links to other websites. We are not responsible for the privacy practices or content of those third-party sites.</p>
+<h2>11. Changes to This Policy</h2>
+<p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy on this page with an updated effective date.</p>
+<h2>12. Contact Us</h2>
+<p>Questions about this policy? Email <a href="mailto:info@celebud.com">info@celebud.com</a> or use our <a href="/contact">Contact page</a>.</p>`,
+  },
+};
+
 function slugify(input: string): string {
   return input
     .toLowerCase()
@@ -120,6 +259,179 @@ Deno.serve(async (req: Request) => {
   const path = searchParams.get('path') || '/';
 
   try {
+    // --- Static trust pages: /about, /contact, /privacy, /editorial-standards ---
+    const staticPage = STATIC_PAGES[path.replace(/\/+$/, '') || '/'];
+    if (staticPage) {
+      const url = `${SITE_URL}${path}`;
+      return new Response(
+        baseHtml({
+          title: staticPage.title,
+          description: staticPage.description,
+          url,
+          type: 'website',
+          jsonLd: {
+            '@context': 'https://schema.org',
+            '@type': 'WebPage',
+            name: staticPage.title,
+            description: staticPage.description,
+            url,
+            publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+          },
+          bodyHtml: staticPage.bodyHtml,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } }
+      );
+    }
+
+    // --- Listing hubs: /originals and /fin-advisor ---
+    //
+    // Both are in sitemap.xml. Without a branch of their own they would
+    // fall through to the homepage listing below and return a byte-for-byte
+    // copy of the homepage under a different URL — trading an empty page
+    // for a duplicate one, which is not an improvement. Each gets the
+    // articles its React page actually shows.
+    const LISTING_HUBS: Record<
+      string,
+      { title: string; description: string; heading: string; intro: string }
+    > = {
+      '/originals': {
+        title: `CelebUD Originals — Reporting and Features by Our Newsroom | ${SITE_NAME}`,
+        description:
+          'CelebUD Originals: features, tributes, interviews and analysis written by the CelebUD newsroom rather than curated from the wires.',
+        heading: 'CelebUD Originals',
+        intro:
+          'Features, tributes, interviews and analysis written by our own newsroom — the work our reporters produce first-hand, not curated from other outlets.',
+      },
+      '/fin-advisor': {
+        title: `Fin-Advisor — Financial &amp; Insurance Education Center | ${SITE_NAME}`,
+        description:
+          'Plain-English guides to insurance, personal finance and business for readers in Canada and Nigeria, plus free planning calculators.',
+        heading: 'Financial & Insurance Education Center',
+        intro:
+          'Plain-English guides to insurance, personal finance and business for readers in Canada, Nigeria and the diaspora — plus free planning calculators.',
+      },
+    };
+    const hub = LISTING_HUBS[path.replace(/\/+$/, '')];
+    if (hub) {
+      const isOriginals = path.startsWith('/originals');
+      let hubQuery = supabase
+        .from('media_content')
+        .select('id, slug, title, description, published_at, categories!inner(name, slug)')
+        .eq('media_type', 'article')
+        .eq('is_published', true);
+      hubQuery = isOriginals
+        ? hubQuery.eq('is_pinned', true)
+        : hubQuery.in('categories.slug', ['fin-advisor', 'finance', 'business']);
+
+      const { data: rows } = await hubQuery
+        .order('published_at', { ascending: false })
+        .limit(60);
+
+      const items = (rows || [])
+        .map(
+          (a: { id: string; slug?: string | null; title: string; description?: string | null }) =>
+            `<li><a href="${articlePath(a)}">${escapeHtml(a.title)}</a>${
+              a.description ? ` — ${escapeHtml(a.description)}` : ''
+            }</li>`
+        )
+        .join('\n');
+      const url = `${SITE_URL}${path}`;
+
+      return new Response(
+        baseHtml({
+          title: hub.title,
+          description: hub.description,
+          url,
+          type: 'website',
+          jsonLd: {
+            '@context': 'https://schema.org',
+            '@type': 'CollectionPage',
+            name: hub.heading,
+            description: hub.description,
+            url,
+            publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+          },
+          bodyHtml: `
+<h1>${escapeHtml(hub.heading)}</h1>
+<p>${escapeHtml(hub.intro)}</p>
+<ul>
+${items}
+</ul>`,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } }
+      );
+    }
+
+    // --- Author profile: /author/:id ---
+    // Every byline on the site links here, so these are among the most
+    // linked-to pages CelebUD has — and they were returning the empty
+    // shell. A named writer with a visible body of work is the clearest
+    // signal that a site is staffed by real, accountable people rather
+    // than assembled automatically.
+    // authors.id is a uuid: querying .eq('id', 'not-a-uuid') is a Postgres
+    // type error, not an empty result, so a junk URL would 500 instead of
+    // falling through. Check the shape before asking the database.
+    const authorMatch = path.match(
+      /^\/author\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+    );
+    if (authorMatch) {
+      const { data: author } = await supabase
+        .from('authors')
+        .select('id, name, bio, avatar_url')
+        .eq('id', authorMatch[1])
+        .maybeSingle();
+
+      if (author) {
+        const { data: byline } = await supabase
+          .from('media_content')
+          .select('id, slug, title, description, published_at')
+          .eq('author_id', author.id)
+          .eq('is_published', true)
+          .order('published_at', { ascending: false })
+          .limit(50);
+
+        const items = (byline || [])
+          .map(
+            (a: { id: string; slug?: string | null; title: string; published_at?: string }) =>
+              `<li><a href="${articlePath(a)}">${escapeHtml(a.title)}</a></li>`
+          )
+          .join('\n');
+        const url = `${SITE_URL}/author/${author.id}`;
+
+        return new Response(
+          baseHtml({
+            title: `${author.name} — Articles and Profile | ${SITE_NAME}`,
+            description:
+              author.bio ||
+              `${author.name} writes for ${SITE_NAME}. Read their latest reporting, interviews and analysis.`,
+            image: author.avatar_url || undefined,
+            url,
+            type: 'website',
+            jsonLd: {
+              '@context': 'https://schema.org',
+              '@type': 'ProfilePage',
+              mainEntity: {
+                '@type': 'Person',
+                name: author.name,
+                description: author.bio || undefined,
+                image: author.avatar_url || undefined,
+                url,
+                worksFor: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+              },
+            },
+            bodyHtml: `
+<h1>${escapeHtml(author.name)}</h1>
+${author.bio ? `<p>${escapeHtml(author.bio)}</p>` : ''}
+<h2>Articles by ${escapeHtml(author.name)}</h2>
+<ul>
+${items}
+</ul>`,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } }
+        );
+      }
+    }
+
     // --- Creator video / audio page: /watch/:id ---
     //
     // Before this existed, the Content Studio share buttons had no CelebUD
@@ -288,6 +600,16 @@ ${ownFile
         jsonLd,
         extraJsonLd: breadcrumb,
         bodyHtml,
+        // A wire summary of a couple of hundred words is not a page worth
+        // ranking on its own, and a site carrying a pile of them reads as
+        // low-value under review. "follow" is deliberate: the page keeps
+        // passing link equity to the fuller articles it points at, it just
+        // stops asking to be indexed itself. Nothing is hidden from
+        // readers — the article stays exactly as published.
+        extraHead:
+          countWords(article.content || article.description || '') < THIN_ARTICLE_WORDS
+            ? '<meta name="robots" content="noindex,follow" />'
+            : undefined,
       });
 
       return new Response(html, {

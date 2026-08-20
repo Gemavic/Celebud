@@ -32,9 +32,28 @@
 import { next, rewrite } from '@vercel/edge';
 
 export const config = {
-  // Only "/" — the single path where the filesystem shadows the rewrite.
-  // Every other public route already reaches vercel.json's bot rules.
-  matcher: '/',
+  // "/" is here because the filesystem shadows the rewrite for it (see
+  // above). The rest are here because vercel.json never had bot rules for
+  // them at all: they are React pages with no file behind them, so a
+  // crawler got the empty SPA shell carrying the HOMEPAGE's title tag.
+  // /about, /contact and /editorial-standards were being advertised in
+  // sitemap.xml while rendering blank, and /privacy — the page an ad
+  // network looks for by name — was neither prerendered nor listed.
+  //
+  // Every path listed must have a real branch in the Prerender function.
+  // Adding one here that Prerender does not recognise makes it fall
+  // through to the homepage listing and serve a duplicate of the homepage
+  // under a second URL, which is worse than leaving it alone.
+  matcher: [
+    '/',
+    '/about',
+    '/contact',
+    '/privacy',
+    '/editorial-standards',
+    '/originals',
+    '/fin-advisor',
+    '/author/:id*',
+  ],
 };
 
 const PRERENDER = 'https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Prerender';

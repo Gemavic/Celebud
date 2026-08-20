@@ -1,6 +1,20 @@
 User-agent: *
 Allow: /
-Disallow: /admin/
+
+# Staff and account-only routes. These are tools, not reader content: the
+# editorial dashboard is a signed-in editor with a save button, /studio is
+# the creator workspace. Crawled, they render as a login prompt — a thin,
+# empty-looking page that says nothing about the publication. /editorial
+# was previously submitted in sitemap.xml as well.
+#
+# The "$" anchors the match to the end of the URL. Without it, robots.txt
+# prefix matching means "Disallow: /editorial" ALSO blocks
+# /editorial-standards — one of the trust pages that most needs crawling.
+Disallow: /editorial$
+Disallow: /editorial/
+Disallow: /studio
+Disallow: /unsubscribe
+Disallow: /admin
 Disallow: /api/
 
 Sitemap: https://celebud.com/sitemap.xml

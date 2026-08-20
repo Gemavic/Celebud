@@ -17,6 +17,12 @@ const corsHeaders = {
 };
 
 const SITE_URL = 'https://celebud.com';
+// Keep in step with THIN_ARTICLE_WORDS in supabase/functions/prerender/index.ts:
+// the sitemap leaves these articles out, and Prerender marks the same ones
+// noindex,follow. Two different numbers would mean submitting a page to Google
+// that then tells Google not to index it.
+const THIN_ARTICLE_WORDS = 300;
+
 const SITE_NAME = 'CelebUD';
 const SITE_DESCRIPTION =
   'Latest celebrity news, entertainment, politics, and financial education from CelebUD.';
@@ -163,10 +169,18 @@ Deno.serve(async (req: Request) => {
     const SITEMAP_MAX_URLS = 50000;
     const articles: Article[] = [];
     for (let from = 0; from < SITEMAP_MAX_URLS; from += PAGE) {
+      // word_count is a STORED generated column on media_content, so this
+      // filter costs nothing and can never drift from the article body.
+      // Articles below the threshold are a headline plus a couple of wire
+      // paragraphs — still readable on the site, but not worth asking
+      // Google to index, and a sitemap full of them is what "low value
+      // content" describes. The Prerender function marks the same articles
+      // noindex,follow using the same number.
       const { data: page, error } = await supabase
         .from('media_content')
         .select('id, slug, title, updated_at, published_at')
         .eq('is_published', true)
+        .gte('word_count', THIN_ARTICLE_WORDS)
         .order('updated_at', { ascending: false })
         .range(from, from + PAGE - 1);
       if (error) throw error;
@@ -179,10 +193,16 @@ Deno.serve(async (req: Request) => {
     const staticPages = [
       { url: '', priority: '1.0', changefreq: 'daily' },
       { url: '/fin-advisor', priority: '0.8', changefreq: 'daily' },
+      { url: '/originals', priority: '0.7', changefreq: 'weekly' },
       { url: '/about', priority: '0.5', changefreq: 'monthly' },
       { url: '/contact', priority: '0.5', changefreq: 'monthly' },
       { url: '/editorial-standards', priority: '0.5', changefreq: 'monthly' },
-      { url: '/editorial', priority: '0.6', changefreq: 'monthly' },
+      // /privacy was missing entirely, which is the one page an ad network
+      // checks for by name. /editorial used to be listed here and has been
+      // removed: it is the signed-in editorial dashboard (an editor with a
+      // save button), not reader-facing content — submitting it asked
+      // Google to index a staff tool that renders as a login prompt.
+      { url: '/privacy', priority: '0.5', changefreq: 'yearly' },
     ];
 
     let sitemap = '<?xml version="1.0" encoding="UTF-8"?>\n';
