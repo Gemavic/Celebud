@@ -17,6 +17,7 @@ import { sanitizeHtml } from '../utils/htmlSanitizer';
 import { ArrowLeft, Clock, Share2, Facebook, Twitter, Linkedin, Instagram, Check } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useArticle } from '../hooks/useArticles';
+import { FALLBACK_AVATAR, FALLBACK_THUMBNAIL, handleImageError } from '../utils/imageFallback';
 
 export function ArticleDetail() {
   const { id, slug } = useParams<{ id: string; slug?: string }>();
@@ -352,7 +353,8 @@ export function ArticleDetail() {
               {article.authors && (
                 <>
                   <img
-                    src={article.authors.avatar_url || ''}
+                    src={article.authors.avatar_url || FALLBACK_AVATAR}
+                    onError={(e) => handleImageError(e, FALLBACK_AVATAR)}
                     alt={article.authors.name}
                     className="w-11 h-11 rounded-full border border-gray-200"
                     itemProp="image"
@@ -489,7 +491,8 @@ export function ArticleDetail() {
           {(article.author_bio_snapshot ?? (autoBioEnabled ? article.authors?.bio : null)) && (
             <div className="mb-8 p-5 bg-gray-50 border border-gray-200 rounded-xl flex gap-4">
               <img
-                src={article.authors?.avatar_url || ''}
+                src={article.authors?.avatar_url || FALLBACK_AVATAR}
+                onError={(e) => handleImageError(e, FALLBACK_AVATAR)}
                 alt={article.authors?.name}
                 className="w-14 h-14 rounded-full border border-gray-200 flex-shrink-0"
               />
@@ -608,7 +611,8 @@ export function ArticleDetail() {
                     <div className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
                       <div className="relative overflow-hidden h-40">
                         <img
-                          src={related.thumbnail_url || ''}
+                          src={related.thumbnail_url || FALLBACK_THUMBNAIL}
+                          onError={(e) => handleImageError(e, FALLBACK_THUMBNAIL)}
                           alt={related.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { formatDistanceToNow } from '../utils/date';
 import { 
+import { FALLBACK_AVATAR, FALLBACK_THUMBNAIL, handleImageError } from '../utils/imageFallback';
   MessageSquare, 
   TrendingUp, 
   AlertCircle,
@@ -149,7 +150,8 @@ export function EditorialSection() {
 
               <Link to={`/article/${features[0].content_id}`} className="block">
                 <img
-                  src={features[0].media_content?.thumbnail_url || ''}
+                  src={features[0].media_content?.thumbnail_url || FALLBACK_THUMBNAIL}
+                  onError={(e) => handleImageError(e, FALLBACK_THUMBNAIL)}
                   alt={features[0].title || features[0].media_content?.title || ''}
                   className="w-full h-64 lg:h-80 object-cover"
                 />
@@ -215,7 +217,8 @@ export function EditorialSection() {
               <Link to={`/article/${feature.content_id}`} className="block">
                 <div className="relative h-32">
                   <img
-                    src={feature.media_content?.thumbnail_url || ''}
+                    src={feature.media_content?.thumbnail_url || FALLBACK_THUMBNAIL}
+                    onError={(e) => handleImageError(e, FALLBACK_THUMBNAIL)}
                     alt={feature.title || feature.media_content?.title || ''}
                     className="w-full h-full object-cover"
                   />

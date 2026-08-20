@@ -1,6 +1,6 @@
-const CACHE_NAME = 'celebud-v6';
-const RUNTIME_CACHE = 'celebud-runtime-v6';
-const IMAGE_CACHE = 'celebud-images-v6';
+const CACHE_NAME = 'celebud-v7';
+const RUNTIME_CACHE = 'celebud-runtime-v7';
+const IMAGE_CACHE = 'celebud-images-v7';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -85,16 +85,38 @@ async function handleImageRequest(request) {
 
   try {
     const response = await fetchWithTimeout(request, NETWORK_TIMEOUT);
-    if (response.ok) {
+
+    // A 200 is NOT proof we got an image. The SPA catch-all rewrite returns
+    // index.html (status 200, Content-Type: text/html) for any asset path
+    // that does not resolve. Caching that HTML under the image URL is what
+    // made broken images survive for IMAGE_CACHE_MAX_AGE even after the
+    // underlying file was fixed. Only ever cache a real image/* payload.
+    const contentType = response.headers.get('content-type') || '';
+    const isImage = contentType.toLowerCase().startsWith('image/');
+
+    if (response.ok && isImage) {
       const clone = response.clone();
       const headers = new Headers(clone.headers);
       headers.set('sw-cache-time', new Date().toISOString());
       const blob = await clone.blob();
       cache.put(request, new Response(blob, { status: clone.status, statusText: clone.statusText, headers }));
+      return response;
     }
+
+    // Wrong content type means the asset is missing and the rewrite served
+    // the app shell. Evict any poisoned entry from a previous version and
+    // return a real 404 so the <img onError> fallback actually fires --
+    // a 200 with HTML never triggers onError, it just renders broken.
+    if (response.ok && !isImage) {
+      await cache.delete(request);
+      return new Response('', { status: 404, statusText: 'Not an image' });
+    }
+
     return response;
   } catch {
-    return cached || new Response('', { status: 408, statusText: 'Timeout' });
+    // Serve stale before failing, but never hand back an empty 200/408 body
+    // dressed as an image -- 504 lets onError fire and the UI fall back.
+    return cached || new Response('', { status: 504, statusText: 'Image fetch timeout' });
   }
 }
 
