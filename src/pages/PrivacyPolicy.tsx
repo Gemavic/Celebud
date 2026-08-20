@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { Header } from '../components/Header';
+import { updateMetaTags } from '../utils/seo';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Shield } from 'lucide-react';
 
@@ -17,6 +19,18 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export function PrivacyPolicy() {
+  // Matches the '/privacy' entry in STATIC_PAGES in
+  // supabase/functions/prerender/index.ts, so the tab title a reader sees
+  // and the title a crawler is served are the same.
+  useEffect(() => {
+    updateMetaTags({
+      title: 'Privacy Policy | CelebUD',
+      description:
+        'How CelebUD collects, uses, shares and retains your information, including Google AdSense advertising cookies, analytics, your rights, and how to opt out of personalised advertising.',
+      type: 'website',
+    });
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />

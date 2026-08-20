@@ -1,11 +1,35 @@
 // src/pages/TrustPages.tsx
 // Trust & transparency pages required for Google News Publisher approval
 // and general reader trust: About Us, Contact, and Editorial Standards.
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '../components/Header';
+import { updateMetaTags } from '../utils/seo';
 import { ArrowLeft, Mail, MapPin, MessageCircle, Newspaper, Shield, Users } from 'lucide-react';
 
-function TrustShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+// Crawlers get these pages fully rendered from the Prerender function, but a
+// reader opening /about or /contact in a browser was still seeing the
+// HOMEPAGE's title in the tab, because nothing here ever set one. Keep
+// seoTitle/seoDescription matching the matching entry in STATIC_PAGES in
+// supabase/functions/prerender/index.ts — the crawler version and the human
+// version should say the same thing.
+function TrustShell({
+  title,
+  subtitle,
+  seoTitle,
+  seoDescription,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  seoTitle: string;
+  seoDescription: string;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    updateMetaTags({ title: seoTitle, description: seoDescription, type: 'website' });
+  }, [seoTitle, seoDescription]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -27,7 +51,12 @@ function TrustShell({ title, subtitle, children }: { title: string; subtitle: st
 
 export function AboutPage() {
   return (
-    <TrustShell title="About CelebUD" subtitle="Who we are and what we stand for">
+    <TrustShell
+      title="About CelebUD"
+      subtitle="Who we are and what we stand for"
+      seoTitle="About CelebUD — Who We Are | CelebUD"
+      seoDescription="CelebUD is a digital magazine covering celebrity news, entertainment, politics, society, lifestyle, business and financial education, operated by Gemavic Media in Ontario, Canada."
+    >
       <p>
         <strong>CelebUD</strong> is a digital magazine covering celebrity news, entertainment,
         politics, society, lifestyle, business, and financial education for readers in Africa,
@@ -58,7 +87,12 @@ export function AboutPage() {
 
 export function ContactPage() {
   return (
-    <TrustShell title="Contact Us" subtitle="We read everything — questions, tips, corrections, and partnerships">
+    <TrustShell
+      title="Contact Us"
+      subtitle="We read everything — questions, tips, corrections, and partnerships"
+      seoTitle="Contact Us — Tips, Corrections & Partnerships | CelebUD"
+      seoDescription="Contact the CelebUD newsroom: editorial enquiries at info@celebud.com, SMS/WhatsApp +1 (437) 788-8011, news tips, corrections, advertising and partnerships. Based in Ontario, Canada."
+    >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 not-prose">
         {[
           { icon: Mail, title: 'Editorial & General', body: 'info@celebud.com', href: 'mailto:info@celebud.com' },
@@ -93,7 +127,12 @@ export function ContactPage() {
 
 export function EditorialStandardsPage() {
   return (
-    <TrustShell title="Editorial Standards" subtitle="How CelebUD reports, curates, attributes, and corrects">
+    <TrustShell
+      title="Editorial Standards"
+      subtitle="How CelebUD reports, curates, attributes, and corrects"
+      seoTitle="Editorial Standards — Accuracy, Attribution & Corrections | CelebUD"
+      seoDescription="How CelebUD reports, curates, attributes and corrects: standards for accuracy and verification, attribution of curated stories, corrections policy, editorial independence and sponsored content labelling."
+    >
       <div className="not-prose flex items-start gap-3 bg-red-50 border border-red-100 rounded-xl p-4 mb-2">
         <Shield className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
         <p className="text-sm text-gray-700">
