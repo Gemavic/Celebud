@@ -4,6 +4,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { formatDistanceToNow } from '../utils/date';
 import { buildArticleUrl } from '../utils/articleUrl';
+import { FALLBACK_AVATAR, FALLBACK_THUMBNAIL, handleImageError } from '../utils/imageFallback';
 
 interface MediaCardProps {
   content: MediaContentWithRelations;
@@ -91,7 +92,8 @@ export const MediaCard = memo(function MediaCard({ content }: MediaCardProps) {
             {content.authors && (
               <>
                 <img
-                  src={content.authors.avatar_url || ''}
+                  src={content.authors.avatar_url || FALLBACK_AVATAR}
+                  onError={(e) => handleImageError(e, FALLBACK_AVATAR)}
                   alt={content.authors.name}
                   loading="lazy"
                   className="w-7 h-7 rounded-full border border-gray-200"
