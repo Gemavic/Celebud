@@ -55,7 +55,16 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
-function xmlResponse(body: string, contentType = 'application/xml'): Response {
+// Note on the default content type: this function asks for XML, but the
+// live response at the edge-function URL comes back as "text/plain" for
+// the sitemap while "application/rss+xml" (passed explicitly by the feed
+// branch) survives untouched — so something between here and the client
+// is rewriting the bare "application/xml" value specifically. Google
+// Search Console reports a sitemap served as text/plain as unreadable.
+// "text/xml" is equally valid per sitemaps.org and may pass through; the
+// authoritative fix is the Content-Type override now set on /sitemap.xml
+// in vercel.json, which is the URL actually submitted to Search Console.
+function xmlResponse(body: string, contentType = 'text/xml'): Response {
   return new Response(body, {
     status: 200,
     headers: {

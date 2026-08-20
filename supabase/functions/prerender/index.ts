@@ -329,10 +329,19 @@ ${ownFile
 
     const html = baseHtml({
       title: category
-        ? `${category.charAt(0).toUpperCase() + category.slice(1)} News - ${SITE_NAME}`
+        // Appending " News" unconditionally produced "News News - CelebUD"
+        // for the news category itself — a duplicated word in the one line
+        // Google shows as the clickable result title.
+        ? `${category.charAt(0).toUpperCase() + category.slice(1)}${
+            /news$/i.test(category) ? '' : ' News'
+          } - ${SITE_NAME}`
         : `${SITE_NAME} - Latest Celebrity News, Entertainment & Exclusive Interviews`,
-      description:
-        'Stay updated with the latest celebrity news, entertainment updates, exclusive interviews, and trending stories.',
+      // A category listing that repeats the site-wide description reads to a
+      // crawler as another near-duplicate page. Naming the category makes
+      // each listing's description its own.
+      description: category
+        ? `The latest ${category.toLowerCase()} stories on ${SITE_NAME} — updated daily with original reporting, interviews and analysis.`
+        : 'Stay updated with the latest celebrity news, entertainment updates, exclusive interviews, and trending stories.',
       url: category ? `${SITE_URL}/?category=${category}` : SITE_URL,
       type: 'website',
       jsonLd: {

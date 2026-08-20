@@ -1,0 +1,72 @@
+// Vercel Edge Middleware — serves crawlers real HTML for the homepage.
+//
+// WHY THIS FILE EXISTS
+// vercel.json already routes crawlers to the Prerender function for
+// /article/*, /watch/* and /. Two of those three work. The homepage did
+// not, and the reason is a routing-order rule rather than anything wrong
+// with the rule itself:
+//
+//   Vercel checks the filesystem BEFORE it evaluates `rewrites`.
+//
+// The build emits index.html, which Vercel serves at "/". So a request
+// for "/" finds a real file and is answered immediately — the bot rewrite
+// in vercel.json is never reached. /article/<id> and /sitemap.xml have no
+// matching file, fall through to the rewrites, and prerender correctly.
+// That is the whole difference: identical rules, and only the one shadowed
+// by a real file failed.
+//
+// The measured effect: Googlebot asking for celebud.com/ got the same
+// 9,390-byte empty JS shell a plain fetch gets — no headlines, no article
+// links, ~200 words of boilerplate — while the Prerender function, called
+// directly, returned 30 article links and ~1,000 words of real content.
+//
+// Middleware runs BEFORE the filesystem check, so it can catch "/" where
+// a rewrite cannot. Everything else is left exactly as it was.
+//
+// FAILURE POSTURE: fail open, always. Any throw, any non-200 from
+// Prerender, any non-bot request falls straight through to the normal SPA.
+// A crawler seeing the old shell is the bug we already had; a reader
+// seeing a broken page would be a worse one. Nothing here can produce the
+// second outcome.
+
+import { next, rewrite } from '@vercel/edge';
+
+export const config = {
+  // Only "/" — the single path where the filesystem shadows the rewrite.
+  // Every other public route already reaches vercel.json's bot rules.
+  matcher: '/',
+};
+
+const PRERENDER = 'https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Prerender';
+
+// Kept deliberately identical to the user-agent list in vercel.json, so
+// the homepage and the article pages agree on what counts as a crawler.
+// If one list gains a bot, the other must too.
+const CRAWLER_UA =
+  /(googlebot|bingbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot|google-inspectiontool|adsbot-google|mediapartners-google)/i;
+
+export default function middleware(request: Request) {
+  try {
+    const ua = request.headers.get('user-agent') || '';
+    if (!CRAWLER_UA.test(ua)) return next();
+
+    const url = new URL(request.url);
+    const target = new URL(PRERENDER);
+    target.searchParams.set('path', url.pathname);
+
+    // The site expresses category listings as /?category=news rather than
+    // /category/news, and Prerender reads that same parameter to build a
+    // category-specific listing. Forwarding it means a crawler on
+    // /?category=news gets that category's articles instead of the
+    // generic homepage. Only this one parameter is passed through —
+    // anything else in the query string is ignored rather than blindly
+    // forwarded to an upstream function.
+    const category = url.searchParams.get('category');
+    if (category) target.searchParams.set('category', category);
+
+    return rewrite(target);
+  } catch {
+    // Never let an SEO optimisation take the homepage down.
+    return next();
+  }
+}
