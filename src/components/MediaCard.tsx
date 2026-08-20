@@ -4,6 +4,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { MediaContentWithRelations } from '../lib/database.types';
 import { formatDistanceToNow } from '../utils/date';
 import { buildArticleUrl } from '../utils/articleUrl';
+import { FALLBACK_AVATAR } from '../utils/imageFallback';
 
 interface MediaCardProps {
   content: MediaContentWithRelations;
@@ -30,6 +31,15 @@ export const MediaCard = memo(function MediaCard({ content }: MediaCardProps) {
   const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const target = e.target as HTMLImageElement;
     target.src = fallbackImage;
+  }, []);
+
+  // Avatars need their own fallback -- fallbackImage is a 16:9 article
+  // thumbnail and looks wrong squeezed into a round 28px frame.
+  const handleAvatarError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement;
+    if (target.dataset.fallbackApplied === 'true') return;
+    target.dataset.fallbackApplied = 'true';
+    target.src = FALLBACK_AVATAR;
   }, []);
 
   const formattedTime = useMemo(
@@ -91,7 +101,8 @@ export const MediaCard = memo(function MediaCard({ content }: MediaCardProps) {
             {content.authors && (
               <>
                 <img
-                  src={content.authors.avatar_url || ''}
+                  src={content.authors.avatar_url || FALLBACK_AVATAR}
+                  onError={handleAvatarError}
                   alt={content.authors.name}
                   loading="lazy"
                   className="w-7 h-7 rounded-full border border-gray-200"
