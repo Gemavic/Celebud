@@ -188,6 +188,23 @@ function escapeHtml(str: string) {
     .replace(/"/g, '&quot;');
 }
 
+// Every prerendered page ends with this. Before it existed, a crawler that
+// landed on any page had no link out of it: the homepage listed 30 articles
+// and nothing else - no categories, no page 2, no About/Privacy. Those pages
+// existed only inside sitemap.xml, and a URL known only from a sitemap with
+// no internal link pointing at it is exactly what Google files under
+// "Discovered - currently not indexed" and then declines to crawl. Search
+// Console showed 2,063 URLs in that state against 1 indexed page.
+const SITE_FOOTER = `<footer><nav aria-label="Site"><ul>
+<li><a href="/">Home</a></li>
+<li><a href="/originals">CelebUD Originals</a></li>
+<li><a href="/fin-advisor">Fin-Advisor</a></li>
+<li><a href="/about">About CelebUD</a></li>
+<li><a href="/contact">Contact</a></li>
+<li><a href="/editorial-standards">Editorial Standards</a></li>
+<li><a href="/privacy">Privacy Policy</a></li>
+</ul></nav></footer>`;
+
 function baseHtml({
   title,
   description,
@@ -249,6 +266,7 @@ ${extraJsonLd ? `<script type="application/ld+json">${JSON.stringify(extraJsonLd
 </head>
 <body>
 ${bodyHtml}
+${SITE_FOOTER}
 </body>
 </html>`;
 }
@@ -627,12 +645,23 @@ ${ownFile
 
     // --- Homepage / category listing: / or /?category=x ---
     const category = searchParams.get('category');
+
+    // Pagination exists for one reason: without it a crawler could reach
+    // only the newest 30 articles. The other ~2,000 were reachable solely
+    // through sitemap.xml, with no link anywhere on the site pointing at
+    // them, which is why they sat in "Discovered - currently not indexed".
+    // Page 2..N now form a chain a crawler can walk to the end of the archive.
+    const PAGE_SIZE = 30;
+    const rawPage = parseInt(searchParams.get('page') || '1', 10);
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const from = (page - 1) * PAGE_SIZE;
+
     let query = supabase
       .from('media_content')
-      .select('id, slug, title, description, thumbnail_url, published_at, categories(name, slug)')
+      .select('id, slug, title, description, thumbnail_url, published_at, categories(name, slug)', { count: 'exact' })
       .eq('is_published', true)
       .order('published_at', { ascending: false })
-      .limit(30);
+      .range(from, from + PAGE_SIZE - 1);
 
     if (category) {
       const { data: cat } = await supabase
@@ -643,7 +672,38 @@ ${ownFile
       if (cat) query = query.eq('category_id', cat.id);
     }
 
-    const { data: articles } = await query;
+    const { data: articles, count } = await query;
+    const total = count || 0;
+    const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+    // Relative hrefs so the same builder serves the link and the canonical.
+    const href = (p: number) => {
+      const parts: string[] = [];
+      if (category) parts.push(`category=${encodeURIComponent(category)}`);
+      if (p > 1) parts.push(`page=${p}`);
+      return parts.length ? `/?${parts.join('&')}` : '/';
+    };
+
+    // Every category, linked from every listing page. 18 categories x the
+    // full paginated chain behind each is what actually gives a crawler a
+    // route to the whole archive rather than just the newest 30 stories.
+    const { data: cats } = await supabase
+      .from('categories')
+      .select('name, slug')
+      .order('name');
+    const categoryNav = (cats || [])
+      .map(
+        (c: { name: string; slug: string }) =>
+          `<li><a href="/?category=${encodeURIComponent(c.slug)}">${escapeHtml(c.name)}</a></li>`
+      )
+      .join('');
+
+    const pager =
+      `<nav aria-label="Pagination"><ul>` +
+      (page > 1 ? `<li><a href="${href(page - 1)}" rel="prev">Previous page</a></li>` : '') +
+      (page < lastPage ? `<li><a href="${href(page + 1)}" rel="next">Next page</a></li>` : '') +
+      `<li>Page ${page} of ${lastPage}</li>` +
+      `</ul></nav>`;
 
     const listHtml = (articles || [])
       .map(
@@ -664,15 +724,20 @@ ${ownFile
         // Google shows as the clickable result title.
         ? `${category.charAt(0).toUpperCase() + category.slice(1)}${
             /news$/i.test(category) ? '' : ' News'
-          } - ${SITE_NAME}`
-        : `${SITE_NAME} - Latest Celebrity News, Entertainment & Exclusive Interviews`,
+          }${page > 1 ? ` - Page ${page}` : ''} - ${SITE_NAME}`
+        : page > 1
+          ? `Latest Stories - Page ${page} - ${SITE_NAME}`
+          : `${SITE_NAME} - Latest Celebrity News, Entertainment & Exclusive Interviews`,
       // A category listing that repeats the site-wide description reads to a
       // crawler as another near-duplicate page. Naming the category makes
       // each listing's description its own.
       description: category
         ? `The latest ${category.toLowerCase()} stories on ${SITE_NAME} — updated daily with original reporting, interviews and analysis.`
         : 'Stay updated with the latest celebrity news, entertainment updates, exclusive interviews, and trending stories.',
-      url: category ? `${SITE_URL}/?category=${category}` : SITE_URL,
+      // Self-canonical per page: page 2 must not claim to be page 1,
+      // or Google folds the whole chain into one URL and the deeper
+      // articles lose the only link pointing at them.
+      url: `${SITE_URL}${href(page)}`,
       type: 'website',
       jsonLd: {
         '@context': 'https://schema.org',
@@ -696,7 +761,14 @@ ${ownFile
           logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.png` },
         },
       },
-      bodyHtml: `<main><h1>Latest Stories</h1><ul>${listHtml}</ul></main>`,
+      bodyHtml:
+        `<main><h1>${
+          category ? escapeHtml(category.charAt(0).toUpperCase() + category.slice(1)) : 'Latest Stories'
+        }${page > 1 ? ` - Page ${page}` : ''}</h1>` +
+        `<nav aria-label="Categories"><ul>${categoryNav}</ul></nav>` +
+        `<ul>${listHtml}</ul>` +
+        pager +
+        `</main>`,
     });
 
     return new Response(html, {

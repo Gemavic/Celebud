@@ -83,6 +83,13 @@ export default function middleware(request: Request) {
     const category = url.searchParams.get('category');
     if (category) target.searchParams.set('category', category);
 
+    // ?page= drives the paginated listing chain. Without it forwarded, every
+    // page of the archive would render as page 1 — a crawler following
+    // "Next page" would loop on identical content and never reach the older
+    // articles, which is the exact problem the pagination was added to fix.
+    const pageParam = url.searchParams.get('page');
+    if (pageParam && /^\d{1,4}$/.test(pageParam)) target.searchParams.set('page', pageParam);
+
     return rewrite(target);
   } catch {
     // Never let an SEO optimisation take the homepage down.
