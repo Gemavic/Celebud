@@ -112,6 +112,12 @@ export interface Database {
           is_trending: boolean;
           is_manual: boolean | null;
           is_pinned: boolean;
+          is_published: boolean;
+          saved_by: string | null;
+          // Generated column (GENERATED ALWAYS): readable, never writable —
+          // deliberately absent from Insert/Update below so a write is a
+          // compile error rather than a Postgres error at runtime.
+          word_count: number | null;
           views_count: number;
           comments_count: number;
           seo_title: string | null;
@@ -142,6 +148,8 @@ export interface Database {
           is_trending?: boolean;
           is_manual?: boolean | null;
           is_pinned?: boolean;
+          is_published?: boolean;
+          saved_by?: string | null;
           views_count?: number;
           comments_count?: number;
           seo_title?: string | null;
@@ -1130,6 +1138,10 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      unsubscribe_newsletter: {
+        Args: { p_id: string };
+        Returns: boolean;
+      };
       restore_archived_article: {
         Args: { p_id: string };
         Returns: Json;

@@ -176,7 +176,7 @@ export function OriginalsPage() {
                         {a.categories.name}
                       </span>
                     )}
-                    <Pin className="w-3 h-3 text-amber-500 flex-shrink-0" title="Permanent" />
+                    <span title="Permanent" className="flex-shrink-0 inline-flex"><Pin className="w-3 h-3 text-amber-500" /></span>
                   </div>
                   <h2 className="font-semibold text-gray-900 line-clamp-2 group-hover:text-slate-700 transition-colors">
                     {a.title}

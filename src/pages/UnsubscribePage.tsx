@@ -23,7 +23,7 @@ export function UnsubscribePage() {
     if (!id) { setStatus('notfound'); return; }
 
     (async () => {
-      const { data, error } = await supabase.rpc('unsubscribe_newsletter' as never, { p_id: id });
+      const { data, error } = await supabase.rpc('unsubscribe_newsletter', { p_id: id });
       if (error) { setStatus('error'); return; }
       setStatus(data ? 'done' : 'notfound');
     })();

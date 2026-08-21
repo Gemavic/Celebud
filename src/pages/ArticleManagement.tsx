@@ -1058,6 +1058,7 @@ export function ArticleManagement() {
       external_url: '',
       is_featured: false,
       is_trending: false,
+      is_pinned: false,
       seo_title: '',
       seo_keywords: '',
     });
@@ -1234,6 +1235,7 @@ export function ArticleManagement() {
         external_url: '',
         is_featured: false,
         is_trending: false,
+        is_pinned: false,
         seo_title: draft.seo_title || '',
         seo_keywords: draft.seo_keywords || '',
       });
@@ -2313,7 +2315,7 @@ export function ArticleManagement() {
               </>
             )}
             <button
-              onClick={fetchArticles}
+              onClick={() => fetchArticles()}
               className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
             >
               <RefreshCw className="w-4 h-4" />
