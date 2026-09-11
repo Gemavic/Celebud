@@ -90,19 +90,35 @@ jobs:
       - name: Deploy cached-articles (cached article list, JWT on)
         run: supabase functions deploy cached-articles --project-ref "$PROJECT_REF"
 
-      # The SEO functions are live under CAPITALISED names (vercel.json
-      # rewrites point at /Prerender and /Generate-sitemap). Deploying the
-      # lowercase folder name would create a second, unused function and
-      # leave the live one stale — which is exactly why SEO fixes had not
-      # been reaching search engines. Stage a copy under the live name.
-      - name: Stage prerender + generate-sitemap under their live names
+      # The SEO functions are deployed under BOTH capitalisations, on
+      # purpose.
+      #
+      # History: these were originally created live as "Prerender" and
+      # "Generate-sitemap" while the repo folders are lowercase. That split
+      # meant whoever edited vercel.json had to remember which casing was
+      # live, and getting it wrong silently served crawlers the empty SPA
+      # shell with no error anywhere — invisible in a browser, because a
+      # browser runs the JavaScript. That single ambiguity cost months of
+      # AdSense rejections.
+      #
+      # Deploying both names from the same source removes the trap for good:
+      # whichever casing vercel.json points at resolves, and both are always
+      # current because they are published from the same folder in the same
+      # run. The cost is two extra deploy steps. Do not "tidy" this away.
+      - name: Stage prerender + generate-sitemap under both casings
         run: |
           mkdir -p supabase/functions/Prerender supabase/functions/Generate-sitemap
           cp -r supabase/functions/prerender/. supabase/functions/Prerender/
           cp -r supabase/functions/generate-sitemap/. supabase/functions/Generate-sitemap/
 
-      - name: Deploy Prerender (crawler HTML, public - JWT off)
+      - name: Deploy Prerender (capitalised, legacy live name)
         run: supabase functions deploy Prerender --project-ref "$PROJECT_REF" --no-verify-jwt
 
-      - name: Deploy Generate-sitemap (sitemap/RSS, public - JWT off)
+      - name: Deploy prerender (lowercase, matches repo folder)
+        run: supabase functions deploy prerender --project-ref "$PROJECT_REF" --no-verify-jwt
+
+      - name: Deploy Generate-sitemap (capitalised, legacy live name)
         run: supabase functions deploy Generate-sitemap --project-ref "$PROJECT_REF" --no-verify-jwt
+
+      - name: Deploy generate-sitemap (lowercase, matches repo folder)
+        run: supabase functions deploy generate-sitemap --project-ref "$PROJECT_REF" --no-verify-jwt
