@@ -126,3 +126,13 @@
   color: #9ca3af;
   pointer-events: none;
 }
+
+/* AdSense slots that came back empty.
+   Google sets data-ad-status="unfilled" on the <ins> when no ad is served.
+   The element keeps its reserved height regardless, which on mobile article
+   pages left a blank band tall enough to push the headline below the fold.
+   GoogleAd.tsx removes its own container when this happens; this rule is the
+   safety net for any slot rendered outside that component. */
+ins.adsbygoogle[data-ad-status='unfilled'] {
+  display: none !important;
+}
