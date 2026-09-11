@@ -72,19 +72,79 @@ function h2Texts(html: string): string[] {
  * wildly oversized content) still block regardless of genre; only the
  * informational-guide-specific structure is skipped for pinned content.
  */
+/**
+ * Source-text detection for the description field.
+ *
+ * The description column is written once by fetch-news from the raw RSS
+ * excerpt and is NOT touched when an article is rewritten -- a reporter
+ * can fully rewrite the body and the original wire text stays behind in
+ * description. prerender then prints it in four places: the listing
+ * <p>, <meta name="description">, og:description and twitter:description.
+ * So the only copy on the page a crawler sees may be someone else's.
+ *
+ * These patterns match newsroom furniture that survives a body rewrite:
+ * another outlet's byline, a wire dateline, or the *** bullet markers
+ * Nigerian papers use for standfirsts.
+ */
+const SOURCE_TEXT_PATTERNS: { re: RegExp; label: string }[] = [
+  { re: /\bBy\s+[A-Z][a-z]+\s+[A-Z][a-z]+/, label: "another outlet's byline" },
+  { re: /\*\*\*/, label: 'standfirst bullet markers (***)' },
+  { re: /\b(LAGOS|ABUJA|NAIROBI|ACCRA|LONDON|NEW YORK|WASHINGTON|OTTAWA|TORONTO)\s*[—–-]\s/, label: 'a wire dateline' },
+  { re: /\b(Reuters|Associated Press|\bAFP\b|\bAP\b|Vanguard|Punch|Premium Times|The Guardian|BBC|CNN|CBC)\b/, label: 'a source publication name' },
+  { re: /Continue reading|Read more at|Source:/i, label: 'a read-on pointer' },
+  { re: /…\s*$|\.\.\.\s*$/, label: 'a truncated excerpt ending' },
+];
+
+/**
+ * Checks a description for unrewritten source text. Exported separately so
+ * it can be reused outside the full article gate.
+ */
+export function checkDescriptionCompliance(description: string): ComplianceViolation[] {
+  const violations: ComplianceViolation[] = [];
+  const d = (description || '').trim();
+  if (!d) return violations;
+
+  for (const { re, label } of SOURCE_TEXT_PATTERNS) {
+    if (re.test(d)) {
+      violations.push({
+        code: 'description_source_text',
+        message: `Description still contains ${label}. It was carried over from the source feed and not rewritten. Rewrite the description before publishing.`,
+        severity: 'blocking',
+      });
+      break;
+    }
+  }
+
+  if (d.length > 320) {
+    violations.push({
+      code: 'description_too_long',
+      message: `Description is ${d.length} characters; keep it under 320 so search engines do not truncate it.`,
+      severity: 'blocking',
+    });
+  }
+  return violations;
+}
+
 export function checkArticleCompliance(
   html: string,
-  opts: { isPinned?: boolean } = {}
+  opts: { isPinned?: boolean; description?: string } = {}
 ): ComplianceResult {
   const violations: ComplianceViolation[] = [];
   const content = html || '';
   const words = wordCount(content);
 
+  // The description is a separate column from the body and is what a
+  // crawler actually reads first, so it is gated even for pinned content.
+  violations.push(...checkDescriptionCompliance(opts.description || ''));
+
   if (!content.trim()) {
     return {
       passed: false,
       wordCount: 0,
-      violations: [{ code: 'empty', message: 'Content is empty.', severity: 'blocking' }],
+      violations: [
+        ...violations,
+        { code: 'empty', message: 'Content is empty.', severity: 'blocking' },
+      ],
     };
   }
 
