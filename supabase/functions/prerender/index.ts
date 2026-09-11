@@ -26,6 +26,38 @@ const corsHeaders = {
 const SITE_URL = 'https://celebud.com';
 const SITE_NAME = 'CelebUD';
 
+/**
+ * Renders a publication date the way a reader expects to see it.
+ *
+ * The byline previously printed article.published_at straight from the
+ * database, so live pages read "By Matthew Ayandare —
+ * 2026-09-08T14:51:09.611+00:00". Wrapped in <time datetime> the machine
+ * readable value is still available to crawlers without showing a raw
+ * timestamp to people.
+ */
+function formatBylineDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+  }).format(d);
+}
+
+/**
+ * Removes the empty paragraphs rich-text editors leave at the end of a
+ * body -- <p><br></p>, <p>&nbsp;</p> and friends. Harmless to a reader but
+ * they add meaningless nodes to the markup a crawler parses.
+ */
+function stripTrailingEmptyBlocks(html: string): string {
+  let out = html;
+  let prev: string;
+  do {
+    prev = out;
+    out = out.replace(/(?:<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>|<br\s*\/?>)\s*$/i, '').trimEnd();
+  } while (out !== prev);
+  return out;
+}
+
 // An article this short is a headline and a couple of paragraphs — a wire
 // summary, not a piece worth ranking on its own. Google calls these "thin"
 // and a site carrying enough of them reads as low-value in review. There
@@ -499,7 +531,7 @@ ${items}
         .maybeSingle();
 
       if (!item || item.status !== 'published') {
-        return new Response('Not found', { status: 404, headers: corsHeaders });
+        return new Response('Not found', { status: 404, headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' } });
       }
 
       const url = `${SITE_URL}/watch/${item.id}`;
@@ -578,7 +610,7 @@ ${ownFile
         .maybeSingle();
 
       if (!article) {
-        return new Response('Not found', { status: 404, headers: corsHeaders });
+        return new Response('Not found', { status: 404, headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' } });
       }
 
       const url = `${SITE_URL}${articlePath(article)}`;
@@ -594,7 +626,7 @@ ${ownFile
         publisher: {
           '@type': 'Organization',
           name: SITE_NAME,
-          logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.png` },
+          logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.jpg` },
         },
         mainEntityOfPage: { '@type': 'WebPage', '@id': url },
         // Section and keywords are what Google News and Top Stories use to
@@ -630,9 +662,13 @@ ${ownFile
       const bodyHtml = `
 <article>
   <h1>${escapeHtml(article.title)}</h1>
-  <p>By ${escapeHtml(article.authors?.name || SITE_NAME)} — ${article.published_at}</p>
+  <p>By ${escapeHtml(article.authors?.name || SITE_NAME)}${
+    article.published_at
+      ? ` — <time datetime="${escapeHtml(article.published_at)}">${escapeHtml(formatBylineDate(article.published_at))}</time>`
+      : ''
+  }</p>
   ${article.thumbnail_url ? `<img src="${article.thumbnail_url}" alt="${escapeHtml(article.title)}" />` : ''}
-  <div>${article.content || escapeHtml(article.description)}</div>
+  <div>${stripTrailingEmptyBlocks(article.content || '') || escapeHtml(article.description || '')}</div>
   ${article.categories ? `<p>Category: <a href="/?category=${article.categories.slug}">${escapeHtml(article.categories.name)}</a></p>` : ''}
 </article>`;
 
@@ -781,7 +817,7 @@ ${ownFile
           '@type': 'NewsMediaOrganization',
           name: SITE_NAME,
           url: SITE_URL,
-          logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.png` },
+          logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.jpg` },
         },
       },
       bodyHtml:
@@ -798,6 +834,7 @@ ${ownFile
       headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
     });
   } catch (err) {
+    // Explicit text/plain so the type is declared rather than inferred.
     return new Response(`Prerender error: ${(err as Error).message}`, {
       status: 500,
       headers: corsHeaders,
