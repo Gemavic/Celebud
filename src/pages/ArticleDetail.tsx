@@ -515,6 +515,16 @@ export function ArticleDetail() {
             </div>
           )}
 
+          {/* Comments sit directly under the article and author bio, above the
+              share bar. They used to render last -- below the newsletter CTA,
+              the related-articles grid and two ad slots -- which put them four
+              sections past the end of the story. Readers reported never
+              finding them, and several did not know the site had comments at
+              all. Discussion belongs next to what it is about. */}
+          <div className="mb-12">
+            <CommentsSection contentId={article.id} initialCount={article.comments_count || 0} />
+          </div>
+
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-6 border-y border-gray-200 mb-12 bg-gray-50 px-5 rounded-lg">
             <p className="text-gray-700 font-medium text-base mb-4 sm:mb-0">Share this article</p>
             <div className="flex items-center space-x-2">
@@ -637,8 +647,6 @@ export function ArticleDetail() {
           </div>
 
           <GoogleAd slot="6950728752" format="horizontal" className="my-8" />
-
-          <CommentsSection contentId={article.id} initialCount={article.comments_count || 0} />
         </div>
       </article>
     </div>
