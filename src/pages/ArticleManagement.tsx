@@ -545,14 +545,14 @@ export function ArticleManagement() {
 
       const { data, error } = await supabase
         .from('media_content')
-        .select('id, title, content, is_published, is_pinned')
+        .select('id, title, content, description, is_published, is_pinned')
         .eq('media_type', 'article')
         .eq('is_manual', true)
         .in('saved_by', reporterIds);
       if (error) throw error;
 
-      const rows = (data as { id: string; title: string; content: string | null; is_published: boolean; is_pinned: boolean | null }[]) || [];
-      const failing = rows.filter((r) => !checkArticleCompliance(r.content || '', { isPinned: !!r.is_pinned }).passed);
+      const rows = (data as { id: string; title: string; content: string | null; description: string | null; is_published: boolean; is_pinned: boolean | null }[]) || [];
+      const failing = rows.filter((r) => !checkArticleCompliance(r.content || '', { isPinned: !!r.is_pinned, description: r.description || '' }).passed);
       const toUnpublish = failing.filter((r) => r.is_published);
 
       if (toUnpublish.length > 0) {
@@ -1469,7 +1469,7 @@ export function ArticleManagement() {
       // already pass their own 800-word + real-photo gate and are generated
       // with this structure built in.
       const compliance = applyGate
-        ? checkArticleCompliance(editForm.content, { isPinned: editForm.is_pinned })
+        ? checkArticleCompliance(editForm.content, { isPinned: editForm.is_pinned, description: editForm.description || '' })
         : null;
       const willPublish = !compliance || compliance.passed;
 
