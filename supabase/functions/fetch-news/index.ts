@@ -2,6 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { parse as parseHTML } from 'npm:node-html-parser@6';
 import { buildSeoTitle, buildSeoKeywords } from '../_shared/seo.ts';
 import { resolvePublishableThumbnail } from '../_shared/articleImages.ts';
+import { sanitizeDescription } from '../_shared/sourceText.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1189,8 +1190,18 @@ Deno.serve(async (req: Request) => {
 
             // Meta description stays short for search results; the body keeps
             // as much of the publisher's own summary as is available.
-            const finalDescription = stripHtml(sanitizeContactInfo(trimTo(richest, 300)));
             const bodyText = stripHtml(sanitizeContactInfo(trimTo(richest, 1200)));
+            // The feed excerpt often carries the publisher's byline, dateline
+            // or *** standfirst markers. That text is written once here and
+            // is NOT revisited when the article is later rewritten, so a
+            // dirty value stored now can outlive the rewrite and end up as
+            // the meta description on a live page. Clean it at the source.
+            const rawDescription = stripHtml(sanitizeContactInfo(trimTo(richest, 300)));
+            const finalDescription = sanitizeDescription(
+              rawDescription,
+              bodyText,
+              stripHtml(item.title),
+            ).description;
             const sourceName = source.name || 'the original source';
             const finalContent = bodyText
               ? `${bodyText}\n\nContinue reading the full story at ${sourceName}.`
