@@ -3,6 +3,7 @@ import { parse as parseHTML } from 'npm:node-html-parser@6';
 import { buildSeoTitle, buildSeoDescription, buildSeoKeywords } from '../_shared/seo.ts';
 import { isDurableImageHost, resolvePublishableThumbnail } from '../_shared/articleImages.ts';
 import { submitToIndexNow } from '../_shared/indexnow.ts';
+import { sanitizeDescription } from '../_shared/sourceText.ts';
 
 // Turns thin, scraped RSS stubs into properly produced CelebUD articles.
 //
@@ -647,8 +648,23 @@ Deno.serve(async (req: Request) => {
         if (!contentHtml) throw new Error('model returned no article body');
       }
 
-      const description = (rewrite?.description || '').trim()
+      // The model is handed the source text, so it sometimes echoes the
+      // original byline or dateline straight into the description. The body
+      // has been rewritten by this point, so deriving a fallback from it
+      // keeps a clean description instead of storing the source's words.
+      const rawDescription = (rewrite?.description || '').trim()
         || buildSeoDescription(stripHtml(contentHtml) || existing, article.title);
+      const descCheck = sanitizeDescription(
+        rawDescription,
+        stripHtml(contentHtml) || existing,
+        article.title,
+      );
+      const description = descCheck.description;
+      if (descCheck.replaced) {
+        console.log(
+          `[enrich] rebuilt description for "${article.title}" — contained ${descCheck.reason || 'source text'}`,
+        );
+      }
       const seoTitle = (rewrite?.seo_title || '').trim() || buildSeoTitle(article.title);
       const seoKeywords = (rewrite?.seo_keywords || '').trim()
         || buildSeoKeywords(article.title, description, categoryName);
