@@ -2,19 +2,19 @@
   "rewrites": [
     {
       "source": "/sitemap.xml",
-      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Generate-sitemap"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/generate-sitemap"
     },
     {
       "source": "/news-sitemap.xml",
-      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Generate-sitemap?type=news"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/generate-sitemap?type=news"
     },
     {
       "source": "/feed.xml",
-      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Generate-sitemap?type=rss"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/generate-sitemap?type=rss"
     },
     {
       "source": "/rss.xml",
-      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Generate-sitemap?type=rss"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/generate-sitemap?type=rss"
     },
     {
       "source": "/article/(.*)",
@@ -22,10 +22,10 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|mediapartners-google|bingbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|adsbot-google-mobile|mediapartners-google|google-safety|bingbot|adidxbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
         }
       ],
-      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Prerender?path=/article/$1"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/article/$1"
     },
     {
       "source": "/watch/(.*)",
@@ -33,10 +33,10 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|mediapartners-google|bingbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|adsbot-google-mobile|mediapartners-google|google-safety|bingbot|adidxbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
         }
       ],
-      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Prerender?path=/watch/$1"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/watch/$1"
     },
     {
       "source": "/",
@@ -44,14 +44,113 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|mediapartners-google|bingbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|adsbot-google-mobile|mediapartners-google|google-safety|bingbot|adidxbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
         }
       ],
-      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/Prerender?path=/"
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/"
     },
     {
       "source": "/(.*)\\.(jpg|jpeg|png|webp|gif|svg|ico|avif|bmp|woff|woff2|ttf|otf|eot|mp4|webm|mp3|wav|pdf|txt|xml|json|map|css|js)",
       "destination": "/$1.$2"
+    },
+    {
+      "source": "/originals/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|adsbot-google-mobile|mediapartners-google|google-safety|bingbot|adidxbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+        }
+      ],
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/originals/$1"
+    },
+    {
+      "source": "/originals",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|adsbot-google-mobile|mediapartners-google|google-safety|bingbot|adidxbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+        }
+      ],
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/originals"
+    },
+    {
+      "source": "/author/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|adsbot-google-mobile|mediapartners-google|google-safety|bingbot|adidxbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+        }
+      ],
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/author/$1"
+    },
+    {
+      "source": "/category/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|adsbot-google-mobile|mediapartners-google|google-safety|bingbot|adidxbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+        }
+      ],
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/category/$1"
+    },
+    {
+      "source": "/about",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|adsbot-google-mobile|mediapartners-google|google-safety|bingbot|adidxbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+        }
+      ],
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/about"
+    },
+    {
+      "source": "/contact",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|adsbot-google-mobile|mediapartners-google|google-safety|bingbot|adidxbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+        }
+      ],
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/contact"
+    },
+    {
+      "source": "/editorial-standards",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|adsbot-google-mobile|mediapartners-google|google-safety|bingbot|adidxbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+        }
+      ],
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/editorial-standards"
+    },
+    {
+      "source": "/privacy",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|adsbot-google-mobile|mediapartners-google|google-safety|bingbot|adidxbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+        }
+      ],
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/privacy"
+    },
+    {
+      "source": "/((?!.*\\.(?:jpg|jpeg|png|webp|gif|svg|ico|avif|woff2?|ttf|otf|mp4|webm|mp3|pdf|xml|json|map|css|js)$).*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|google-inspectiontool|adsbot-google|adsbot-google-mobile|mediapartners-google|google-safety|bingbot|adidxbot|yandex|duckduckbot|baiduspider|facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|pinterest|redditbot|applebot|petalbot).*"
+        }
+      ],
+      "destination": "https://bwtrtzvlqvykobmlfjcl.supabase.co/functions/v1/prerender?path=/$1"
     },
     {
       "source": "/(.*)",
@@ -140,19 +239,39 @@
     },
     {
       "source": "/sitemap.xml",
-      "headers": [{ "key": "Content-Type", "value": "application/xml; charset=utf-8" }]
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/xml; charset=utf-8"
+        }
+      ]
     },
     {
       "source": "/news-sitemap.xml",
-      "headers": [{ "key": "Content-Type", "value": "application/xml; charset=utf-8" }]
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/xml; charset=utf-8"
+        }
+      ]
     },
     {
       "source": "/feed.xml",
-      "headers": [{ "key": "Content-Type", "value": "application/rss+xml; charset=utf-8" }]
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/rss+xml; charset=utf-8"
+        }
+      ]
     },
     {
       "source": "/rss.xml",
-      "headers": [{ "key": "Content-Type", "value": "application/rss+xml; charset=utf-8" }]
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/rss+xml; charset=utf-8"
+        }
+      ]
     }
   ]
 }
