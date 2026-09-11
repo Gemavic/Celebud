@@ -345,16 +345,32 @@ Deno.serve(async (req: Request) => {
         .select('id, slug, title, description, published_at, categories!inner(name, slug)')
         .eq('media_type', 'article')
         .eq('is_published', true);
-      // 'business' is deliberately NOT in this list. It is a wide net that
-      // catches entertainment-industry deals, sports sponsorships and
-      // geopolitics, and this hub advertises itself as insurance, personal
-      // finance and business *education*. A reader -- or an ad-network
-      // reviewer -- landing here on a Rotten Tomatoes score or a jersey
-      // sponsorship sees a page that does not deliver what its heading
-      // promises. Keep this list tight to what the intro paragraph claims.
+      // This hub is restricted to hand-written work, and that is not
+      // fussiness -- it is the only thing that makes the page honest.
+      //
+      // categorizeArticle() in fetch-news assigns categories with
+      // text.includes(keyword) on a broad list. Substring matching means
+      // 'bond' matches "a bond that must never be broken" and "deep
+      // maternal bonds", 'money' matches a Powerball jackpot story, and
+      // 'asset'/'currency'/'savings' behave the same way. The result:
+      // 'finance' holds 81 published articles of which only 4 were written
+      // here, and the other 77 include a Britney Spears chart record, an
+      // NYT puzzle walkthrough, a Comic-Con reveal and an advice column.
+      // 'business' is worse -- 215 articles, 4 hand-written.
+      //
+      // 'fin-advisor' is the one clean category: 16 articles, all 16
+      // hand-written, because the keyword detector has no rule that can
+      // land anything there. Adding is_manual keeps that property while
+      // still picking up the four genuine finance pieces.
+      //
+      // ~20 accurate articles beat 60 where two thirds contradict the
+      // heading. Fixing the underlying categorisation is a separate job;
+      // until then this page must not inherit the damage.
       hubQuery = isOriginals
         ? hubQuery.eq('is_pinned', true)
-        : hubQuery.in('categories.slug', ['fin-advisor', 'finance']);
+        : hubQuery
+            .in('categories.slug', ['fin-advisor', 'finance'])
+            .eq('is_manual', true);
 
       const { data: rows } = await hubQuery
         .order('published_at', { ascending: false })
