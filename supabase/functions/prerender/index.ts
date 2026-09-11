@@ -345,9 +345,16 @@ Deno.serve(async (req: Request) => {
         .select('id, slug, title, description, published_at, categories!inner(name, slug)')
         .eq('media_type', 'article')
         .eq('is_published', true);
+      // 'business' is deliberately NOT in this list. It is a wide net that
+      // catches entertainment-industry deals, sports sponsorships and
+      // geopolitics, and this hub advertises itself as insurance, personal
+      // finance and business *education*. A reader -- or an ad-network
+      // reviewer -- landing here on a Rotten Tomatoes score or a jersey
+      // sponsorship sees a page that does not deliver what its heading
+      // promises. Keep this list tight to what the intro paragraph claims.
       hubQuery = isOriginals
         ? hubQuery.eq('is_pinned', true)
-        : hubQuery.in('categories.slug', ['fin-advisor', 'finance', 'business']);
+        : hubQuery.in('categories.slug', ['fin-advisor', 'finance']);
 
       const { data: rows } = await hubQuery
         .order('published_at', { ascending: false })
