@@ -613,6 +613,52 @@ ${ownFile
         return new Response('Not found', { status: 404, headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' } });
       }
 
+      // Every prerendered article page was a dead end: the only outbound
+      // links were the category and the footer. A crawler arriving on an
+      // article found nothing pointing at any other article, which is why
+      // URL inspection reported "Referring page: None detected" even for
+      // pages sitting in the sitemap -- the sitemap was the ONLY way in.
+      //
+      // Internal links are the one form of link equity entirely within our
+      // control, and a flat archive with none of them gives Google no reason
+      // to believe any single article matters. Same category first, then
+      // recent articles to fill, so even a thin category still produces a
+      // usable trail.
+      const { data: sameCategory } = article.category_id
+        ? await supabase
+            .from('media_content')
+            .select('id, title, slug, description')
+            .eq('media_type', 'article')
+            .eq('is_published', true)
+            .eq('category_id', article.category_id)
+            .neq('id', article.id)
+            .order('published_at', { ascending: false })
+            .limit(6)
+        : { data: [] };
+
+      let related = sameCategory || [];
+      if (related.length < 6) {
+        const exclude = [article.id, ...related.map((r: { id: string }) => r.id)];
+        const { data: filler } = await supabase
+          .from('media_content')
+          .select('id, title, slug, description')
+          .eq('media_type', 'article')
+          .eq('is_published', true)
+          .not('id', 'in', `(${exclude.join(',')})`)
+          .order('published_at', { ascending: false })
+          .limit(6 - related.length);
+        related = [...related, ...(filler || [])];
+      }
+
+      const relatedHtml = related.length
+        ? `<nav aria-label="Related articles"><h2>More from CelebUD</h2><ul>${related
+            .map(
+              (r: { id: string; title: string; slug?: string | null }) =>
+                `<li><a href="${articlePath(r)}">${escapeHtml(r.title || '')}</a></li>`,
+            )
+            .join('')}</ul></nav>`
+        : '';
+
       const url = `${SITE_URL}${articlePath(article)}`;
       const jsonLd = {
         '@context': 'https://schema.org',
@@ -670,7 +716,8 @@ ${ownFile
   ${article.thumbnail_url ? `<img src="${article.thumbnail_url}" alt="${escapeHtml(article.title)}" />` : ''}
   <div>${stripTrailingEmptyBlocks(article.content || '') || escapeHtml(article.description || '')}</div>
   ${article.categories ? `<p>Category: <a href="/?category=${article.categories.slug}">${escapeHtml(article.categories.name)}</a></p>` : ''}
-</article>`;
+</article>
+${relatedHtml}`;
 
       const html = baseHtml({
         // Prefer the purpose-written SEO title: it is trimmed to the length
