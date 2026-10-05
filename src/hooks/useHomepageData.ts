@@ -29,7 +29,13 @@ async function fetchDirectFromSupabase(category: string, page: number, pageSize:
   const endIndex = startIndex + pageSize - 1;
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [categoriesRes, featuredRes, trendingRes, articlesRes] = await Promise.all([
+  // Promise.all is all-or-nothing: if ANY one of these four queries rejects,
+  // the whole homepage load rejects and the page renders "No content found in
+  // this category" -- which reads to a visitor as "this site is empty" when
+  // the real cause is a dropped request on a weak mobile connection. The main
+  // articles query is the one that matters; the other three are decoration.
+  // allSettled lets the page render whatever arrived.
+  const [categoriesRes, featuredRes, trendingRes, articlesRes] = await Promise.allSettled([
     supabase.from('categories').select('*').gt('display_order', 0).order('display_order'),
 
     supabase
@@ -75,12 +81,27 @@ async function fetchDirectFromSupabase(category: string, page: number, pageSize:
     })(),
   ]);
 
+  const value = <T,>(r: PromiseSettledResult<T>): T | null =>
+    r.status === 'fulfilled' ? r.value : null;
+
+  const categories = value(categoriesRes);
+  const featured = value(featuredRes);
+  const trending = value(trendingRes);
+  const articles = value(articlesRes);
+
+  // Only the articles query failing is a real failure. Throw so react-query
+  // retries and the UI can tell "request failed" apart from "nothing here",
+  // instead of silently showing an empty page.
+  if (!articles) {
+    throw new Error('Could not load articles');
+  }
+
   return {
-    categories: categoriesRes.data || [],
-    featured: featuredRes.data || [],
-    trending: trendingRes.data || [],
-    articles: articlesRes.data || [],
-    articlesCount: articlesRes.count ?? (articlesRes.data?.length || 0),
+    categories: categories?.data || [],
+    featured: featured?.data || [],
+    trending: trending?.data || [],
+    articles: articles.data || [],
+    articlesCount: articles.count ?? (articles.data?.length || 0),
     editorial: [],
   };
 }
