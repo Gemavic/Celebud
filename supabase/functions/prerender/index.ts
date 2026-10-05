@@ -638,16 +638,22 @@ ${ownFile
 
       let related = sameCategory || [];
       if (related.length < 6) {
-        const exclude = [article.id, ...related.map((r: { id: string }) => r.id)];
+        // Deliberately no .not('id','in',...) here: PostgREST requires UUIDs
+        // in an `in` list to be quoted, and an unquoted list fails the whole
+        // query -- which silently yields no links at all. Over-fetch a small
+        // batch and de-duplicate in code instead; it cannot fail this way.
+        const exclude = new Set([article.id, ...related.map((r: { id: string }) => r.id)]);
         const { data: filler } = await supabase
           .from('media_content')
           .select('id, title, slug, description')
           .eq('media_type', 'article')
           .eq('is_published', true)
-          .not('id', 'in', `(${exclude.join(',')})`)
           .order('published_at', { ascending: false })
-          .limit(6 - related.length);
-        related = [...related, ...(filler || [])];
+          .limit(18);
+        related = [
+          ...related,
+          ...(filler || []).filter((f: { id: string }) => !exclude.has(f.id)),
+        ].slice(0, 6);
       }
 
       const relatedHtml = related.length
