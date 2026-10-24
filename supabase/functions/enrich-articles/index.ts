@@ -732,7 +732,15 @@ Deno.serve(async (req: Request) => {
       // than a visible thin one).
       if (contentHtml) {
         update.content = contentHtml;
-        update.is_published = true;
+        // DRAFTS ONLY (trial, Oct 2026). A rewrite of another outlet's story
+        // no longer goes live on its own. Google read the site's genuine
+        // articles and still declined to index them, and the likely cause is
+        // the volume of rewritten wire news around them. So a rewrite is now
+        // a starting point: it is saved hidden, an editor adds CelebUD's own
+        // angle in Article Management, and saving it there is what publishes
+        // it. To revert, restore `update.is_published = true;` here and the
+        // newlyPublishedUrls.push() below.
+        update.is_published = false;
         // These Gemini failures are transient (a 400 or malformed JSON on one
         // attempt, then a clean result on the next), so a success must clear
         // the old error and the attempt count — otherwise the article stays
@@ -740,7 +748,7 @@ Deno.serve(async (req: Request) => {
         // despite now being perfectly fine.
         update.enrichment_error = null;
         update.enrichment_attempts = 0;
-        newlyPublishedUrls.push(`https://celebud.com/article/${article.id}/${article.slug}`);
+        // Not announced to IndexNow: nothing is live until an editor publishes it.
       }
 
       const { error: updateErr } = await supabase

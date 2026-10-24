@@ -83,8 +83,10 @@ interface Article {
   is_pinned?: boolean;
   /** Written in-house — never eligible for automated rewriting. */
   is_manual?: boolean | null;
-  /** False = a fetched teaser, hidden from the site/sitemap until rewritten. */
+  /** False = hidden from the site/sitemap (a teaser, a rewrite draft, or a blocked save). */
   is_published?: boolean;
+  /** Set once an article has been rewritten or saved by an editor. */
+  enriched_at?: string | null;
   seo_title: string | null;
   seo_keywords: string | null;
   categories: {
@@ -497,7 +499,7 @@ export function ArticleManagement() {
 
       const cost = data.usage?.costUsd;
       setNotifyResult(
-        `Rewritten and published${cost ? ` — cost $${cost.toFixed(3)}` : ''}.`
+        `Rewritten as a draft${cost ? ` — cost $${cost.toFixed(3)}` : ''}. It is NOT live yet: open it with Edit, add CelebUD's own angle (what it means for our readers), then Save to publish.`
       );
       await fetchArticles();
     } catch (err) {
@@ -912,6 +914,7 @@ export function ArticleManagement() {
           is_pinned,
           is_manual,
           is_published,
+          enriched_at,
           seo_title,
           seo_keywords,
           categories:category_id (
@@ -2050,8 +2053,8 @@ export function ArticleManagement() {
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8 flex items-center justify-between gap-4 flex-wrap">
           <p className="text-sm text-amber-900">
             <strong>{unpublishedCount.toLocaleString()}</strong> article{unpublishedCount === 1 ? '' : 's'} {unpublishedCount === 1 ? 'is' : 'are'} hidden
-            from your site and the sitemap — either a fetched story waiting to be rewritten, or a
-            reporter's draft that needs a fix before it can go live.
+            from your site and the sitemap — a fetched story, a rewritten draft waiting for your
+            angle, or a reporter's draft that needs a fix before it can go live.
           </p>
           <button
             onClick={() => { setShowUnpublishedOnly((v) => !v); setArticlePage(0); }}
@@ -2101,11 +2104,10 @@ export function ArticleManagement() {
               Rebuild fetched articles
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              Nothing is rewritten automatically. Articles are published as short excerpts that
-              credit and link to the original source, and stay that way until you choose otherwise —
-              use <strong>Rewrite</strong> on an individual article, or select several and rebuild
-              them here. Your hand-written articles are never touched, and you can stop any time
-              and pick up where you left off.
+              Nothing is rewritten automatically, and a rewrite never goes live on its own: it is
+              saved as a hidden <strong>Draft</strong>. Open it with Edit, add CelebUD's own angle —
+              what the story means for our readers in Nigeria and Canada — and Save to publish.
+              Your hand-written articles are never touched.
             </p>
 
             {enrichQueue !== null && (
@@ -2389,14 +2391,21 @@ export function ArticleManagement() {
                           <Pin className="w-3 h-3" /> Pinned
                         </span>
                       )}
-                      {article.is_published === false && (
+                      {article.is_published === false && (article.external_url && !article.is_manual && article.enriched_at && article.content ? (
+                        <span
+                          className="flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-amber-900 bg-amber-100 rounded-full flex-shrink-0"
+                          title="Rewritten from a news source. Open with Edit, add CelebUD's own angle, then Save to publish."
+                        >
+                          Draft — add your angle
+                        </span>
+                      ) : (
                         <span
                           className="flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-red-800 bg-red-100 rounded-full flex-shrink-0"
-                          title="Hidden from your site and the sitemap until rewritten"
+                          title="Hidden from your site and the sitemap"
                         >
                           Unpublished
                         </span>
-                      )}
+                      ))}
                       <span className="truncate">{article.title}</span>
                     </h3>
 
