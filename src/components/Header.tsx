@@ -7,8 +7,11 @@ import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
 import { supabase } from '../lib/supabase';
 
-const NAV_LINKS: { label: string; to: string }[] = [
-  { label: 'Home', to: '/' },
+// `desktop: false` items stay in the mobile menu only. The desktop bar ran
+// out of room (items slid under the search box), and every category here is
+// also one tap away in the category pills on the homepage.
+const NAV_LINKS: { label: string; to: string; desktop?: boolean }[] = [
+  { label: 'Home', to: '/', desktop: false },
   { label: 'News', to: '/?category=news' },
   { label: 'Politics', to: '/?category=politics' },
   { label: 'Society', to: '/?category=society' },
@@ -16,11 +19,11 @@ const NAV_LINKS: { label: string; to: string }[] = [
   { label: 'Fin-Advisor', to: '/fin-advisor' },
   { label: 'Originals', to: '/originals' },
   { label: 'Trackers', to: '/trackers' },
-  { label: 'Tributes', to: '/tributes/submit' },
-  { label: 'Business', to: '/?category=business' },
-  { label: 'Lifestyle', to: '/?category=lifestyle' },
-  { label: 'Videos', to: '/?category=video' },
-];
+  { label: 'Tributes', to: '/tributes/submit', desktop: false },
+  { label: 'Business', to: '/?category=business', desktop: false },
+  { label: 'Lifestyle', to: '/?category=lifestyle', desktop: false },
+  { label: 'Videos', to: '/?category=video', desktop: false },
+]
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -220,8 +223,8 @@ export function Header() {
               </span>
             </Link>
 
-            <nav className="hidden lg:flex items-center flex-1 min-w-0" aria-label="Primary">
-              {NAV_LINKS.map((item) => (
+            <nav className="hidden lg:flex items-center flex-1 min-w-0 overflow-hidden" aria-label="Primary">
+              {NAV_LINKS.filter((item) => item.desktop !== false).map((item) => (
                 <Link
                   key={item.label}
                   to={item.to}
