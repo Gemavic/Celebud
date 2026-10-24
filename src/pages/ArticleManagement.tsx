@@ -1379,6 +1379,63 @@ export function ArticleManagement() {
     }
   };
 
+  // --- "Suggest angles": CelebUD's own perspective on a rewritten story ---
+  // A rewrite of another outlet's report adds nothing new on its own. These
+  // are three reader-focused perspectives (what the story means for
+  // Nigerians at home, the diaspora, newcomers, families…) proposed by AI
+  // for the editor to choose, adjust and publish by saving.
+  type Angle = { label: string; heading: string; html: string };
+  const [angles, setAngles] = useState<Angle[] | null>(null);
+  const [anglesLoading, setAnglesLoading] = useState(false);
+  const [anglesError, setAnglesError] = useState<string | null>(null);
+  const [angleNote, setAngleNote] = useState('');
+  const [insertedAngle, setInsertedAngle] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAngles(null);
+    setAnglesError(null);
+    setAngleNote('');
+    setInsertedAngle(null);
+  }, [editingArticle?.id]);
+
+  const suggestAngles = async () => {
+    setAnglesLoading(true);
+    setAnglesError(null);
+    setInsertedAngle(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('You must be signed in as an admin to do this.');
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest-angles`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: editForm.title, content: editForm.content, note: angleNote }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `Request failed (${res.status})`);
+      setAngles(data.angles as Angle[]);
+    } catch (err) {
+      setAnglesError(err instanceof Error ? err.message : 'Could not suggest angles');
+    } finally {
+      setAnglesLoading(false);
+    }
+  };
+
+  const insertAngle = (angle: Angle) => {
+    const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const section = `<h2>${esc(angle.heading)}</h2>${angle.html}`;
+    setEditForm((f) => {
+      const body = f.content || '';
+      // Before the conclusion if there is one, else before the closing
+      // disclaimer rule, else at the end.
+      const at = [/<h2>\s*Conclusion/i, /<hr\b/i]
+        .map((re) => body.search(re))
+        .find((i) => i >= 0);
+      const content = at === undefined ? body + section : body.slice(0, at) + section + body.slice(at);
+      return { ...f, content };
+    });
+    setInsertedAngle(angle.label);
+  };
+
   // Matches the "[Suggested image: ...]" placeholder paragraphs the AI
   // drafter leaves in the body where it couldn't invent a real photo.
   const SUGGESTED_IMAGE_RE = /<p>\s*<em>\s*\[Suggested image:\s*([^\]]*)\]\s*<\/em>\s*<\/p>/gi;
@@ -2691,6 +2748,56 @@ export function ArticleManagement() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Content</label>
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={suggestAngles}
+                      disabled={anglesLoading}
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-amber-900 bg-white border border-amber-300 rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors flex-shrink-0"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      {anglesLoading ? 'Thinking of angles…' : angles ? 'Suggest different angles' : 'Suggest angles'}
+                    </button>
+                    <input
+                      type="text"
+                      value={angleNote}
+                      onChange={(e) => setAngleNote(e.target.value)}
+                      placeholder="Optional: your own point, e.g. 'this raises school fees for families back home'"
+                      className="flex-1 min-w-[220px] px-3 py-2 text-sm border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                    />
+                  </div>
+                  <p className="text-xs text-amber-800 mt-1.5">
+                    Proposes three perspectives on what this story means for CelebUD readers. Insert one, read it over, then Save to publish.
+                  </p>
+                  {anglesError && <p className="mt-2 text-sm text-red-600">{anglesError}</p>}
+                  {insertedAngle && (
+                    <p className="mt-2 text-sm text-green-700">
+                      Inserted “{insertedAngle}” into the article below — check it reads right, then Save.
+                    </p>
+                  )}
+                  {angles && (
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {angles.map((a) => (
+                        <div key={a.heading} className="flex flex-col bg-white border border-amber-200 rounded-lg p-3">
+                          <p className="text-xs font-bold uppercase tracking-wide text-amber-700">{a.label}</p>
+                          <p className="text-sm font-semibold text-gray-900 mt-1">{a.heading}</p>
+                          <div
+                            className="text-xs text-gray-600 mt-1.5 line-clamp-6 [&_p]:mb-1"
+                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(a.html) }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => insertAngle(a)}
+                            className="mt-auto pt-2 self-start text-sm font-semibold text-amber-900 underline hover:no-underline"
+                          >
+                            Insert this angle
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <RichTextEditor
                   value={editForm.content}
                   onChange={(html) => setEditForm((f) => ({ ...f, content: html }))}
