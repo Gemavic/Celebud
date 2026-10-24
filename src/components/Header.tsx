@@ -6,6 +6,7 @@ import { NotificationButton } from './NotificationButton';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
 import { supabase } from '../lib/supabase';
+import { partnerUrl, trackPartnerClick, SPONSORED_REL } from '../utils/partners';
 
 // `desktop: false` items stay in the mobile menu only. The desktop bar ran
 // out of room (items slid under the search box), and every category here is
@@ -297,6 +298,12 @@ export function Header() {
                   {item.label}
                 </Link>
               ))}
+              <a href={partnerUrl('mobile-menu')} target="_blank" rel={SPONSORED_REL}
+                onClick={() => { trackPartnerClick('mobile-menu'); setIsMenuOpen(false); }}
+                className="flex items-center justify-between text-pink-700 bg-pink-50 hover:bg-pink-100 font-semibold py-3 px-4 text-sm rounded-lg transition-colors mt-2">
+                <span className="uppercase">Dates.care · meet verified singles</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-pink-500">Sponsored</span>
+              </a>
               <div className="pt-4">
                 <form onSubmit={handleSearch} className="flex items-center bg-gray-100 rounded-full px-4 py-2.5">
                   <Search className="w-4 h-4 text-gray-500 mr-2" />

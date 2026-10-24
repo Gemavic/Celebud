@@ -267,6 +267,12 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['tribute_submissions']['Insert']>;
         Relationships: [];
       };
+      partner_clicks: {
+        Row: { id: number; partner: string; placement: string; path: string | null; created_at: string };
+        Insert: { id?: number; partner: string; placement: string; path?: string | null; created_at?: string };
+        Update: Partial<Database['public']['Tables']['partner_clicks']['Insert']>;
+        Relationships: [];
+      };
       tracker_entries: {
         Row: {
           id: string; tracker: string; observed_on: string; value: number; label: string | null;

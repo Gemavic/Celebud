@@ -5,6 +5,8 @@ import { MediaContentWithRelations } from '../lib/database.types';
 import { Header } from '../components/Header';
 import CommentsSection from '../components/CommentsSection';
 import { AdBanner } from '../components/AdBanner';
+import { PartnerCard } from '../components/PartnerCard';
+import { articleAllowsPartner } from '../utils/partners';
 import { GoogleAd } from '../components/GoogleAd';
 import { InlineNewsletterCta } from '../components/InlineNewsletterCta';
 import { formatDistanceToNow } from '../utils/date';
@@ -259,6 +261,21 @@ export function ArticleDetail() {
     return sanitizeHtml(rawContent);
   }, [article, useHtmlContent, rawContent]);
 
+  const showPartner = !!article && articleAllowsPartner(article.categories?.slug, article.title);
+  // Split rich HTML after its third paragraph so the sponsored card sits
+  // inside the story rather than tacked on the end.
+  const htmlParts = useMemo(() => {
+    if (!showPartner || !sanitizedHtml) return null;
+    let idx = -1;
+    for (let i = 0; i < 3; i++) {
+      idx = sanitizedHtml.indexOf('</p>', idx + 1);
+      if (idx === -1) return null;
+    }
+    const cut = idx + 4;
+    if (sanitizedHtml.length - cut < 200) return null;
+    return [sanitizedHtml.slice(0, cut), sanitizedHtml.slice(cut)];
+  }, [showPartner, sanitizedHtml]);
+
   const contentParagraphs = useMemo(() => {
     if (!article || useHtmlContent) return [];
     return sanitizeArticleContent(rawContent)
@@ -429,10 +446,18 @@ export function ArticleDetail() {
           <div className="prose prose-lg max-w-none mb-12" itemProp="articleBody">
             {useHtmlContent && sanitizedHtml ? (
               <>
-                <div
-                  className="article-rich-content text-gray-700 text-base leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-                />
+                {htmlParts ? (
+                  <>
+                    <div className="article-rich-content text-gray-700 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: htmlParts[0] }} />
+                    <PartnerCard variant="article" />
+                    <div className="article-rich-content text-gray-700 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: htmlParts[1] }} />
+                  </>
+                ) : (
+                  <div
+                    className="article-rich-content text-gray-700 text-base leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+                  />
+                )}
                 <GoogleAd slot="2687784187" format="rectangle" className="my-6" />
               </>
             ) : contentParagraphs.length > 0 ? (
@@ -461,6 +486,7 @@ export function ArticleDetail() {
                       <p className="leading-loose text-justify">
                         {paragraph}
                       </p>
+                      {showPartner && index === 2 && contentParagraphs.length > 5 && <PartnerCard variant="article" />}
                       {showMidArticleAd && (
                         <GoogleAd slot="2687784187" format="rectangle" className="my-6" />
                       )}

@@ -3,6 +3,7 @@
 import { Link } from 'react-router-dom';
 import { Heart, LineChart, Send, Vote } from 'lucide-react';
 import { daysUntil, PRESIDENTIAL_DAY } from '../utils/election';
+import { PartnerCard } from './PartnerCard';
 
 const ITEMS = [
   {
@@ -58,6 +59,7 @@ export function ReaderToolsStrip() {
           </Link>
         ))}
       </div>
+      <PartnerCard variant="home" />
     </section>
   );
 }

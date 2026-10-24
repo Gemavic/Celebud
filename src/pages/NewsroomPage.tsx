@@ -16,6 +16,7 @@ import { WeeklyDigest } from '../components/newsroom/WeeklyDigest';
 import { LivingGuides } from '../components/newsroom/LivingGuides';
 import { TrackersAdmin } from '../components/newsroom/TrackersAdmin';
 import { ElectionAdmin } from '../components/newsroom/ElectionAdmin';
+import { PartnersAdmin } from '../components/newsroom/PartnersAdmin';
 
 const TABS = [
   { id: 'election', label: 'Election 2027', el: ElectionAdmin },
@@ -26,6 +27,7 @@ const TABS = [
   { id: 'digest', label: 'Weekly Digest', el: WeeklyDigest },
   { id: 'guides', label: 'Living Guides', el: LivingGuides },
   { id: 'trackers', label: 'Trackers', el: TrackersAdmin },
+  { id: 'partners', label: 'Partners', el: PartnersAdmin },
 ] as const;
 
 export function NewsroomPage() {

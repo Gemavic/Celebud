@@ -15,6 +15,7 @@ import { SocialMediaGrid } from '../components/SocialLinks';
 import { Loader2, LayoutGrid, List, Clock } from 'lucide-react';
 import { useHomepageData } from '../hooks/useHomepageData';
 import { formatDistanceToNow } from '../utils/date';
+import { partnerUrl, trackPartnerClick, SPONSORED_REL } from '../utils/partners';
 
 const EditorialSection = lazy(() => import('../components/EditorialSection').then(m => ({ default: m.EditorialSection })));
 const LiveNewsIndicator = lazy(() => import('../components/LiveNewsIndicator').then(m => ({ default: m.LiveNewsIndicator })));
@@ -357,6 +358,11 @@ function HomePage() {
                   <Link to="/trackers" className="hover:text-white transition-colors">
                     Naira &amp; Express Entry Trackers
                   </Link>
+                </li>
+                <li>
+                  <a href={partnerUrl('footer')} target="_blank" rel={SPONSORED_REL} onClick={() => trackPartnerClick('footer')} className="hover:text-white transition-colors">
+                    Dates.care <span className="text-xs text-gray-400">(Sponsored partner)</span>
+                  </a>
                 </li>
                 <li>
                   <Link to="/reporters/apply" className="hover:text-white transition-colors">
