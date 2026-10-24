@@ -1422,9 +1422,17 @@ export function ArticleManagement() {
 
   const insertAngle = (angle: Angle) => {
     const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const section = `<h2>${esc(angle.heading)}</h2>${angle.html}`;
+    const heading = `<h2>${esc(angle.heading)}</h2>`;
+    const section = `${heading}${angle.html}`;
+    // Never the same angle twice: a second click (or a double-click) on
+    // "Insert" used to paste the whole section again.
+    if ((editForm.content || '').includes(heading)) {
+      setInsertedAngle(angle.label);
+      return;
+    }
     setEditForm((f) => {
       const body = f.content || '';
+      if (body.includes(heading)) return f;
       // Before the conclusion if there is one, else before the closing
       // disclaimer rule, else at the end.
       const at = [/<h2>\s*Conclusion/i, /<hr\b/i]
@@ -2786,13 +2794,17 @@ export function ArticleManagement() {
                             className="text-xs text-gray-600 mt-1.5 line-clamp-6 [&_p]:mb-1"
                             dangerouslySetInnerHTML={{ __html: sanitizeHtml(a.html) }}
                           />
-                          <button
-                            type="button"
-                            onClick={() => insertAngle(a)}
-                            className="mt-auto pt-2 self-start text-sm font-semibold text-amber-900 underline hover:no-underline"
-                          >
-                            Insert this angle
-                          </button>
+                          {(editForm.content || '').includes(`>${a.heading.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h2>`) ? (
+                            <span className="mt-auto pt-2 self-start text-sm font-semibold text-green-700">✓ Inserted</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => insertAngle(a)}
+                              className="mt-auto pt-2 self-start text-sm font-semibold text-amber-900 underline hover:no-underline"
+                            >
+                              Insert this angle
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
