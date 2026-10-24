@@ -2,14 +2,15 @@
 // presidential candidate on equal terms, and the reader poll.
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Vote, Users, MapPin, CalendarDays, ArrowRight, Share2 } from 'lucide-react';
+import { Vote, Users, MapPin, CalendarDays, ArrowRight } from 'lucide-react';
+import { ShareButtons } from '../components/ShareButtons';
 import { Header } from '../components/Header';
 import { supabase } from '../lib/supabase';
 import { updateMetaTags } from '../utils/seo';
 import { buildArticleUrl } from '../utils/articleUrl';
 import {
   type Candidate, type VoterStat, type PollResults, POLL_SLUG, PRESIDENTIAL_DAY, GOVERNORSHIP_DAY,
-  daysUntil, fmtNum, pct, initials, pollShareText,
+  daysUntil, fmtNum, pct, initials, POLL_SHARE_MESSAGE, SITE,
 } from '../utils/election';
 
 function Bar({ label, value, total, note }: { label: string; value: number; total: number; note?: string }) {
@@ -59,7 +60,6 @@ export function ElectionHubPage() {
   const source = by('total')[0];
   const under50 = ages.filter((a) => a.label === '18-34' || a.label === '35-49').reduce((n, a) => n + a.value, 0);
   const north = zones.filter((z) => z.label.startsWith('North')).reduce((n, z) => n + z.value, 0);
-  const share = encodeURIComponent(pollShareText());
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -151,10 +151,11 @@ export function ElectionHubPage() {
                   : `${fmtNum(results?.total ?? 0)} readers have voted. See how each zone and age group is leaning.`}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Link to="/election-2027/poll" className="px-5 py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700">Vote & see results</Link>
-              <a href={`https://wa.me/?text=${share}`} target="_blank" rel="noopener noreferrer" className="px-5 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 inline-flex items-center gap-2"><Share2 className="w-4 h-4" /> WhatsApp</a>
-            </div>
+            <Link to="/election-2027/poll" className="px-5 py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 text-center">Vote & see results</Link>
+          </section>
+          <section className="-mt-6 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <p className="font-semibold text-gray-900 mb-3">Share the poll</p>
+            <ShareButtons url={`${SITE}/election-2027/poll`} text={POLL_SHARE_MESSAGE} title="CelebUD 2027 reader poll" />
           </section>
 
           {/* Stories */}

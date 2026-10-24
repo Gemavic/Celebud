@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, Vote } from 'lucide-react';
 import { Header } from '../components/Header';
+import { ShareButtons } from '../components/ShareButtons';
 import { supabase } from '../lib/supabase';
 import { updateMetaTags } from '../utils/seo';
 import { buildArticleUrl } from '../utils/articleUrl';
-import { type Candidate, asPromises, asSources, initials } from '../utils/election';
+import { type Candidate, asPromises, asSources, initials, SITE } from '../utils/election';
 
 export function ElectionCandidatePage() {
   const { slug } = useParams();
@@ -88,6 +89,11 @@ export function ElectionCandidatePage() {
             <div className="mt-8 p-5 bg-gray-900 text-white rounded-xl flex flex-col sm:flex-row sm:items-center gap-3">
               <p className="flex-1 font-semibold flex items-center gap-2"><Vote className="w-5 h-5 text-red-400" /> Who would you vote for today?</p>
               <Link to="/election-2027/poll" className="px-5 py-2.5 bg-red-600 hover:bg-red-700 rounded-lg font-semibold text-center">Take the reader poll</Link>
+            </div>
+
+            <div className="mt-6">
+              <p className="text-sm font-semibold text-gray-900 mb-2">Share this profile</p>
+              <ShareButtons url={`${SITE}/election-2027/${c.slug}`} text={`${c.name} (${c.party_abbr}): background, running mate and campaign promises — 2027 presidential candidate profile on CelebUD`} title={`${c.name} — 2027 presidential candidate`} />
             </div>
 
             {stories.length > 0 && (<>

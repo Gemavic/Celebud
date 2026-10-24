@@ -5,13 +5,14 @@
 // self-selected reader poll, not a scientific survey or a prediction.
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Vote, Share2, Copy, CheckCheck, Info } from 'lucide-react';
+import { ArrowLeft, Vote, Info } from 'lucide-react';
+import { ShareButtons } from '../components/ShareButtons';
 import { Header } from '../components/Header';
 import { supabase } from '../lib/supabase';
 import { updateMetaTags } from '../utils/seo';
 import {
   type Candidate, type PollResults, POLL_SLUG, STATES, STATE_ZONE, ZONES, AGE_BANDS,
-  getDeviceId, hasVoted, markVoted, fmtNum, pct, pollShareText, SITE,
+  getDeviceId, hasVoted, markVoted, fmtNum, pct, POLL_SHARE_MESSAGE, SITE,
 } from '../utils/election';
 
 const MIN_FOR_BREAKDOWN = 30; // a zone or age group needs this many votes before its leader is shown
@@ -31,7 +32,6 @@ export function ElectionPollPage() {
   const [form, setForm] = useState({ age_band: '', state: '', gender: '', registered: '', website: '' });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     updateMetaTags({
@@ -102,7 +102,6 @@ export function ElectionPollPage() {
   const zoneRows = [...ZONES, 'Diaspora'].map((z) => ({ z, ...leaders((results?.by_zone || []).filter((r) => r.zone === z)) }));
   const ageRows = AGE_BANDS.map((a) => ({ a, ...leaders((results?.by_age || []).filter((r) => r.age_band === a)) }));
 
-  const shareText = pollShareText();
   const shareUrl = `${SITE}/election-2027/poll`;
   const select = 'w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent';
   const showForm = !voted && results && !results.blackout && results.is_open !== false;
@@ -213,14 +212,7 @@ export function ElectionPollPage() {
 
           <div className="mt-8 pt-6 border-t border-gray-100">
             <p className="font-semibold text-gray-900">Share the poll — the more people vote, the more it means</p>
-            <div className="flex flex-wrap gap-2 mt-3">
-              <a href={`https://wa.me/?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noopener noreferrer" className="px-4 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 inline-flex items-center gap-2"><Share2 className="w-4 h-4" /> WhatsApp</a>
-              <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noopener noreferrer" className="px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">Facebook</a>
-              <a href={`https://x.com/intent/post?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noopener noreferrer" className="px-4 py-2.5 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-black">X</a>
-              <button onClick={() => { navigator.clipboard.writeText(shareText); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className="px-4 py-2.5 border border-gray-300 text-sm font-semibold rounded-lg hover:bg-gray-50 inline-flex items-center gap-2">
-                {copied ? <CheckCheck className="w-4 h-4" /> : <Copy className="w-4 h-4" />} {copied ? 'Copied' : 'Copy link'}
-              </button>
-            </div>
+            <ShareButtons className="mt-3" url={shareUrl} text={POLL_SHARE_MESSAGE} title="CelebUD 2027 reader poll" />
           </div>
         </div>
         <p className="text-xs text-gray-500 mt-4 text-center">See <Link to="/election-2027" className="underline">all 18 candidates and where Nigeria’s votes are</Link>. CelebUD does not endorse any candidate.</p>

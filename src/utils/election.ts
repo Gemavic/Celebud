@@ -91,5 +91,7 @@ export function hasVoted(slug: string) { try { return localStorage.getItem(voted
 export function markVoted(slug: string) { try { localStorage.setItem(votedKey(slug), '1'); } catch { /* private mode */ } }
 
 export const SITE = 'https://celebud.com';
+export const POLL_SHARE_MESSAGE =
+  'If Nigeria voted today, who gets your vote for President in 2027? Take the CelebUD reader poll and see how every zone and age group is voting:';
 export const pollShareText = () =>
   `If Nigeria voted today, who gets your vote for President in 2027? Take the CelebUD reader poll and see how every zone and age group is voting:\n${SITE}/election-2027/poll`;
