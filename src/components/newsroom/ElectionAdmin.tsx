@@ -2,16 +2,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { Vote, Sparkles, Save, Plus, Trash2, Upload, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Json } from '../../lib/database.types';
-import { type Candidate, type Promise_, type Source, type VoterStat, asPromises, asSources, STATE_ZONE, STATES, POLL_SLUG, fmtNum } from '../../utils/election';
+import { type Candidate, type Promise_, type Source, type VoterStat, asPromises, asSources, STATE_ZONE, STATES, RACES, fmtNum } from '../../utils/election';
 import { newsroomAI, btnPrimary, btnSecondary, input, card } from './shared';
 
-interface Draft { party_name: string; running_mate: string; photo_url: string; bio: string; past_offices: string; search_terms: string; promises: Promise_[]; sources: Source[] }
+interface Draft { name: string; party_name: string; running_mate: string; photo_url: string; bio: string; past_offices: string; search_terms: string; promises: Promise_[]; sources: Source[] }
 
 /**
  * Newsroom > Election 2027. Every candidate is edited with the same form,
  * and "Research profile" applies the same neutral brief to all of them.
  */
 export function ElectionAdmin() {
+  const [raceId, setRaceId] = useState(RACES[0].id);
+  const race = RACES.find((r) => r.id === raceId)!;
   const [cands, setCands] = useState<Candidate[]>([]);
   const [sel, setSel] = useState<Candidate | null>(null);
   const [d, setD] = useState<Draft | null>(null);
@@ -23,9 +25,9 @@ export function ElectionAdmin() {
 
   const load = useCallback(async () => {
     const [c, s, p] = await Promise.all([
-      supabase.from('election_candidates').select('*').order('ballot_order'),
+      supabase.from('election_candidates').select('*').eq('race', raceId).order('ballot_order'),
       supabase.from('election_voter_stats').select('*').eq('kind', 'state').order('value', { ascending: false }),
-      supabase.from('election_polls').select('id, is_open').eq('slug', POLL_SLUG).maybeSingle(),
+      supabase.from('election_polls').select('id, is_open').eq('slug', raceId).maybeSingle(),
     ]);
     setCands((c.data as unknown as Candidate[]) || []);
     setStats((s.data as unknown as VoterStat[]) || []);
@@ -37,13 +39,13 @@ export function ElectionAdmin() {
       ]);
       setPoll({ id: p.data.id, is_open: p.data.is_open, total: total ?? 0, lastDay: lastDay ?? 0 });
     }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  }, [raceId]);
+  useEffect(() => { load(); setSel(null); setD(null); }, [load]);
 
   const open = (c: Candidate) => {
     setSel(c); setMsg(null);
     setD({
-      party_name: c.party_name || '', running_mate: c.running_mate || '', photo_url: c.photo_url || '',
+      name: c.name, party_name: c.party_name || '', running_mate: c.running_mate || '', photo_url: c.photo_url || '',
       bio: c.bio || '', past_offices: c.past_offices || '', search_terms: c.search_terms.join(', '),
       promises: asPromises(c.promises), sources: asSources(c.sources),
     });
@@ -80,6 +82,7 @@ export function ElectionAdmin() {
     if (!sel || !d) return;
     setBusy('Saving…');
     const { error } = await supabase.from('election_candidates').update({
+      name: d.name.trim() || sel.name,
       party_name: d.party_name.trim() || null,
       running_mate: d.running_mate.trim() || null,
       photo_url: d.photo_url.trim() || null,
@@ -120,8 +123,14 @@ export function ElectionAdmin() {
       <div className={`${card} flex flex-wrap items-center justify-between gap-3`}>
         <div>
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Vote className="w-5 h-5 text-red-600" /> Election 2027</h2>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {RACES.map((r) => (
+              <button key={r.id} onClick={() => setRaceId(r.id)}
+                className={`px-3 py-1.5 text-sm rounded-full border ${raceId === r.id ? 'bg-red-600 text-white border-red-600' : 'bg-white border-gray-300 text-gray-700'}`}>{r.title}</button>
+            ))}
+          </div>
           <p className="text-sm text-gray-600 mt-1">
-            Public hub: <a href="/election-2027" target="_blank" className="underline">celebud.com/election-2027</a> · poll: <a href="/election-2027/poll" target="_blank" className="underline">/election-2027/poll</a>.
+            Public page: <a href={race.path} target="_blank" className="underline">celebud.com{race.path}</a> · poll: <a href={race.pollPath} target="_blank" className="underline">{race.pollPath}</a>.
             Give every candidate the same treatment — {cands.filter(filled).length} of {cands.length} profiles written.
           </p>
         </div>
@@ -152,9 +161,11 @@ export function ElectionAdmin() {
                 <h3 className="font-bold text-gray-900">{sel.name} <span className="text-gray-500 font-normal">({sel.party_abbr})</span></h3>
                 <button onClick={research} disabled={!!busy} className={btnSecondary}><Sparkles className="w-4 h-4" /> Research profile</button>
               </div>
+              <label className="block"><span className="text-xs font-semibold text-gray-600">Name as shown on the site{race.kind === 'governor' ? ' (INEC lists surname first — reorder only if you are sure)' : ''}</span>
+                <input className={input} value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} /></label>
               <div className="grid md:grid-cols-2 gap-3">
                 <label className="block"><span className="text-xs font-semibold text-gray-600">Party full name</span><input className={input} value={d.party_name} onChange={(e) => setD({ ...d, party_name: e.target.value })} /></label>
-                <label className="block"><span className="text-xs font-semibold text-gray-600">Running mate</span><input className={input} value={d.running_mate} onChange={(e) => setD({ ...d, running_mate: e.target.value })} /></label>
+                <label className="block"><span className="text-xs font-semibold text-gray-600">{race.kind === 'president' ? 'Running mate' : 'Deputy'}</span><input className={input} value={d.running_mate} onChange={(e) => setD({ ...d, running_mate: e.target.value })} /></label>
               </div>
               <div className="flex items-center gap-3">
                 {d.photo_url && <img src={d.photo_url} alt="" className="w-14 h-14 rounded-full object-cover" />}

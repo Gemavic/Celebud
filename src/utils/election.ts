@@ -6,7 +6,35 @@ export const POLL_SLUG = 'president-2027';
 export const PRESIDENTIAL_DAY = '2027-01-16';
 export const GOVERNORSHIP_DAY = '2027-02-06';
 
+export interface Race {
+  id: string;
+  kind: 'president' | 'governor';
+  state?: string;
+  stateSlug?: string;
+  title: string;
+  office: string;
+  day: string;
+  path: string;
+  pollPath: string;
+}
+
+export const RACES: Race[] = [
+  { id: 'president-2027', kind: 'president', title: 'Presidential election', office: 'President', day: PRESIDENTIAL_DAY, path: '/election-2027', pollPath: '/election-2027/poll' },
+  // South-West first. Ekiti, Osun and Ondo vote on separate off-cycle dates.
+  { id: 'governor-2027-lagos', kind: 'governor', state: 'Lagos', stateSlug: 'lagos', title: 'Lagos governorship', office: 'Governor of Lagos State', day: GOVERNORSHIP_DAY, path: '/election-2027/governor/lagos', pollPath: '/election-2027/governor/lagos/poll' },
+  { id: 'governor-2027-ogun', kind: 'governor', state: 'Ogun', stateSlug: 'ogun', title: 'Ogun governorship', office: 'Governor of Ogun State', day: GOVERNORSHIP_DAY, path: '/election-2027/governor/ogun', pollPath: '/election-2027/governor/ogun/poll' },
+  { id: 'governor-2027-oyo', kind: 'governor', state: 'Oyo', stateSlug: 'oyo', title: 'Oyo governorship', office: 'Governor of Oyo State', day: GOVERNORSHIP_DAY, path: '/election-2027/governor/oyo', pollPath: '/election-2027/governor/oyo/poll' },
+];
+export const raceById = (id: string) => RACES.find((r) => r.id === id) || RACES[0];
+export const raceByState = (stateSlug?: string) => RACES.find((r) => r.stateSlug === stateSlug);
+export const GOVERNOR_RACES = RACES.filter((r) => r.kind === 'governor');
+
+export const raceShareMessage = (r: Race) => r.kind === 'president'
+  ? 'If Nigeria voted today, who gets your vote for President in 2027? Take the CelebUD reader poll and see how every zone and age group is voting:'
+  : `If ${r.state} voted today, who gets your vote for governor in 2027? Take the CelebUD reader poll and see how ${r.state} is leaning:`;
+
 export interface Candidate {
+  race: string;
   id: string;
   ballot_order: number;
   slug: string;
@@ -49,6 +77,7 @@ export interface PollResults {
   total?: number;
   by_candidate?: { candidate_id: string | null; undecided: boolean; votes: number }[];
   by_zone?: { zone: string; candidate_id: string | null; undecided: boolean; votes: number }[];
+  by_state?: { state: string; candidate_id: string | null; undecided: boolean; votes: number }[];
   by_age?: { age_band: string; candidate_id: string | null; undecided: boolean; votes: number }[];
 }
 

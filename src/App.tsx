@@ -26,6 +26,7 @@ const TributeSubmitPage = lazy(() => import('./pages/TributeSubmitPage').then(m 
 const TrackersPage = lazy(() => import('./pages/TrackersPage').then(m => ({ default: m.TrackersPage })));
 const ElectionHubPage = lazy(() => import('./pages/ElectionHubPage').then(m => ({ default: m.ElectionHubPage })));
 const ElectionPollPage = lazy(() => import('./pages/ElectionPollPage').then(m => ({ default: m.ElectionPollPage })));
+const ElectionGovernorPage = lazy(() => import('./pages/ElectionGovernorPage').then(m => ({ default: m.ElectionGovernorPage })));
 const ElectionCandidatePage = lazy(() => import('./pages/ElectionCandidatePage').then(m => ({ default: m.ElectionCandidatePage })));
 const FinAdvisor = lazy(() => import('./pages/FinAdvisor').then(module => ({ default: module.FinAdvisor })));
 const WatchPage = lazy(() => import('./pages/WatchPage').then(m => ({ default: m.WatchPage })));
@@ -65,6 +66,8 @@ function App() {
             <Route path="/trackers" element={<TrackersPage />} />
             <Route path="/election-2027" element={<ElectionHubPage />} />
             <Route path="/election-2027/poll" element={<ElectionPollPage />} />
+            <Route path="/election-2027/governor/:state" element={<ElectionGovernorPage />} />
+            <Route path="/election-2027/governor/:state/poll" element={<ElectionPollPage />} />
             <Route path="/election-2027/:slug" element={<ElectionCandidatePage />} />
             <Route path="/admin/recovery" element={<ArticleRecovery />} />
             <Route path="/admin/subscribers" element={<SubscribersPage />} />

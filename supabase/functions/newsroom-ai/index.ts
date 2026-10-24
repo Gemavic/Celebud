@@ -239,13 +239,15 @@ Output: {"themes":[{"theme":"...","count":0,"example_indexes":[0]}], ${DRAFT_SHA
 async function candidateProfile(sb: SupabaseClient, key: string, body: { candidate_id?: string }) {
   const { data: c } = await sb.from('election_candidates').select('*').eq('id', body.candidate_id || '').maybeSingle();
   if (!c) throw new Error('Candidate not found.');
-  const system = `You are a neutral election researcher for CelebUD, a Nigerian news site. Write a factual, even-handed profile of a 2027 Nigerian presidential candidate using current, reliable reporting. Never praise or criticise; no adjectives like "visionary" or "controversial"; no predictions. If you cannot verify something, leave it out. Prefer INEC, official party/campaign statements and established Nigerian newspapers.
+  const system = `You are a neutral election researcher for CelebUD, a Nigerian news site. Write a factual, even-handed profile of a 2027 Nigerian election candidate using current, reliable reporting. Never praise or criticise; no adjectives like "visionary" or "controversial"; no predictions. If you cannot verify something, leave it out. Prefer INEC, official party/campaign statements and established Nigerian newspapers.
 Respond with ONE JSON object only, no code fences:
 {"bio": "3-5 neutral sentences: background, profession, political career (plain text)",
  "past_offices": "semicolon-separated list of offices held with years, or empty string",
  "promises": [{"text": "a specific campaign promise in their own framing, attributed", "date": "YYYY-MM-DD or empty", "source_url": "URL where it was reported"}]}
 Give at most 5 promises, each with a real source URL from your research. If none can be verified, return an empty array.`;
-  const text = `Candidate: ${c.name}\nParty: ${c.party_name || c.party_abbr} (${c.party_abbr})\nRunning mate: ${c.running_mate || 'unknown'}\nElection: Nigeria presidential election, 16 January 2027.`;
+  const gov = String(c.race || '').startsWith('governor-2027-');
+  const state = gov ? String(c.race).replace('governor-2027-', '').replace(/^./, (x: string) => x.toUpperCase()) : '';
+  const text = `Candidate: ${c.name}${gov ? ' (name as listed by INEC, which often puts the surname first)' : ''}\nParty: ${c.party_name || c.party_abbr} (${c.party_abbr})\n${gov ? 'Deputy' : 'Running mate'}: ${c.running_mate || 'unknown'}\nElection: ${gov ? `${state} State governorship election, 6 February 2027` : 'Nigeria presidential election, 16 January 2027'}.`;
 
   const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`, {
     method: 'POST',

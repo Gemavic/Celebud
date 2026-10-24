@@ -158,3 +158,10 @@ grant execute on function public.election_poll_in_blackout(date) to anon, authen
 -- publication in Newsroom > Election.
 -- See the live rows; this file records structure, the seed was run once
 -- through the SQL editor.
+
+-- 24 Oct 2026 (applied live as election_poll_results_by_state): results also
+-- grouped by state, for the governorship polls. Governorship candidates for
+-- Lagos (17), Ogun (13) and Oyo (16) seeded from INEC's final lists
+-- (inecnigeria.org/documents/FINAL LIST - <STATE> STATE GOVERNORSHIP.pdf),
+-- names kept in INEC's order; Oyo deputies not yet available. Polls:
+-- governor-2027-lagos / -ogun / -oyo, polling day 2027-02-06.

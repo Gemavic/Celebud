@@ -93,6 +93,8 @@ const PRERENDER_EXACT = new Set([
 
 // Election candidate profiles: /election-2027/<slug>, own Prerender branch.
 const ELECTION_CANDIDATE = /^\/election-2027\/[a-z0-9-]{3,80}$/;
+// Governorship race pages and their polls: /election-2027/governor/<state>[/poll]
+const ELECTION_GOVERNOR = /^\/election-2027\/governor\/(lagos|ogun|oyo)(\/poll)?$/;
 
 // Reader callouts (/ask/:slug) have their own Prerender branch, which 404s
 // an unknown slug itself — so only a well-formed slug is sent there.
@@ -172,7 +174,7 @@ export default function middleware(request: Request) {
     if (!known) return notFoundPage(raw);
 
     const ua = request.headers.get('user-agent') || '';
-    const prerenderable = PRERENDER_EXACT.has(path) || AUTHOR_PROFILE.test(path) || ASK_PAGE.test(path) || ELECTION_CANDIDATE.test(path);
+    const prerenderable = PRERENDER_EXACT.has(path) || AUTHOR_PROFILE.test(path) || ASK_PAGE.test(path) || ELECTION_CANDIDATE.test(path) || ELECTION_GOVERNOR.test(path);
     if (!CRAWLER_UA.test(ua) || !prerenderable) return next();
 
     const target = new URL(PRERENDER);

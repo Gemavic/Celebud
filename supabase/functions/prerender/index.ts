@@ -368,11 +368,33 @@ Deno.serve(async (req: Request) => {
     // React pages show; poll RESULTS are deliberately not rendered here (a
     // crawler snapshot would freeze a moving number into search results).
     const electionPath = path.replace(/\/+$/, '');
+    const govMatch = electionPath.match(/^\/election-2027\/governor\/([a-z]+)(\/poll)?$/);
+    const GOV_STATES: Record<string, string> = { lagos: 'Lagos', ogun: 'Ogun', oyo: 'Oyo' };
+    if (govMatch && GOV_STATES[govMatch[1]]) {
+      const st = GOV_STATES[govMatch[1]];
+      const { data: gc } = await supabase.from('election_candidates')
+        .select('slug, name, party_abbr, party_name, running_mate, ballot_order')
+        .eq('race', `governor-2027-${govMatch[1]}`).eq('is_active', true).order('ballot_order');
+      const list = gc || [];
+      const items = `<ol>${list.map((c) => `<li><a href="/election-2027/${c.slug}">${escapeHtml(c.name)}</a> — ${escapeHtml(c.party_name || c.party_abbr)} (${escapeHtml(c.party_abbr)})${c.running_mate ? `; deputy ${escapeHtml(c.running_mate)}` : ''}</li>`).join('')}</ol>`;
+      const isPoll = !!govMatch[2];
+      const url = `${SITE_URL}/election-2027/governor/${govMatch[1]}${isPoll ? '/poll' : ''}`;
+      const title = isPoll ? `Who should be the next Governor of ${st}? CelebUD Reader Poll` : `${st} Governorship Election 2027: All Candidates & Reader Poll | CelebUD`;
+      const description = isPoll
+        ? `If ${st} voted today, who would you choose for governor? Vote in the CelebUD reader poll and see how ${st} is leaning.`
+        : `All ${list.length} candidates for Governor of ${st} State on INEC's final list, with deputies and party, and the CelebUD reader poll. Election day: 6 February 2027.`;
+      return new Response(
+        baseHtml({ title, description, url, type: 'website', jsonLd: { '@context': 'https://schema.org', '@type': 'WebPage', name: title, description, url },
+          bodyHtml: `<main><h1>${isPoll ? `If the 2027 ${st} governorship election were held today, who would you vote for?` : `${st} governorship election 2027: the candidates`}</h1><p>Polling day: Saturday, 6 February 2027. Names as they appear on INEC's final list. CelebUD does not endorse any candidate.</p>${items}<p><a href="/election-2027/governor/${govMatch[1]}/poll">Take the ${st} reader poll</a> · <a href="/election-2027">Nigeria Decides 2027</a></p></main>` }),
+        { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } },
+      );
+    }
     if (electionPath === '/election-2027' || electionPath === '/election-2027/poll' || /^\/election-2027\/[a-z0-9-]{3,80}$/.test(electionPath)) {
-      const { data: cands } = await supabase
+      const { data: allCands } = await supabase
         .from('election_candidates')
-        .select('slug, name, party_abbr, party_name, running_mate, bio, past_offices, promises, sources, ballot_order')
-        .eq('race', 'president-2027').eq('is_active', true).order('ballot_order');
+        .select('slug, race, name, party_abbr, party_name, running_mate, bio, past_offices, promises, sources, ballot_order')
+        .eq('is_active', true).order('ballot_order');
+      const cands = (allCands || []).filter((c) => c.race === 'president-2027');
       const list = cands || [];
       const html200 = (title: string, description: string, url: string, bodyHtml: string, jsonType = 'WebPage') => new Response(
         baseHtml({ title, description, url, type: 'website', jsonLd: { '@context': 'https://schema.org', '@type': jsonType, name: title, description, url }, bodyHtml }),
@@ -404,21 +426,25 @@ Deno.serve(async (req: Request) => {
           `<main><h1>If the 2027 presidential election were held today, who would you vote for?</h1><p>A CelebUD reader poll: one vote per device, results shown by geopolitical zone and age group. It counts readers who choose to take part and is not a scientific survey.</p><h2>Candidates</h2>${candList}</main>`);
       }
       const slugPart = electionPath.split('/').pop();
-      const c = list.find((x) => x.slug === slugPart);
+      const c = (allCands || []).find((x) => x.slug === slugPart);
       if (!c) {
         return new Response('Not found', { status: 404, headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' } });
       }
       const promises = (Array.isArray(c.promises) ? c.promises : []) as Array<{ text?: string; source_url?: string }>;
       const sources = (Array.isArray(c.sources) ? c.sources : []) as Array<{ title?: string; url?: string }>;
-      const body = `<main><article><h1>${escapeHtml(c.name)}: 2027 presidential candidate</h1>
-<p>${escapeHtml(c.party_name || c.party_abbr)} (${escapeHtml(c.party_abbr)}) · ballot number ${c.ballot_order}${c.running_mate ? ` · running mate ${escapeHtml(c.running_mate)}` : ''} · election day 16 January 2027</p>
+      const gov = String(c.race).startsWith('governor-2027-');
+      const gs = gov ? String(c.race).slice('governor-2027-'.length) : '';
+      const st = gs ? gs.charAt(0).toUpperCase() + gs.slice(1) : '';
+      const role = gov ? `2027 ${st} governorship candidate` : '2027 presidential candidate';
+      const body = `<main><article><h1>${escapeHtml(c.name)}: ${role}</h1>
+<p>${escapeHtml(c.party_name || c.party_abbr)} (${escapeHtml(c.party_abbr)}) · ${gov ? 'INEC list' : 'ballot'} number ${c.ballot_order}${c.running_mate ? ` · ${gov ? 'deputy' : 'running mate'} ${escapeHtml(c.running_mate)}` : ''} · election day ${gov ? '6 February 2027' : '16 January 2027'}</p>
 <h2>Background</h2><p>${c.bio ? escapeHtml(c.bio) : 'Profile being prepared by CelebUD editors.'}</p>
 ${c.past_offices ? `<h2>Offices held</h2><ul>${c.past_offices.split(';').map((o: string) => o.trim()).filter(Boolean).map((o: string) => `<li>${escapeHtml(o)}</li>`).join('')}</ul>` : ''}
 ${promises.length ? `<h2>Campaign promises</h2><ul>${promises.map((p) => `<li>${escapeHtml(p.text || '')}${p.source_url ? ` (<a href="${escapeHtml(p.source_url)}" rel="nofollow noopener">source</a>)` : ''}</li>`).join('')}</ul>` : ''}
 ${sources.length ? `<h2>Sources</h2><ul>${sources.map((s) => `<li><a href="${escapeHtml(s.url || '')}" rel="nofollow noopener">${escapeHtml(s.title || 'Source')}</a></li>`).join('')}</ul>` : ''}
-<p><a href="/election-2027">All presidential candidates</a> · <a href="/election-2027/poll">Reader poll</a>. CelebUD does not endorse any candidate.</p></article></main>`;
-      return html200(`${c.name} (${c.party_abbr}) — 2027 Presidential Candidate Profile | CelebUD`,
-        `${c.name} is the ${c.party_name || c.party_abbr} candidate for Nigeria's 2027 presidential election${c.running_mate ? `, with ${c.running_mate} as running mate` : ''}. Background, offices held, promises and sources.`,
+<p><a href="${gov ? `/election-2027/governor/${gs}` : '/election-2027'}">All ${gov ? `${st} governorship` : 'presidential'} candidates</a> · <a href="${gov ? `/election-2027/governor/${gs}/poll` : '/election-2027/poll'}">Reader poll</a>. CelebUD does not endorse any candidate.</p></article></main>`;
+      return html200(gov ? `${c.name} (${c.party_abbr}) — ${st} Governorship Candidate 2027 | CelebUD` : `${c.name} (${c.party_abbr}) — 2027 Presidential Candidate Profile | CelebUD`,
+        `${c.name} is the ${c.party_name || c.party_abbr} candidate for ${gov ? `${st} State governor in 2027` : "Nigeria's 2027 presidential election"}${c.running_mate ? `, with ${c.running_mate} as ${gov ? 'deputy' : 'running mate'}` : ''}. Background, offices held, promises and sources.`,
         `${SITE_URL}/election-2027/${c.slug}`, body, 'ProfilePage');
     }
 

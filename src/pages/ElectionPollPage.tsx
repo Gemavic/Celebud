@@ -4,15 +4,15 @@
 // favour anyone. Results are aggregates only and are always labelled as a
 // self-selected reader poll, not a scientific survey or a prediction.
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Vote, Info } from 'lucide-react';
 import { ShareButtons } from '../components/ShareButtons';
 import { Header } from '../components/Header';
 import { supabase } from '../lib/supabase';
 import { updateMetaTags } from '../utils/seo';
 import {
-  type Candidate, type PollResults, POLL_SLUG, STATES, STATE_ZONE, ZONES, AGE_BANDS,
-  getDeviceId, hasVoted, markVoted, fmtNum, pct, POLL_SHARE_MESSAGE, SITE,
+  type Candidate, type PollResults, RACES, raceByState, raceShareMessage, STATES, STATE_ZONE, ZONES, AGE_BANDS,
+  getDeviceId, hasVoted, markVoted, fmtNum, pct, SITE,
 } from '../utils/election';
 
 const MIN_FOR_BREAKDOWN = 30; // a zone or age group needs this many votes before its leader is shown
@@ -24,24 +24,31 @@ function shuffle<T>(a: T[]): T[] {
 }
 
 export function ElectionPollPage() {
+  // /election-2027/poll is the presidential poll; /election-2027/governor/:state/poll a governorship one.
+  const { state: stateSlug } = useParams();
+  const race = stateSlug ? raceByState(stateSlug) : RACES[0];
+  const POLL_SLUG = race?.id || RACES[0].id;
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [order, setOrder] = useState<Candidate[]>([]);
   const [results, setResults] = useState<PollResults | null>(null);
   const [voted, setVoted] = useState(hasVoted(POLL_SLUG));
   const [choice, setChoice] = useState<string>('');
-  const [form, setForm] = useState({ age_band: '', state: '', gender: '', registered: '', website: '' });
+  const [form, setForm] = useState({ age_band: '', state: race?.state || '', gender: '', registered: '', website: '' });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!race) return;
     updateMetaTags({
-      title: 'Who gets your vote in 2027? CelebUD Reader Poll',
-      description: 'If Nigeria voted today, who would you choose for President? Vote in the CelebUD reader poll and see how each zone and age group is leaning.',
+      title: race.kind === 'president' ? 'Who gets your vote in 2027? CelebUD Reader Poll' : `Who should be the next Governor of ${race.state}? CelebUD Reader Poll`,
+      description: race.kind === 'president'
+        ? 'If Nigeria voted today, who would you choose for President? Vote in the CelebUD reader poll and see how each zone and age group is leaning.'
+        : `If ${race.state} voted today, who would you choose for governor? Vote in the CelebUD reader poll and see how ${race.state} is leaning.`,
       type: 'website',
     });
     (async () => {
       const [c, r] = await Promise.all([
-        supabase.from('election_candidates').select('*').eq('race', 'president-2027').eq('is_active', true).order('ballot_order'),
+        supabase.from('election_candidates').select('*').eq('race', POLL_SLUG).eq('is_active', true).order('ballot_order'),
         supabase.rpc('election_poll_results', { p_slug: POLL_SLUG }),
       ]);
       const list = (c.data as unknown as Candidate[]) || [];
@@ -49,7 +56,7 @@ export function ElectionPollPage() {
       setOrder(shuffle(list));
       setResults((r.data as unknown as PollResults) || null);
     })();
-  }, []);
+  }, [POLL_SLUG]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const name = (id: string | null, undecided: boolean) =>
     undecided ? 'Undecided' : candidates.find((c) => c.id === id)?.name || 'Unknown';
@@ -102,7 +109,13 @@ export function ElectionPollPage() {
   const zoneRows = [...ZONES, 'Diaspora'].map((z) => ({ z, ...leaders((results?.by_zone || []).filter((r) => r.zone === z)) }));
   const ageRows = AGE_BANDS.map((a) => ({ a, ...leaders((results?.by_age || []).filter((r) => r.age_band === a)) }));
 
-  const shareUrl = `${SITE}/election-2027/poll`;
+  const shareUrl = `${SITE}${race?.pollPath || '/election-2027/poll'}`;
+  const stateRows = race?.state
+    ? [
+        { label: `Readers who vote in ${race.state}`, ...leaders((results?.by_state || []).filter((r) => r.state === race.state)) },
+        { label: 'Readers elsewhere', ...leaders((results?.by_state || []).filter((r) => r.state !== race.state)) },
+      ]
+    : [];
   const select = 'w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent';
   const showForm = !voted && results && !results.blackout && results.is_open !== false;
 
@@ -110,10 +123,12 @@ export function ElectionPollPage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="pt-28 pb-16 max-w-3xl mx-auto px-4">
-        <Link to="/election-2027" className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-6"><ArrowLeft className="w-4 h-4 mr-1" /> Nigeria Decides 2027</Link>
+        {!race && <p className="text-gray-700">This poll doesn’t exist. <Link to="/election-2027" className="text-red-600 underline">Go to the election hub</Link>.</p>}
+        {race && (<>
+        <Link to={race.path} className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-6"><ArrowLeft className="w-4 h-4 mr-1" /> {race.kind === 'president' ? 'Nigeria Decides 2027' : `${race.state} governorship 2027`}</Link>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8">
           <p className="text-sm font-bold uppercase tracking-wide text-red-600 flex items-center gap-2"><Vote className="w-4 h-4" /> CelebUD reader poll</p>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">If the 2027 presidential election were held today, who would you vote for?</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{race.kind === 'president' ? 'If the 2027 presidential election were held today, who would you vote for?' : `If the 2027 ${race.state} governorship election were held today, who would you vote for?`}</h1>
 
           {results?.blackout && (
             <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-sm">
@@ -185,11 +200,11 @@ export function ElectionPollPage() {
                 {ranked.length === 0 && <p className="text-sm text-gray-500">No votes yet — be the first, and share the poll.</p>}
               </div>
 
-              <h2 className="font-bold text-gray-900 mt-8">Leading choice by zone</h2>
+              <h2 className="font-bold text-gray-900 mt-8">{race.kind === 'president' ? 'Leading choice by zone' : `Readers in ${race.state} and elsewhere`}</h2>
               <table className="w-full text-sm mt-2">
-                <tbody>{zoneRows.map(({ z, n, top }) => (
-                  <tr key={z} className="border-b last:border-0">
-                    <td className="py-2 pr-3 font-medium text-gray-800">{z === 'Diaspora' ? 'Outside Nigeria' : z}</td>
+                <tbody>{(race.kind === 'president' ? zoneRows.map((r) => ({ ...r, label: r.z === 'Diaspora' ? 'Outside Nigeria' : r.z })) : stateRows).map(({ label, n, top }) => (
+                  <tr key={label} className="border-b last:border-0">
+                    <td className="py-2 pr-3 font-medium text-gray-800">{label}</td>
                     <td className="py-2 pr-3 text-gray-700">{n >= MIN_FOR_BREAKDOWN && top ? `${name(top.candidate_id, top.undecided)} (${pct(top.votes, n, 0)})` : <span className="text-gray-400">Not enough votes yet</span>}</td>
                     <td className="py-2 text-right text-gray-500 tabular-nums">{fmtNum(n)} votes</td>
                   </tr>))}
@@ -212,10 +227,11 @@ export function ElectionPollPage() {
 
           <div className="mt-8 pt-6 border-t border-gray-100">
             <p className="font-semibold text-gray-900">Share the poll — the more people vote, the more it means</p>
-            <ShareButtons className="mt-3" url={shareUrl} text={POLL_SHARE_MESSAGE} title="CelebUD 2027 reader poll" />
+            <ShareButtons className="mt-3" url={shareUrl} text={raceShareMessage(race)} title={`CelebUD 2027 reader poll: ${race.title}`} />
           </div>
         </div>
-        <p className="text-xs text-gray-500 mt-4 text-center">See <Link to="/election-2027" className="underline">all 18 candidates and where Nigeria’s votes are</Link>. CelebUD does not endorse any candidate.</p>
+        <p className="text-xs text-gray-500 mt-4 text-center">See <Link to={race.path} className="underline">{race.kind === 'president' ? 'all 18 candidates and where Nigeria’s votes are' : `all ${candidates.length} candidates for ${race.state} governor`}</Link>. CelebUD does not endorse any candidate.</p>
+        </>)}
       </main>
     </div>
   );

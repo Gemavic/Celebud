@@ -10,7 +10,7 @@ import { updateMetaTags } from '../utils/seo';
 import { buildArticleUrl } from '../utils/articleUrl';
 import {
   type Candidate, type VoterStat, type PollResults, POLL_SLUG, PRESIDENTIAL_DAY, GOVERNORSHIP_DAY,
-  daysUntil, fmtNum, pct, initials, POLL_SHARE_MESSAGE, SITE,
+  daysUntil, fmtNum, pct, initials, POLL_SHARE_MESSAGE, SITE, GOVERNOR_RACES,
 } from '../utils/election';
 
 function Bar({ label, value, total, note }: { label: string; value: number; total: number; note?: string }) {
@@ -29,6 +29,7 @@ export function ElectionHubPage() {
   const [stats, setStats] = useState<VoterStat[]>([]);
   const [results, setResults] = useState<PollResults | null>(null);
   const [stories, setStories] = useState<{ id: string; title: string; slug: string | null; published_at: string }[]>([]);
+  const [govCounts, setGovCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     updateMetaTags({
@@ -48,6 +49,12 @@ export function ElectionHubPage() {
       setStats((s.data as unknown as VoterStat[]) || []);
       setResults((r.data as unknown as PollResults) || null);
       setStories(a.data || []);
+      const counts: Record<string, number> = {};
+      await Promise.all(GOVERNOR_RACES.map(async (g) => {
+        const { count } = await supabase.from('election_candidates').select('id', { count: 'exact', head: true }).eq('race', g.id).eq('is_active', true);
+        counts[g.id] = count ?? 0;
+      }));
+      setGovCounts(counts);
     })();
   }, []);
 
@@ -82,6 +89,26 @@ export function ElectionHubPage() {
         </section>
 
         <div className="max-w-6xl mx-auto px-4 space-y-10 mt-10">
+          {/* Governorship races — South-West first */}
+          <section>
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Vote className="w-6 h-6 text-red-600" /> Governorship races · South-West</h2>
+            <p className="text-gray-600 mt-1">Polling day Saturday 6 February 2027 · {daysUntil(GOVERNORSHIP_DAY)} days to go. Every candidate on INEC’s final list, with a reader poll for each state.</p>
+            <div className="grid md:grid-cols-3 gap-4 mt-4">
+              {GOVERNOR_RACES.map((g) => {
+                const v = stats.find((x) => x.kind === 'state' && x.label === g.state);
+                return (
+                  <Link key={g.id} to={g.path} className="group bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
+                    <p className="text-xs font-bold uppercase tracking-widest text-red-600">{g.state} State</p>
+                    <p className="text-xl font-bold text-gray-900 mt-1 group-hover:text-red-600">Who should be governor?</p>
+                    <p className="text-sm text-gray-600 mt-2">{govCounts[g.id] ?? '—'} candidates{v ? ` · ${fmtNum(v.value)} registered voters` : ''}</p>
+                    <p className="text-sm font-semibold text-red-600 mt-3 group-hover:underline">See candidates & vote →</p>
+                  </Link>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Ekiti, Osun and Ondo elect their governors on separate off-cycle dates. More states coming.</p>
+          </section>
+
           {/* Where the votes are */}
           {total > 0 && (
             <section>
