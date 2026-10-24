@@ -49,7 +49,7 @@ export function RemittanceCalculator() {
   const numIn = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent';
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+    <div id="send-money" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 scroll-mt-28">
       <div className="flex items-center gap-2 mb-2">
         <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center"><Send className="w-5 h-5 text-emerald-600" /></div>
         <h3 className="text-lg font-bold text-gray-900">Sending money home: what it really costs</h3>

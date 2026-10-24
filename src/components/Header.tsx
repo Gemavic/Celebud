@@ -15,6 +15,8 @@ const NAV_LINKS: { label: string; to: string }[] = [
   { label: 'Entertainment', to: '/?category=entertainment' },
   { label: 'Fin-Advisor', to: '/fin-advisor' },
   { label: 'Originals', to: '/originals' },
+  { label: 'Trackers', to: '/trackers' },
+  { label: 'Tributes', to: '/tributes/submit' },
   { label: 'Business', to: '/?category=business' },
   { label: 'Lifestyle', to: '/?category=lifestyle' },
   { label: 'Videos', to: '/?category=video' },

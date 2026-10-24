@@ -9,6 +9,7 @@ import { Pagination } from '../components/Pagination';
 import { AdBanner } from '../components/AdBanner';
 import { GoogleAd } from '../components/GoogleAd';
 import { WhatsAppChannelBanner } from '../components/WhatsAppChannelBanner';
+import { ReaderToolsStrip } from '../components/ReaderToolsStrip';
 import { WhatsAppFloatingButton } from '../components/WhatsAppFloatingButton';
 import { SocialMediaGrid } from '../components/SocialLinks';
 import { Loader2, LayoutGrid, List, Clock } from 'lucide-react';
@@ -131,6 +132,8 @@ function HomePage() {
       <main id="main-content" className="pt-28" role="main">
         <WhatsAppChannelBanner />
         <Hero featuredContent={featuredContent} />
+
+        <ReaderToolsStrip />
 
         <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-12">
           <AdBanner placement="header" className="max-w-4xl mx-auto" />

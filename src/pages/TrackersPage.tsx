@@ -100,6 +100,10 @@ export function TrackersPage() {
     (async () => {
       const { data } = await supabase.from('tracker_entries').select('*').order('observed_on', { ascending: false }).limit(1000);
       setEntries((data as TrackerEntry[]) || []);
+      // Homepage "Sending money home?" links to /trackers#send-money.
+      if (window.location.hash === '#send-money') {
+        setTimeout(() => document.getElementById('send-money')?.scrollIntoView({ behavior: 'smooth' }), 100);
+      }
     })();
   }, []);
 
