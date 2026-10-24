@@ -147,7 +147,7 @@ export function ArticleDetail() {
       type: 'article',
       author: article.authors?.name || 'CelebUD',
       publishedTime: article.published_at,
-      modifiedTime: article.updated_at,
+      modifiedTime: article.content_updated_at || article.updated_at,
     });
 
     generateArticleStructuredData({
@@ -157,7 +157,7 @@ export function ArticleDetail() {
       author: article.authors?.name || 'CelebUD',
       authorSlug: article.authors?.name?.toLowerCase().replace(/\s+/g, '-'),
       publishedDate: article.published_at,
-      modifiedDate: article.updated_at,
+      modifiedDate: article.content_updated_at || article.updated_at,
       url: `${window.location.origin}${canonicalPath}`,
       keywords: article.seo_keywords || undefined,
       section: article.categories?.name || undefined,
@@ -380,6 +380,14 @@ export function ArticleDetail() {
                   {formatDistanceToNow(article.published_at)}
                 </time>
               </div>
+              {article.content_updated_at && (
+                <span className="font-semibold text-emerald-700">
+                  Updated{' '}
+                  <time itemProp="dateModified" dateTime={article.content_updated_at}>
+                    {new Date(article.content_updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </time>
+                </span>
+              )}
             </div>
           </div>
 

@@ -88,6 +88,16 @@ function countWords(html: string): number {
 // something different from the human page is cloaking — a considerably
 // worse problem than the one being fixed here.
 const STATIC_PAGES: Record<string, { title: string; description: string; bodyHtml: string }> = {
+  // Mirrors src/pages/TributeSubmitPage.tsx.
+  '/tributes/submit': {
+    title: `Send us a tribute | ${SITE_NAME}`,
+    description:
+      'Celebrating a birthday, an achievement or a life well lived? Send CelebUD their story and photos and our editors will write a tribute.',
+    bodyHtml: `
+<h1>Celebrate someone special on CelebUD</h1>
+<p>A birthday, an anniversary, an achievement, or a life to remember. Tell us their story in your own words and send a few photos. Our editors will write the tribute and contact you before it is published.</p>
+<p>Your contact details are only used to reach you about this tribute and are never published. See our <a href="/privacy">privacy policy</a>.</p>`,
+  },
   '/about': {
     title: `About CelebUD — Who We Are | ${SITE_NAME}`,
     description:
@@ -231,6 +241,8 @@ const SITE_FOOTER = `<footer><nav aria-label="Site"><ul>
 <li><a href="/">Home</a></li>
 <li><a href="/originals">CelebUD Originals</a></li>
 <li><a href="/fin-advisor">Fin-Advisor</a></li>
+<li><a href="/trackers">Trackers</a></li>
+<li><a href="/tributes/submit">Send us a tribute</a></li>
 <li><a href="/about">About CelebUD</a></li>
 <li><a href="/contact">Contact</a></li>
 <li><a href="/editorial-standards">Editorial Standards</a></li>
@@ -317,6 +329,61 @@ Deno.serve(async (req: Request) => {
   const path = searchParams.get('path') || '/';
 
   try {
+    // --- /trackers: the recorded figures, so crawlers see the real data ---
+    if (path.replace(/\/+$/, '') === '/trackers') {
+      const { data: entries } = await supabase
+        .from('tracker_entries')
+        .select('tracker, observed_on, value, label, extra, source_url, note')
+        .order('observed_on', { ascending: false })
+        .limit(400);
+      const NAMES: Record<string, [string, string]> = {
+        'ngn-cad': ['Naira to Canadian dollar', 'Naira per C$1'],
+        'ngn-usd': ['Naira to US dollar', 'Naira per US$1'],
+        'express-entry': ['Express Entry draws', 'Minimum CRS score'],
+        'fuel-price': ['Petrol pump price', 'Naira per litre'],
+      };
+      const sections = Object.entries(NAMES).map(([id, [name, unit]]) => {
+        const rows = (entries || []).filter((e) => e.tracker === id).slice(0, 30);
+        const body = rows.length
+          ? `<table><thead><tr><th>Date</th><th></th><th>${unit}</th></tr></thead><tbody>${rows.map((e) =>
+              `<tr><td>${escapeHtml(e.observed_on)}</td><td>${escapeHtml(e.label || '')}</td><td>${Number(e.value).toLocaleString('en')}${e.extra != null ? ` (${Number(e.extra).toLocaleString('en')} invited)` : ''}</td></tr>`).join('')}</tbody></table>`
+          : '<p>Our editors are starting this record.</p>';
+        return `<h2>${name}</h2>${body}`;
+      }).join('');
+      const title = `Naira rates, Express Entry draws & petrol prices — CelebUD Trackers`;
+      const description = 'Naira to Canadian and US dollar, every Express Entry draw, and petrol pump prices, recorded over time with sources by CelebUD editors.';
+      const url = `${SITE_URL}/trackers`;
+      return new Response(
+        baseHtml({
+          title, description, url, type: 'website',
+          jsonLd: { '@context': 'https://schema.org', '@type': 'WebPage', name: title, description, url },
+          bodyHtml: `<main><h1>The numbers that shape life between Nigeria and Canada</h1><p>Recorded by our editors over time, every figure with its source.</p>${sections}</main>`,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } },
+      );
+    }
+
+    // --- /ask/:slug: a reader callout. Real page, but a one-line form is
+    // not something to rank, so it is noindex.
+    const askMatch = path.match(/^\/ask\/([a-z0-9-]+)\/?$/);
+    if (askMatch) {
+      const { data: q } = await supabase.from('reader_questions').select('question, intro').eq('slug', askMatch[1]).maybeSingle();
+      if (!q) {
+        return new Response('Not found', { status: 404, headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' } });
+      }
+      const url = `${SITE_URL}/ask/${askMatch[1]}`;
+      const description = 'Tell CelebUD in a minute — your answer may appear in our next story.';
+      return new Response(
+        baseHtml({
+          title: `${q.question} | Ask CelebUD`, description, url, type: 'website',
+          jsonLd: { '@context': 'https://schema.org', '@type': 'WebPage', name: q.question, description, url },
+          bodyHtml: `<main><h1>${escapeHtml(q.question)}</h1>${q.intro ? `<p>${escapeHtml(q.intro)}</p>` : ''}<p>${description}</p></main>`,
+          robots: 'noindex,follow',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } },
+      );
+    }
+
     // --- Static trust pages: /about, /contact, /privacy, /editorial-standards ---
     const staticPage = STATIC_PAGES[path.replace(/\/+$/, '') || '/'];
     if (staticPage) {
@@ -673,7 +740,9 @@ ${ownFile
         description: article.description,
         image: article.thumbnail_url ? [article.thumbnail_url] : undefined,
         datePublished: article.published_at,
-        dateModified: article.updated_at,
+        // A deliberate editorial review (Newsroom > Living guides) is the
+        // meaningful modification date; fall back to the row's updated_at.
+        dateModified: article.content_updated_at || article.updated_at,
         author: [{ '@type': 'Person', name: article.authors?.name || SITE_NAME }],
         publisher: {
           '@type': 'Organization',
@@ -717,6 +786,10 @@ ${ownFile
   <p>By ${escapeHtml(article.authors?.name || SITE_NAME)}${
     article.published_at
       ? ` — <time datetime="${escapeHtml(article.published_at)}">${escapeHtml(formatBylineDate(article.published_at))}</time>`
+      : ''
+  }${
+    article.content_updated_at
+      ? ` · Updated <time datetime="${escapeHtml(article.content_updated_at)}">${escapeHtml(formatBylineDate(article.content_updated_at))}</time>`
       : ''
   }</p>
   ${article.thumbnail_url ? `<img src="${article.thumbnail_url}" alt="${escapeHtml(article.title)}" />` : ''}

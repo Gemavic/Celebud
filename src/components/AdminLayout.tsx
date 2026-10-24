@@ -22,6 +22,7 @@ import {
   UserCheck,
   Archive,
   Mail,
+  Newspaper,
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -33,6 +34,7 @@ interface AdminLayoutProps {
 const NAV_ITEMS = [
   { path: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { path: '/admin/articles', label: 'Articles', icon: FileText },
+  { path: '/admin/newsroom', label: 'Newsroom', icon: Newspaper },
   { path: '/admin/recovery', label: 'Recovery', icon: Archive },
   { path: '/admin/subscribers', label: 'Newsletter', icon: Mail },
   { path: '/admin/writers', label: "Writer's Production", icon: PenLine },

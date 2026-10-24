@@ -193,6 +193,8 @@ Deno.serve(async (req: Request) => {
     const staticPages = [
       { url: '', priority: '1.0', changefreq: 'daily' },
       { url: '/fin-advisor', priority: '0.8', changefreq: 'daily' },
+      { url: '/trackers', priority: '0.7', changefreq: 'weekly' },
+      { url: '/tributes/submit', priority: '0.4', changefreq: 'monthly' },
       { url: '/originals', priority: '0.7', changefreq: 'weekly' },
       { url: '/about', priority: '0.5', changefreq: 'monthly' },
       { url: '/contact', priority: '0.5', changefreq: 'monthly' },

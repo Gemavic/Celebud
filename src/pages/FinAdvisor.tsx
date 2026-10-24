@@ -3,6 +3,7 @@
 // Four gradient topic cards each open a full written guide (TopicView),
 // alongside live calculators (Investment, Savings Goal, 50/30/20 Budget
 // Analyzer), finance-only articles, and quick tips.
+import { RemittanceCalculator } from '../components/RemittanceCalculator';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -524,6 +525,9 @@ export function FinAdvisor() {
               </div>
               <div className="lg:col-span-2">
                 <DebtPayoffCalculator />
+              </div>
+              <div className="lg:col-span-2">
+                <RemittanceCalculator />
               </div>
               <div className="lg:col-span-2">
                 <PageDisclaimer />

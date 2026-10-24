@@ -123,6 +123,11 @@ export interface Database {
           seo_title: string | null;
           seo_keywords: string | null;
           enriched_at: string | null;
+          radar_score: number | null;
+          radar_notes: Json | null;
+          radar_scored_at: string | null;
+          radar_dismissed: boolean;
+          content_updated_at: string | null;
           published_at: string;
           created_at: string;
           updated_at: string;
@@ -155,6 +160,11 @@ export interface Database {
           seo_title?: string | null;
           seo_keywords?: string | null;
           enriched_at?: string | null;
+          radar_score?: number | null;
+          radar_notes?: Json | null;
+          radar_scored_at?: string | null;
+          radar_dismissed?: boolean;
+          content_updated_at?: string | null;
           published_at?: string;
           created_at?: string;
           updated_at?: string;
@@ -175,7 +185,58 @@ export interface Database {
             referencedRelation: 'authors';
             referencedColumns: ['id'];
           },
+          {
+            foreignKeyName: 'media_content_source_id_fkey';
+            columns: ['source_id'];
+            isOneToOne: false;
+            referencedRelation: 'news_sources';
+            referencedColumns: ['id'];
+          },
         ];
+      };
+      reader_questions: {
+        Row: { id: string; slug: string; question: string; intro: string | null; is_open: boolean; created_at: string };
+        Insert: { id?: string; slug: string; question: string; intro?: string | null; is_open?: boolean; created_at?: string };
+        Update: Partial<Database['public']['Tables']['reader_questions']['Insert']>;
+        Relationships: [];
+      };
+      reader_answers: {
+        Row: {
+          id: string; question_id: string; name: string | null; location: string | null; answer: string;
+          contact: string | null; may_quote: boolean; status: string; created_at: string;
+        };
+        Insert: {
+          id?: string; question_id: string; name?: string | null; location?: string | null; answer: string;
+          contact?: string | null; may_quote?: boolean; status?: string; created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['reader_answers']['Insert']>;
+        Relationships: [];
+      };
+      tribute_submissions: {
+        Row: {
+          id: string; submitter_name: string; submitter_contact: string; relationship: string | null;
+          honoree_name: string; occasion: string; occasion_date: string | null; story: string; quotes: string | null;
+          photos: string[]; consent: boolean; status: string; article_id: string | null; created_at: string;
+        };
+        Insert: {
+          id?: string; submitter_name: string; submitter_contact: string; relationship?: string | null;
+          honoree_name: string; occasion: string; occasion_date?: string | null; story: string; quotes?: string | null;
+          photos?: string[]; consent: boolean; status?: string; article_id?: string | null; created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['tribute_submissions']['Insert']>;
+        Relationships: [];
+      };
+      tracker_entries: {
+        Row: {
+          id: string; tracker: string; observed_on: string; value: number; label: string | null;
+          extra: number | null; source_url: string | null; note: string | null; created_at: string;
+        };
+        Insert: {
+          id?: string; tracker: string; observed_on: string; value: number; label?: string | null;
+          extra?: number | null; source_url?: string | null; note?: string | null; created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['tracker_entries']['Insert']>;
+        Relationships: [];
       };
       media_content_archive: {
         Row: {

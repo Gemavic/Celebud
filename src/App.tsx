@@ -20,6 +20,10 @@ const ReporterManagement = lazy(() => import('./pages/ReporterManagement').then(
 const SubscribersPage = lazy(() => import('./pages/SubscribersPage').then(m => ({ default: m.SubscribersPage })));
 const UnsubscribePage = lazy(() => import('./pages/UnsubscribePage').then(m => ({ default: m.UnsubscribePage })));
 const OriginalsPage = lazy(() => import('./pages/OriginalsPage').then(m => ({ default: m.OriginalsPage })));
+const NewsroomPage = lazy(() => import('./pages/NewsroomPage').then(m => ({ default: m.NewsroomPage })));
+const AskPage = lazy(() => import('./pages/AskPage').then(m => ({ default: m.AskPage })));
+const TributeSubmitPage = lazy(() => import('./pages/TributeSubmitPage').then(m => ({ default: m.TributeSubmitPage })));
+const TrackersPage = lazy(() => import('./pages/TrackersPage').then(m => ({ default: m.TrackersPage })));
 const FinAdvisor = lazy(() => import('./pages/FinAdvisor').then(module => ({ default: module.FinAdvisor })));
 const WatchPage = lazy(() => import('./pages/WatchPage').then(m => ({ default: m.WatchPage })));
 const AuthorPage = lazy(() => import('./pages/AuthorPage').then(module => ({ default: module.AuthorPage })));
@@ -52,6 +56,10 @@ function App() {
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/ad-revenue" element={<AdRevenueReport />} />
             <Route path="/admin/articles" element={<ArticleManagement />} />
+            <Route path="/admin/newsroom" element={<NewsroomPage />} />
+            <Route path="/ask/:slug" element={<AskPage />} />
+            <Route path="/tributes/submit" element={<TributeSubmitPage />} />
+            <Route path="/trackers" element={<TrackersPage />} />
             <Route path="/admin/recovery" element={<ArticleRecovery />} />
             <Route path="/admin/subscribers" element={<SubscribersPage />} />
             <Route path="/unsubscribe" element={<UnsubscribePage />} />

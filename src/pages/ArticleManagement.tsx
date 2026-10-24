@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { supabase } from '../lib/supabase';
@@ -1042,6 +1043,26 @@ export function ArticleManagement() {
       }
     }
   };
+
+  // /admin/articles?edit=<id> opens that article straight in the editor —
+  // the Newsroom tools link here after saving a draft.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkId = searchParams.get('edit');
+  useEffect(() => {
+    if (!profile?.is_admin || !deepLinkId) return;
+    (async () => {
+      const { data } = await supabase
+        .from('media_content')
+        .select('*, categories:category_id (id, name, slug)')
+        .eq('id', deepLinkId)
+        .maybeSingle();
+      if (data) openEditor(data as unknown as Article);
+      const next = new URLSearchParams(searchParams);
+      next.delete('edit');
+      setSearchParams(next, { replace: true });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.is_admin, deepLinkId]);
 
   const openNewArticle = () => {
     setIsCreatingNew(true);

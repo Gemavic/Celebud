@@ -346,6 +346,16 @@ function HomePage() {
                   </Link>
                 </li>
                 <li>
+                  <Link to="/tributes/submit" className="hover:text-white transition-colors">
+                    Send Us a Tribute
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/trackers" className="hover:text-white transition-colors">
+                    Naira &amp; Express Entry Trackers
+                  </Link>
+                </li>
+                <li>
                   <Link to="/reporters/apply" className="hover:text-white transition-colors">
                     Become a Reporter
                   </Link>
