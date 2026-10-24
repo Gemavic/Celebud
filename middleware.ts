@@ -59,11 +59,13 @@ const KNOWN_EXACT = new Set([
   '/curators/apply',
   '/reporters/apply',
   '/admin',
+  '/trackers',
+  '/tributes/submit',
 ]);
 
 // Parameterised and wildcard routes: /article/:id, /article/:id/:slug,
 // /author/:id, /watch/:id, /admin/*, /editorial/*.
-const KNOWN_PREFIXES = ['/article/', '/author/', '/watch/', '/admin/', '/editorial/'];
+const KNOWN_PREFIXES = ['/article/', '/author/', '/watch/', '/admin/', '/editorial/', '/ask/'];
 
 // Only these get the Prerender treatment from middleware. /article/* and
 // /watch/* are already handled by vercel.json rewrites (no file shadows
@@ -82,7 +84,13 @@ const PRERENDER_EXACT = new Set([
   '/editorial-standards',
   '/originals',
   '/fin-advisor',
+  '/trackers',
+  '/tributes/submit',
 ]);
+
+// Reader callouts (/ask/:slug) have their own Prerender branch, which 404s
+// an unknown slug itself — so only a well-formed slug is sent there.
+const ASK_PAGE = /^\/ask\/[a-z0-9-]{3,80}$/;
 
 // Author profiles are prerendered too — every byline links to one, and they
 // are what makes the newsroom look staffed by real, named people rather than
@@ -158,7 +166,7 @@ export default function middleware(request: Request) {
     if (!known) return notFoundPage(raw);
 
     const ua = request.headers.get('user-agent') || '';
-    const prerenderable = PRERENDER_EXACT.has(path) || AUTHOR_PROFILE.test(path);
+    const prerenderable = PRERENDER_EXACT.has(path) || AUTHOR_PROFILE.test(path) || ASK_PAGE.test(path);
     if (!CRAWLER_UA.test(ua) || !prerenderable) return next();
 
     const target = new URL(PRERENDER);
