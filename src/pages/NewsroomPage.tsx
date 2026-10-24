@@ -15,8 +15,10 @@ import { TributeInbox } from '../components/newsroom/TributeInbox';
 import { WeeklyDigest } from '../components/newsroom/WeeklyDigest';
 import { LivingGuides } from '../components/newsroom/LivingGuides';
 import { TrackersAdmin } from '../components/newsroom/TrackersAdmin';
+import { ElectionAdmin } from '../components/newsroom/ElectionAdmin';
 
 const TABS = [
+  { id: 'election', label: 'Election 2027', el: ElectionAdmin },
   { id: 'radar', label: 'Story Radar', el: StoryRadar },
   { id: 'voice', label: 'Voice Notes', el: VoiceNotes },
   { id: 'ask', label: 'Reader Questions', el: ReaderQuestions },
@@ -28,7 +30,7 @@ const TABS = [
 
 export function NewsroomPage() {
   const [params, setParams] = useSearchParams();
-  const initial = TABS.find((t) => t.id === params.get('tab'))?.id ?? 'radar';
+  const initial = TABS.find((t) => t.id === params.get('tab'))?.id ?? 'election';
   const [tab, setTab] = useState<string>(initial);
   const Active = TABS.find((t) => t.id === tab)!.el;
 

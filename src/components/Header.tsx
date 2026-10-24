@@ -12,9 +12,10 @@ import { supabase } from '../lib/supabase';
 // also one tap away in the category pills on the homepage.
 const NAV_LINKS: { label: string; to: string; desktop?: boolean }[] = [
   { label: 'Home', to: '/', desktop: false },
+  { label: 'Election 2027', to: '/election-2027' },
   { label: 'News', to: '/?category=news' },
   { label: 'Politics', to: '/?category=politics' },
-  { label: 'Society', to: '/?category=society' },
+  { label: 'Society', to: '/?category=society', desktop: false },
   { label: 'Entertainment', to: '/?category=entertainment' },
   { label: 'Fin-Advisor', to: '/fin-advisor' },
   { label: 'Originals', to: '/originals' },
@@ -229,7 +230,7 @@ export function Header() {
                   key={item.label}
                   to={item.to}
                   onClick={item.to === '/' ? scrollToTop : undefined}
-                  className="px-2.5 xl:px-3 py-2 text-[13px] font-semibold uppercase tracking-wide text-gray-700 border-b-2 border-transparent hover:text-red-600 hover:border-red-600 transition-colors whitespace-nowrap"
+                  className={`px-2.5 xl:px-3 py-2 text-[13px] font-semibold uppercase tracking-wide border-b-2 border-transparent hover:text-red-600 hover:border-red-600 transition-colors whitespace-nowrap ${item.to === '/election-2027' ? 'text-red-600' : 'text-gray-700'}`}
                 >
                   {item.label}
                 </Link>

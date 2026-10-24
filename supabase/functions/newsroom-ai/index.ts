@@ -232,6 +232,57 @@ Output: {"themes":[{"theme":"...","count":0,"example_indexes":[0]}], ${DRAFT_SHA
   return { themes, total: answers.length, draft: cleanDraft(d) };
 }
 
+// Researched candidate profile for the Election 2027 hub, with sources.
+// Uses Google Search grounding so facts come from current reporting, and
+// returns the URLs Google actually used. The editor reviews every line —
+// every candidate gets the same template and the same scrutiny.
+async function candidateProfile(sb: SupabaseClient, key: string, body: { candidate_id?: string }) {
+  const { data: c } = await sb.from('election_candidates').select('*').eq('id', body.candidate_id || '').maybeSingle();
+  if (!c) throw new Error('Candidate not found.');
+  const system = `You are a neutral election researcher for CelebUD, a Nigerian news site. Write a factual, even-handed profile of a 2027 Nigerian presidential candidate using current, reliable reporting. Never praise or criticise; no adjectives like "visionary" or "controversial"; no predictions. If you cannot verify something, leave it out. Prefer INEC, official party/campaign statements and established Nigerian newspapers.
+Respond with ONE JSON object only, no code fences:
+{"bio": "3-5 neutral sentences: background, profession, political career (plain text)",
+ "past_offices": "semicolon-separated list of offices held with years, or empty string",
+ "promises": [{"text": "a specific campaign promise in their own framing, attributed", "date": "YYYY-MM-DD or empty", "source_url": "URL where it was reported"}]}
+Give at most 5 promises, each with a real source URL from your research. If none can be verified, return an empty array.`;
+  const text = `Candidate: ${c.name}\nParty: ${c.party_name || c.party_abbr} (${c.party_abbr})\nRunning mate: ${c.running_mate || 'unknown'}\nElection: Nigeria presidential election, 16 January 2027.`;
+
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents: [{ role: 'user', parts: [{ text }] }],
+      tools: [{ google_search: {} }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+    }),
+  });
+  if (!resp.ok) throw new Error(`AI request failed (${resp.status}): ${(await resp.text()).slice(0, 200)}`);
+  const data = await resp.json();
+  const cand = data?.candidates?.[0];
+  const raw: string = (cand?.content?.parts || []).map((p: { text?: string }) => p.text || '').join('').trim();
+  let s = raw.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  const a = s.indexOf('{'); const b = s.lastIndexOf('}');
+  if (a !== -1 && b !== -1) s = s.slice(a, b + 1);
+  let d: Record<string, unknown>;
+  try { d = JSON.parse(s); } catch { throw new Error('The AI returned malformed output — please try again.'); }
+
+  const grounding = (cand?.groundingMetadata?.groundingChunks || []) as Array<{ web?: { uri?: string; title?: string } }>;
+  const sources = grounding.map((g) => ({ title: stripHtml(g.web?.title || 'Source').slice(0, 200), url: g.web?.uri || '' }))
+    .filter((x) => /^https?:\/\//.test(x.url)).slice(0, 8);
+  const promises = (Array.isArray(d.promises) ? d.promises : []).slice(0, 5).map((p: Record<string, unknown>) => ({
+    text: stripHtml(String(p.text || '')).slice(0, 400),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(String(p.date || '')) ? String(p.date) : '',
+    source_url: /^https?:\/\//.test(String(p.source_url || '')) ? String(p.source_url).slice(0, 500) : '',
+  })).filter((p) => p.text);
+  return {
+    bio: stripHtml(String(d.bio || '')).slice(0, 4000),
+    past_offices: stripHtml(String(d.past_offices || '')).slice(0, 2000),
+    promises,
+    sources,
+  };
+}
+
 async function tributeDraft(sb: SupabaseClient, key: string, body: { submission_id?: string }) {
   const { data: s } = await sb.from('tribute_submissions').select('*').eq('id', body.submission_id || '').maybeSingle();
   if (!s) throw new Error('Submission not found.');
@@ -276,6 +327,7 @@ Deno.serve(async (req) => {
       case 'digest_notes': return json({ success: true, ...(await digestNotes(sb, key, body)) });
       case 'group_answers': return json({ success: true, ...(await groupAnswers(sb, key, body)) });
       case 'tribute_draft': return json({ success: true, ...(await tributeDraft(sb, key, body)) });
+      case 'candidate_profile': return json({ success: true, ...(await candidateProfile(sb, key, body)) });
       default: return json({ error: `Unknown action: ${body.action}` }, 400);
     }
   } catch (e) {

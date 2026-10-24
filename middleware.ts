@@ -61,11 +61,12 @@ const KNOWN_EXACT = new Set([
   '/admin',
   '/trackers',
   '/tributes/submit',
+  '/election-2027',
 ]);
 
 // Parameterised and wildcard routes: /article/:id, /article/:id/:slug,
 // /author/:id, /watch/:id, /admin/*, /editorial/*.
-const KNOWN_PREFIXES = ['/article/', '/author/', '/watch/', '/admin/', '/editorial/', '/ask/'];
+const KNOWN_PREFIXES = ['/article/', '/author/', '/watch/', '/admin/', '/editorial/', '/ask/', '/election-2027/'];
 
 // Only these get the Prerender treatment from middleware. /article/* and
 // /watch/* are already handled by vercel.json rewrites (no file shadows
@@ -86,7 +87,12 @@ const PRERENDER_EXACT = new Set([
   '/fin-advisor',
   '/trackers',
   '/tributes/submit',
+  '/election-2027',
+  '/election-2027/poll',
 ]);
+
+// Election candidate profiles: /election-2027/<slug>, own Prerender branch.
+const ELECTION_CANDIDATE = /^\/election-2027\/[a-z0-9-]{3,80}$/;
 
 // Reader callouts (/ask/:slug) have their own Prerender branch, which 404s
 // an unknown slug itself — so only a well-formed slug is sent there.
@@ -166,7 +172,7 @@ export default function middleware(request: Request) {
     if (!known) return notFoundPage(raw);
 
     const ua = request.headers.get('user-agent') || '';
-    const prerenderable = PRERENDER_EXACT.has(path) || AUTHOR_PROFILE.test(path) || ASK_PAGE.test(path);
+    const prerenderable = PRERENDER_EXACT.has(path) || AUTHOR_PROFILE.test(path) || ASK_PAGE.test(path) || ELECTION_CANDIDATE.test(path);
     if (!CRAWLER_UA.test(ua) || !prerenderable) return next();
 
     const target = new URL(PRERENDER);

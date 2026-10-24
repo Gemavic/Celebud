@@ -193,6 +193,8 @@ Deno.serve(async (req: Request) => {
     const staticPages = [
       { url: '', priority: '1.0', changefreq: 'daily' },
       { url: '/fin-advisor', priority: '0.8', changefreq: 'daily' },
+      { url: '/election-2027', priority: '0.9', changefreq: 'daily' },
+      { url: '/election-2027/poll', priority: '0.6', changefreq: 'daily' },
       { url: '/trackers', priority: '0.7', changefreq: 'weekly' },
       { url: '/tributes/submit', priority: '0.4', changefreq: 'monthly' },
       { url: '/originals', priority: '0.7', changefreq: 'weekly' },
@@ -216,6 +218,11 @@ Deno.serve(async (req: Request) => {
       sitemap += `    <changefreq>${page.changefreq}</changefreq>\n`;
       sitemap += `    <priority>${page.priority}</priority>\n`;
       sitemap += '  </url>\n';
+    });
+    // Election 2027 candidate profiles — one page per candidate.
+    const { data: cands } = await supabase.from('election_candidates').select('slug, updated_at').eq('is_active', true);
+    (cands || []).forEach((c: { slug: string; updated_at: string }) => {
+      sitemap += `  <url>\n    <loc>${SITE_URL}/election-2027/${c.slug}</loc>\n    <lastmod>${c.updated_at}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>\n`;
     });
     (articles || []).forEach((article: Article) => {
       sitemap += '  <url>\n';

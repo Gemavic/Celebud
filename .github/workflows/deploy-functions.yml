@@ -70,6 +70,9 @@ jobs:
       - name: Deploy generate-author-bio (AI author bios, JWT on)
         run: supabase functions deploy generate-author-bio --project-ref "$PROJECT_REF"
 
+      - name: Deploy election-vote (Election 2027 reader poll, JWT on - anon key)
+        run: supabase functions deploy election-vote --project-ref "$PROJECT_REF"
+
       - name: Deploy newsroom-ai (Newsroom page AI helpers, JWT on)
         run: supabase functions deploy newsroom-ai --project-ref "$PROJECT_REF"
 

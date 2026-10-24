@@ -194,6 +194,47 @@ export interface Database {
           },
         ];
       };
+      election_candidates: {
+        Row: {
+          id: string; race: string; ballot_order: number; slug: string; name: string; party_abbr: string;
+          party_name: string | null; running_mate: string | null; photo_url: string | null; bio: string | null;
+          past_offices: string | null; promises: Json; sources: Json; search_terms: string[]; is_active: boolean; updated_at: string;
+        };
+        Insert: {
+          id?: string; race?: string; ballot_order: number; slug: string; name: string; party_abbr: string;
+          party_name?: string | null; running_mate?: string | null; photo_url?: string | null; bio?: string | null;
+          past_offices?: string | null; promises?: Json; sources?: Json; search_terms?: string[]; is_active?: boolean; updated_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['election_candidates']['Insert']>;
+        Relationships: [];
+      };
+      election_voter_stats: {
+        Row: {
+          id: string; kind: string; label: string; zone: string | null; value: number; sort: number;
+          as_of: string; source_title: string | null; source_url: string | null;
+        };
+        Insert: {
+          id?: string; kind: string; label: string; zone?: string | null; value: number; sort?: number;
+          as_of: string; source_title?: string | null; source_url?: string | null;
+        };
+        Update: Partial<Database['public']['Tables']['election_voter_stats']['Insert']>;
+        Relationships: [];
+      };
+      election_polls: {
+        Row: { id: string; slug: string; race: string; question: string; polling_day: string; is_open: boolean; created_at: string };
+        Insert: { id?: string; slug: string; race?: string; question: string; polling_day: string; is_open?: boolean; created_at?: string };
+        Update: Partial<Database['public']['Tables']['election_polls']['Insert']>;
+        Relationships: [];
+      };
+      election_poll_votes: {
+        Row: {
+          id: string; poll_id: string; candidate_id: string | null; undecided: boolean; device_id: string; ip_hash: string;
+          age_band: string | null; state: string | null; zone: string | null; gender: string | null; registered: string | null; created_at: string;
+        };
+        Insert: { id?: string; poll_id: string; candidate_id?: string | null; undecided?: boolean; device_id: string; ip_hash: string };
+        Update: Partial<Database['public']['Tables']['election_poll_votes']['Insert']>;
+        Relationships: [];
+      };
       reader_questions: {
         Row: { id: string; slug: string; question: string; intro: string | null; is_open: boolean; created_at: string };
         Insert: { id?: string; slug: string; question: string; intro?: string | null; is_open?: boolean; created_at?: string };
@@ -1199,6 +1240,10 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      election_poll_results: {
+        Args: { p_slug: string };
+        Returns: Json;
+      };
       unsubscribe_newsletter: {
         Args: { p_id: string };
         Returns: boolean;

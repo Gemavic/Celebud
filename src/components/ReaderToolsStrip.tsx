@@ -1,7 +1,8 @@
 // Homepage entry points for the reader-facing tools, so they are found from
 // the top of the site rather than only from footer links.
 import { Link } from 'react-router-dom';
-import { Heart, LineChart, Send } from 'lucide-react';
+import { Heart, LineChart, Send, Vote } from 'lucide-react';
+import { daysUntil, PRESIDENTIAL_DAY } from '../utils/election';
 
 const ITEMS = [
   {
@@ -33,6 +34,17 @@ const ITEMS = [
 export function ReaderToolsStrip() {
   return (
     <section aria-label="Reader tools" className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-10">
+      <Link to="/election-2027"
+        className="group mb-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-gray-900 text-white rounded-2xl p-5 hover:bg-black transition">
+        <span className="flex items-center gap-3 flex-1">
+          <span className="w-11 h-11 rounded-xl bg-red-600 flex items-center justify-center flex-shrink-0"><Vote className="w-5 h-5" /></span>
+          <span>
+            <span className="block text-xs font-bold uppercase tracking-widest text-red-400">Nigeria Decides 2027 · {daysUntil(PRESIDENTIAL_DAY)} days to go</span>
+            <span className="block font-bold text-lg">All 18 presidential candidates, where the 103.4m votes are, and who our readers would vote for today</span>
+          </span>
+        </span>
+        <span className="font-semibold text-red-300 group-hover:underline whitespace-nowrap">Open the election hub →</span>
+      </Link>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {ITEMS.map(({ to, icon: Icon, title, text, cta, tone }) => (
           <Link key={to} to={to}

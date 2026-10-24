@@ -241,6 +241,7 @@ const SITE_FOOTER = `<footer><nav aria-label="Site"><ul>
 <li><a href="/">Home</a></li>
 <li><a href="/originals">CelebUD Originals</a></li>
 <li><a href="/fin-advisor">Fin-Advisor</a></li>
+<li><a href="/election-2027">Election 2027</a></li>
 <li><a href="/trackers">Trackers</a></li>
 <li><a href="/tributes/submit">Send us a tribute</a></li>
 <li><a href="/about">About CelebUD</a></li>
@@ -361,6 +362,64 @@ Deno.serve(async (req: Request) => {
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } },
       );
+    }
+
+    // --- Election 2027 hub, poll and candidate profiles. Same facts the
+    // React pages show; poll RESULTS are deliberately not rendered here (a
+    // crawler snapshot would freeze a moving number into search results).
+    const electionPath = path.replace(/\/+$/, '');
+    if (electionPath === '/election-2027' || electionPath === '/election-2027/poll' || /^\/election-2027\/[a-z0-9-]{3,80}$/.test(electionPath)) {
+      const { data: cands } = await supabase
+        .from('election_candidates')
+        .select('slug, name, party_abbr, party_name, running_mate, bio, past_offices, promises, sources, ballot_order')
+        .eq('race', 'president-2027').eq('is_active', true).order('ballot_order');
+      const list = cands || [];
+      const html200 = (title: string, description: string, url: string, bodyHtml: string, jsonType = 'WebPage') => new Response(
+        baseHtml({ title, description, url, type: 'website', jsonLd: { '@context': 'https://schema.org', '@type': jsonType, name: title, description, url }, bodyHtml }),
+        { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } },
+      );
+      const candList = `<ol>${list.map((c) => `<li><a href="/election-2027/${c.slug}">${escapeHtml(c.name)}</a> — ${escapeHtml(c.party_name || c.party_abbr)} (${escapeHtml(c.party_abbr)})${c.running_mate ? `; running mate ${escapeHtml(c.running_mate)}` : ''}</li>`).join('')}</ol>`;
+
+      if (electionPath === '/election-2027') {
+        const { data: stats } = await supabase.from('election_voter_stats').select('kind, label, value, zone').order('sort');
+        const st = stats || [];
+        const total = st.find((s) => s.kind === 'total')?.value || 0;
+        const rows = (kind: string) => st.filter((s) => s.kind === kind).map((s) => `<tr><td>${escapeHtml(s.label)}</td><td>${Number(s.value).toLocaleString('en')}</td><td>${total ? ((Number(s.value) / Number(total)) * 100).toFixed(1) : '0'}%</td></tr>`).join('');
+        const body = `<main><h1>Nigeria Decides 2027: candidates, voter numbers and reader poll</h1>
+<p>The presidential and National Assembly elections are on Saturday, 16 January 2027; governorship and State House of Assembly elections on 6 February 2027. INEC's 2027 register has ${Number(total).toLocaleString('en')} registered voters.</p>
+<h2>Registered voters by geopolitical zone</h2><table><tbody>${rows('zone')}</tbody></table>
+<h2>Registered voters by age</h2><table><tbody>${rows('age')}</tbody></table>
+<h2>Registered voters by gender</h2><table><tbody>${rows('gender')}</tbody></table>
+<h2>Largest states by registered voters</h2><table><tbody>${rows('state')}</tbody></table>
+<h2>The ${list.length} presidential candidates (INEC ballot order)</h2>${candList}
+<p><a href="/election-2027/poll">Take the CelebUD reader poll</a>. CelebUD does not endorse any candidate.</p></main>`;
+        return html200('Nigeria Decides 2027: Candidates, Voter Numbers & Reader Poll | CelebUD',
+          `All ${list.length} presidential candidates, where Nigeria's ${Number(total).toLocaleString('en')} registered voters are by zone, state and age, and the CelebUD reader poll.`,
+          `${SITE_URL}/election-2027`, body);
+      }
+      if (electionPath === '/election-2027/poll') {
+        return html200('Who gets your vote in 2027? CelebUD Reader Poll',
+          'If Nigeria voted today, who would you choose for President? Vote in the CelebUD reader poll and see how each zone and age group is leaning.',
+          `${SITE_URL}/election-2027/poll`,
+          `<main><h1>If the 2027 presidential election were held today, who would you vote for?</h1><p>A CelebUD reader poll: one vote per device, results shown by geopolitical zone and age group. It counts readers who choose to take part and is not a scientific survey.</p><h2>Candidates</h2>${candList}</main>`);
+      }
+      const slugPart = electionPath.split('/').pop();
+      const c = list.find((x) => x.slug === slugPart);
+      if (!c) {
+        return new Response('Not found', { status: 404, headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' } });
+      }
+      const promises = (Array.isArray(c.promises) ? c.promises : []) as Array<{ text?: string; source_url?: string }>;
+      const sources = (Array.isArray(c.sources) ? c.sources : []) as Array<{ title?: string; url?: string }>;
+      const body = `<main><article><h1>${escapeHtml(c.name)}: 2027 presidential candidate</h1>
+<p>${escapeHtml(c.party_name || c.party_abbr)} (${escapeHtml(c.party_abbr)}) · ballot number ${c.ballot_order}${c.running_mate ? ` · running mate ${escapeHtml(c.running_mate)}` : ''} · election day 16 January 2027</p>
+<h2>Background</h2><p>${c.bio ? escapeHtml(c.bio) : 'Profile being prepared by CelebUD editors.'}</p>
+${c.past_offices ? `<h2>Offices held</h2><ul>${c.past_offices.split(';').map((o: string) => o.trim()).filter(Boolean).map((o: string) => `<li>${escapeHtml(o)}</li>`).join('')}</ul>` : ''}
+${promises.length ? `<h2>Campaign promises</h2><ul>${promises.map((p) => `<li>${escapeHtml(p.text || '')}${p.source_url ? ` (<a href="${escapeHtml(p.source_url)}" rel="nofollow noopener">source</a>)` : ''}</li>`).join('')}</ul>` : ''}
+${sources.length ? `<h2>Sources</h2><ul>${sources.map((s) => `<li><a href="${escapeHtml(s.url || '')}" rel="nofollow noopener">${escapeHtml(s.title || 'Source')}</a></li>`).join('')}</ul>` : ''}
+<p><a href="/election-2027">All presidential candidates</a> · <a href="/election-2027/poll">Reader poll</a>. CelebUD does not endorse any candidate.</p></article></main>`;
+      return html200(`${c.name} (${c.party_abbr}) — 2027 Presidential Candidate Profile | CelebUD`,
+        `${c.name} is the ${c.party_name || c.party_abbr} candidate for Nigeria's 2027 presidential election${c.running_mate ? `, with ${c.running_mate} as running mate` : ''}. Background, offices held, promises and sources.`,
+        `${SITE_URL}/election-2027/${c.slug}`, body, 'ProfilePage');
     }
 
     // --- /ask/:slug: a reader callout. Real page, but a one-line form is
