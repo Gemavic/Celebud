@@ -1530,6 +1530,10 @@ export function ArticleManagement() {
 
   const saveArticle = async () => {
     if (!editingArticle && !isCreatingNew) return;
+    if (editForm.content.includes('upload.pending.invalid')) {
+      alert('A photo or video is still uploading into the article. Wait until it appears, then save again.');
+      return;
+    }
     setSaving(true);
     setPublishBlockedBy(null);
     try {

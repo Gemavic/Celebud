@@ -303,6 +303,51 @@ Output: {${DRAFT_SHAPE}}`;
   return { draft, thumbnail: photos[0] || null };
 }
 
+
+// ---------------------------------------------------------------------------
+// rehost_image — fetch a public image URL and store a copy in the media bucket.
+
+const IMAGE_TYPES: Record<string, string> = {
+  'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/avif': 'avif',
+};
+
+function isPublicHost(host: string): boolean {
+  const h = host.toLowerCase();
+  if (!h.includes('.') || h === 'localhost' || /\.(local|internal|localhost)$/.test(h)) return false;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.startsWith('[')) return false; // no raw IPs
+  return true;
+}
+
+async function rehostImage(sb: ReturnType<typeof createClient>, supabaseUrl: string, body: { url?: string }) {
+  let target = String(body.url || '').trim();
+  const own = new URL(supabaseUrl).host;
+  for (let hop = 0; hop < 4; hop++) {
+    const u = new URL(target);
+    if (!['http:', 'https:'].includes(u.protocol) || !isPublicHost(u.hostname)) throw new Error('That image address cannot be copied.');
+    if (u.host === own) return { url: target };
+    const res = await fetch(u.toString(), {
+      redirect: 'manual',
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; CelebUD image import)', Accept: 'image/*' },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
+      target = new URL(res.headers.get('location')!, u).toString();
+      continue;
+    }
+    if (!res.ok) throw new Error(`The other site refused the image (${res.status}).`);
+    const type = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    const ext = IMAGE_TYPES[type];
+    if (!ext) throw new Error('That link is not a picture.');
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.byteLength > 15 * 1024 * 1024) throw new Error('That picture is too large (over 15 MB).');
+    const path = `article-content/imported/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+    const { error } = await sb.storage.from('media').upload(path, buf, { contentType: type, cacheControl: '31536000', upsert: false });
+    if (error) throw new Error(error.message);
+    return { url: sb.storage.from('media').getPublicUrl(path).data.publicUrl };
+  }
+  throw new Error('Too many redirects.');
+}
+
 // ---------------------------------------------------------------------------
 
 Deno.serve(async (req) => {
@@ -319,10 +364,15 @@ Deno.serve(async (req) => {
     const { data: profile } = await sb.from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
     if (!profile?.is_admin) return json({ error: 'Admin access required' }, 403);
 
+    const body = await req.json();
+    // Not an AI action: copies an image pasted from another website into
+    // CelebUD's own storage, so the article doesn't break when that site
+    // moves or blocks the picture.
+    if (body.action === 'rehost_image') return json({ success: true, ...(await rehostImage(sb, url, body)) });
+
     const key = Deno.env.get('GEMINI_API_KEY');
     if (!key) return json({ error: 'GEMINI_API_KEY is not configured in Supabase → Edge Functions → Secrets.' }, 500);
 
-    const body = await req.json();
     switch (body.action) {
       case 'transcribe_voice': return json({ success: true, ...(await transcribeVoice(sb, key, body)) });
       case 'radar_score': return json({ success: true, ...(await radarScore(sb, key)) });

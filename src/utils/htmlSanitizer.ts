@@ -18,6 +18,8 @@ const BLOCKED_URL_SCHEMES = ['javascript:', 'vbscript:', 'data:', 'blob:', 'file
 
 function isBlockedUrl(val: string): boolean {
   const normalized = val.trim().toLowerCase();
+  // The editor's "still uploading" stand-in — never a real picture.
+  if (normalized.startsWith('https://upload.pending.invalid/')) return true;
   return BLOCKED_URL_SCHEMES.some((scheme) => normalized.startsWith(scheme));
 }
 
