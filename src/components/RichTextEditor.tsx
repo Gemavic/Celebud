@@ -172,7 +172,7 @@ function Toolbar({ editorRef, onContentChange, onFiles, onEmbed, busy, error, se
   };
 
   return (
-    <div className="border-b border-gray-200 bg-gray-50 rounded-t-lg">
+    <div className="sticky z-20 border-b border-gray-200 bg-gray-50 rounded-t-lg shadow-sm" style={{ top: 'var(--rte-sticky-top, 0px)' }}>
       <div className="flex flex-wrap items-center gap-0.5 p-1.5">
         <ToolbarButton title="Bold" onClick={() => exec('bold')}><Bold className="w-4 h-4" /></ToolbarButton>
         <ToolbarButton title="Italic" onClick={() => exec('italic')}><Italic className="w-4 h-4" /></ToolbarButton>
@@ -204,9 +204,14 @@ function Toolbar({ editorRef, onContentChange, onFiles, onEmbed, busy, error, se
         </ToolbarButton>
         <input ref={audioFileInputRef} type="file" accept="audio/*" className="hidden" onChange={pick} />
 
-        {busy && <span className="text-xs text-blue-700 ml-1 animate-pulse">{busy}</span>}
+        {busy && <span className="text-xs font-semibold text-blue-700 ml-1 animate-pulse">{busy}</span>}
       </div>
-      {error && <p className="px-2 pb-1.5 text-xs text-red-600">{error}</p>}
+      {error && (
+        <div role="alert" className="mx-1.5 mb-1.5 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <span className="flex-1">{error}</span>
+          <button type="button" onClick={() => setError(null)} className="font-bold text-red-500 hover:text-red-700" aria-label="Dismiss">×</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -391,7 +396,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   }, [insertClipboard, uploadFiles]);
 
   return (
-    <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500">
+    <div className="border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-500">
       <Toolbar
         editorRef={editorRef}
         onContentChange={handleInput}

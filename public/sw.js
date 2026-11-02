@@ -1,6 +1,6 @@
-const CACHE_NAME = 'celebud-v7';
-const RUNTIME_CACHE = 'celebud-runtime-v7';
-const IMAGE_CACHE = 'celebud-images-v7';
+const CACHE_NAME = 'celebud-v8';
+const RUNTIME_CACHE = 'celebud-runtime-v8';
+const IMAGE_CACHE = 'celebud-images-v8';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -166,9 +166,18 @@ async function handleStaticAsset(request) {
   }
 }
 
+// Pages always come from the network so every visit gets the latest
+// version of the site. The saved copy is ONLY for being truly offline, and
+// it is refreshed on every successful visit. (Before, a page slower than 6s
+// fell back to the copy saved when the worker was first installed, so slow
+// connections kept running a weeks-old version of the site.)
 async function handleNavigationRequest(request) {
   try {
-    const response = await fetchWithTimeout(request, NETWORK_TIMEOUT);
+    const response = await fetch(request);
+    if (response.ok && (response.headers.get('content-type') || '').includes('text/html')) {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then((c) => c.put('/index.html', copy)).catch(() => {});
+    }
     return response;
   } catch {
     const cached = await caches.open(CACHE_NAME).then(c => c.match('/index.html'));
