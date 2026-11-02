@@ -368,13 +368,48 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     e.preventDefault();
-    const html = e.clipboardData.getData('text/html');
-    const text = e.clipboardData.getData('text/plain');
-    const files = Array.from(e.clipboardData.files || []).filter((f) => kindOf(f));
+    const cd = e.clipboardData;
+    const html = cd.getData('text/html');
+    const text = cd.getData('text/plain');
+    // Some apps expose a copied picture only through clipboard "items",
+    // not "files" — check both.
+    let files = Array.from(cd.files || []).filter((f) => kindOf(f));
+    if (!files.length) {
+      files = Array.from(cd.items || [])
+        .filter((it) => it.kind === 'file')
+        .map((it) => it.getAsFile())
+        .filter((f): f is File => !!f && !!kindOf(f));
+    }
+    const types = Array.from(cd.types || []);
+    const htmlDoc = html ? new DOMParser().parseFromString(html, 'text/html') : null;
+    const htmlUseful = !!htmlDoc && ((htmlDoc.body.textContent || '').trim().length > 0 || !!htmlDoc.querySelector('img,iframe,video,audio,table'));
+    if (!files.length && !htmlUseful && !text.trim()) {
+      // Nothing usable came with the paste event (some Windows apps put the
+      // picture in a format the event doesn't expose). Ask the browser's
+      // clipboard directly; it may show a one-time permission prompt.
+      const nav = navigator.clipboard as Clipboard & { read?: () => Promise<ClipboardItem[]> };
+      if (nav?.read) {
+        nav.read().then(async (items) => {
+          const got: File[] = [];
+          for (const item of items) {
+            const t = item.types.find((x) => x.startsWith('image/'));
+            if (t) {
+              const blob = await item.getType(t);
+              got.push(new File([blob], `pasted-image.${t.split('/')[1] || 'png'}`, { type: t }));
+            }
+          }
+          if (got.length) uploadFiles(got);
+          else setError(`Nothing to paste: your clipboard didn't contain a picture${types.length ? ` (it held: ${types.join(', ')})` : ''}. Copy the picture again (right-click → Copy image), or drag the file in, or use the photo button.`);
+        }).catch(() => setError(`The picture on your clipboard couldn't be read${types.length ? ` (it held: ${types.join(', ')})` : ''}. Save it to your device, then drag it in or use the photo button.`));
+      } else {
+        setError('Nothing to paste: your clipboard was empty. Copy the picture again, or drag the file in, or use the photo button.');
+      }
+      return;
+    }
     // A screenshot or "Copy image" gives a real file. Word also puts a
     // picture of the whole selection on the clipboard next to the text, so
     // when the paste carries real text, the text (and its pictures) wins.
-    const htmlHasText = !!html && (new DOMParser().parseFromString(html, 'text/html').body.textContent || '').trim().length > 0;
+    const htmlHasText = !!htmlDoc && (htmlDoc.body.textContent || '').trim().length > 0;
     if (files.length && !htmlHasText) { uploadFiles(files); return; }
     // Word, Google Docs and chat apps put a fully-formatted HTML fragment on
     // the clipboard — fonts, spans, Office XML. The sanitizer keeps real
@@ -425,6 +460,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         Paste or drag photos, videos and audio straight into the text — or click where you want one and use the buttons above.
         Paste a YouTube, Vimeo or TikTok link on its own line to embed the player. Photos are resized automatically; videos up to 50 MB
         (longer ones: upload to YouTube and paste the link). Pasting from Word or Google Docs keeps bold, links, tables and pictures.
+        <span className="ml-1 text-gray-400">Editor build {__BUILD_ID__}.</span>
       </p>
     </div>
   );

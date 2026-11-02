@@ -1,3 +1,4 @@
+import { UpdateBanner } from './components/UpdateBanner';
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
@@ -50,6 +51,7 @@ function App() {
   return (
     <ErrorBoundary>
       <Router>
+        <UpdateBanner />
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
             <Route path="/" element={<HomePage />} />
