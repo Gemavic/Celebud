@@ -24,7 +24,7 @@
 // never a 404. A crawler seeing a shell is the bug we already had; a reader
 // losing a working page would be worse. Any throw also lands on next().
 
-import { next, rewrite } from '@vercel/edge';
+import { next } from '@vercel/edge';
 
 export const config = {
   // Catch-all, because "does this path exist?" cannot be expressed as a
@@ -153,7 +153,40 @@ function notFoundPage(pathname: string): Response {
   });
 }
 
-export default function middleware(request: Request) {
+// Supabase now delivers every Edge Function response from its default
+// domain as "Content-Type: text/plain" (with a sandbox CSP), whatever the
+// function sets — an anti-phishing rule. A plain Vercel rewrite passes that
+// header straight through, so Google's own Rich Results Test showed every
+// prerendered page arriving as "Content type: text/plain": Google got the
+// right words but treated each page as a text file, not a web page. So
+// crawler pages are fetched here and re-served with a proper HTML type.
+async function servePrerendered(target: URL, ua: string): Promise<Response> {
+  const res = await fetch(target.toString(), {
+    headers: { 'user-agent': ua, accept: 'text/html' },
+    redirect: 'manual',
+  });
+  if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
+    return new Response(null, { status: res.status, headers: { location: res.headers.get('location')! } });
+  }
+  // A Prerender failure must never become what Google indexes — let the
+  // normal app shell answer instead.
+  if (res.status >= 500) return next();
+  const body = await res.text();
+  const headers = new Headers({
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'public, max-age=0, s-maxage=600, stale-while-revalidate=86400',
+    vary: 'user-agent',
+  });
+  const robots = res.headers.get('x-robots-tag');
+  if (robots) headers.set('x-robots-tag', robots);
+  return new Response(body, { status: res.status, headers });
+}
+
+// Paths whose crawler version vercel.json used to rewrite straight to
+// Prerender (and so arrived as text/plain). Handled here now instead.
+const REWRITTEN_FOR_BOTS = /^\/(article|watch)\/[^/]+(\/[^/]+)?$/;
+
+export default async function middleware(request: Request) {
   try {
     const url = new URL(request.url);
     const raw = url.pathname;
@@ -174,10 +207,13 @@ export default function middleware(request: Request) {
     if (!known) return notFoundPage(raw);
 
     const ua = request.headers.get('user-agent') || '';
-    const prerenderable = PRERENDER_EXACT.has(path) || AUTHOR_PROFILE.test(path) || ASK_PAGE.test(path) || ELECTION_CANDIDATE.test(path) || ELECTION_GOVERNOR.test(path);
+    const viaRewrite = REWRITTEN_FOR_BOTS.test(path);
+    const prerenderable = viaRewrite || PRERENDER_EXACT.has(path) || AUTHOR_PROFILE.test(path) || ASK_PAGE.test(path) || ELECTION_CANDIDATE.test(path) || ELECTION_GOVERNOR.test(path);
     if (!CRAWLER_UA.test(ua) || !prerenderable) return next();
 
-    const target = new URL(PRERENDER);
+    // Article/watch/author pages historically went to the lowercase
+    // "prerender" deployment (vercel.json); keep using that one for them.
+    const target = new URL(viaRewrite ? PRERENDER.replace(/Prerender$/, 'prerender') : PRERENDER);
     target.searchParams.set('path', path);
 
     // The site expresses category listings as /?category=news rather than
@@ -196,7 +232,7 @@ export default function middleware(request: Request) {
     const pageParam = url.searchParams.get('page');
     if (pageParam && /^\d{1,4}$/.test(pageParam)) target.searchParams.set('page', pageParam);
 
-    return rewrite(target);
+    return await servePrerendered(target, ua);
   } catch {
     // Never let an SEO optimisation take a page down.
     return next();
