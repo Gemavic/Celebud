@@ -20,6 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check every app page is known to middleware
+        run: node scripts/check_routes.mjs
       - name: Wait for the Vercel deploy (push only)
         if: github.event_name == 'push'
         run: sleep 180
