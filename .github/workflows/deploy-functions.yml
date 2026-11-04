@@ -45,7 +45,7 @@ jobs:
           version: latest
 
       - name: Deploy fetch-news (public endpoint, JWT off)
-        run: supabase functions deploy fetch-news --project-ref "$PROJECT_REF" --no-verify-jwt
+        run: supabase functions deploy fetch-news --project-ref "$PROJECT_REF" --yes --no-verify-jwt
 
       - name: Stage generate-article-draft under its live name (quick-task)
         run: |
@@ -53,40 +53,40 @@ jobs:
           cp -r supabase/functions/generate-article-draft/. supabase/functions/quick-task/
 
       - name: Deploy quick-task (AI drafting, JWT on)
-        run: supabase functions deploy quick-task --project-ref "$PROJECT_REF"
+        run: supabase functions deploy quick-task --project-ref "$PROJECT_REF" --yes
 
       - name: Deploy generate-thumbnail (AI thumbnails, JWT on)
-        run: supabase functions deploy generate-thumbnail --project-ref "$PROJECT_REF"
+        run: supabase functions deploy generate-thumbnail --project-ref "$PROJECT_REF" --yes
 
       - name: Deploy match-thumbnail (real-photo matching, JWT on)
-        run: supabase functions deploy match-thumbnail --project-ref "$PROJECT_REF"
+        run: supabase functions deploy match-thumbnail --project-ref "$PROJECT_REF" --yes
 
       - name: Deploy generate-creator-audio (AI audio, JWT on)
-        run: supabase functions deploy generate-creator-audio --project-ref "$PROJECT_REF"
+        run: supabase functions deploy generate-creator-audio --project-ref "$PROJECT_REF" --yes
 
       - name: Deploy generate-creator-video (AI video via Veo, JWT on)
-        run: supabase functions deploy generate-creator-video --project-ref "$PROJECT_REF"
+        run: supabase functions deploy generate-creator-video --project-ref "$PROJECT_REF" --yes
 
       - name: Deploy generate-author-bio (AI author bios, JWT on)
-        run: supabase functions deploy generate-author-bio --project-ref "$PROJECT_REF"
+        run: supabase functions deploy generate-author-bio --project-ref "$PROJECT_REF" --yes
 
       - name: Deploy election-vote (Election 2027 reader poll, JWT on - anon key)
-        run: supabase functions deploy election-vote --project-ref "$PROJECT_REF"
+        run: supabase functions deploy election-vote --project-ref "$PROJECT_REF" --yes
 
       - name: Deploy newsroom-ai (Newsroom page AI helpers, JWT on)
-        run: supabase functions deploy newsroom-ai --project-ref "$PROJECT_REF"
+        run: supabase functions deploy newsroom-ai --project-ref "$PROJECT_REF" --yes
 
       - name: Deploy suggest-angles (reader-perspective angles for drafts, JWT on)
-        run: supabase functions deploy suggest-angles --project-ref "$PROJECT_REF"
+        run: supabase functions deploy suggest-angles --project-ref "$PROJECT_REF" --yes
 
       - name: Deploy enrich-articles (AI article rewriting + SEO, JWT on)
-        run: supabase functions deploy enrich-articles --project-ref "$PROJECT_REF"
+        run: supabase functions deploy enrich-articles --project-ref "$PROJECT_REF" --yes
 
       - name: Deploy repair-thumbnails (re-host hotlinked images, JWT on)
-        run: supabase functions deploy repair-thumbnails --project-ref "$PROJECT_REF"
+        run: supabase functions deploy repair-thumbnails --project-ref "$PROJECT_REF" --yes
 
       - name: Deploy send-newsletter (email editions, JWT on)
-        run: supabase functions deploy send-newsletter --project-ref "$PROJECT_REF"
+        run: supabase functions deploy send-newsletter --project-ref "$PROJECT_REF" --yes
 
       # These two read articles for the public site. They were missing from
       # this workflow, so edits to them never reached production — the live
@@ -94,10 +94,10 @@ jobs:
       # refused to open ("Article Not Found"). Called from the browser with
       # the anon key as the bearer token, so default JWT verification passes.
       - name: Deploy homepage-data (public homepage feed, JWT on)
-        run: supabase functions deploy homepage-data --project-ref "$PROJECT_REF"
+        run: supabase functions deploy homepage-data --project-ref "$PROJECT_REF" --yes
 
       - name: Deploy cached-articles (cached article list, JWT on)
-        run: supabase functions deploy cached-articles --project-ref "$PROJECT_REF"
+        run: supabase functions deploy cached-articles --project-ref "$PROJECT_REF" --yes
 
       # The SEO functions are deployed under BOTH capitalisations, on
       # purpose.
@@ -121,13 +121,13 @@ jobs:
           cp -r supabase/functions/generate-sitemap/. supabase/functions/Generate-sitemap/
 
       - name: Deploy Prerender (capitalised, legacy live name)
-        run: supabase functions deploy Prerender --project-ref "$PROJECT_REF" --no-verify-jwt
+        run: supabase functions deploy Prerender --project-ref "$PROJECT_REF" --yes --no-verify-jwt
 
       - name: Deploy prerender (lowercase, matches repo folder)
-        run: supabase functions deploy prerender --project-ref "$PROJECT_REF" --no-verify-jwt
+        run: supabase functions deploy prerender --project-ref "$PROJECT_REF" --yes --no-verify-jwt
 
       - name: Deploy Generate-sitemap (capitalised, legacy live name)
-        run: supabase functions deploy Generate-sitemap --project-ref "$PROJECT_REF" --no-verify-jwt
+        run: supabase functions deploy Generate-sitemap --project-ref "$PROJECT_REF" --yes --no-verify-jwt
 
       - name: Deploy generate-sitemap (lowercase, matches repo folder)
-        run: supabase functions deploy generate-sitemap --project-ref "$PROJECT_REF" --no-verify-jwt
+        run: supabase functions deploy generate-sitemap --project-ref "$PROJECT_REF" --yes --no-verify-jwt
