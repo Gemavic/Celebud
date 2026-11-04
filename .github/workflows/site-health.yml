@@ -1,0 +1,47 @@
+# Daily check of how celebud.com looks to Google, the AdSense crawler and
+# readers (scripts/site_health.py). Also runs after every deploy to main.
+# On failure it opens (or updates) a GitHub issue labelled "site-health",
+# which emails the repository owner, so a break is known the same day.
+name: Site health check
+
+on:
+  schedule:
+    - cron: '17 10 * * *'   # 05:17 New York / 11:17 Lagos
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for the Vercel deploy (push only)
+        if: github.event_name == 'push'
+        run: sleep 180
+      - name: Check the live site
+        run: python3 scripts/site_health.py
+      - name: Report the problem as an issue
+        if: failure() && hashFiles('health-report.md') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create site-health --color B60205 --description "Daily site health check" 2>/dev/null || true
+          num=$(gh issue list --label site-health --state open --json number --jq '.[0].number')
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --body-file health-report.md
+          else
+            gh issue create --title "celebud.com health check failed" --label site-health --body-file health-report.md
+          fi
+      - name: Close the issue once everything passes again
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list --label site-health --state open --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "Fixed: today's check passed on every page."
+          done
