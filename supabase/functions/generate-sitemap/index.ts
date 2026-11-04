@@ -101,6 +101,7 @@ Deno.serve(async (req: Request) => {
         .from('media_content')
         .select('id, slug, title, description, updated_at, published_at')
         .eq('is_published', true)
+        .eq('is_manual', true) // originals only — wire stories are noindex
         .gte('published_at', cutoff)
         .order('published_at', { ascending: false })
         .limit(1000);
@@ -180,6 +181,9 @@ Deno.serve(async (req: Request) => {
         .from('media_content')
         .select('id, slug, title, updated_at, published_at')
         .eq('is_published', true)
+        // Only CelebUD's own newsroom articles are offered to Google; the
+        // wire-based ones stay readable on the site but are noindex.
+        .eq('is_manual', true)
         .gte('word_count', THIN_ARTICLE_WORDS)
         .order('updated_at', { ascending: false })
         .range(from, from + PAGE - 1);

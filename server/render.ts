@@ -920,14 +920,23 @@ ${relatedHtml}`;
         // passing link equity to the fuller articles it points at, it just
         // stops asking to be indexed itself. Nothing is hidden from
         // readers — the article stays exactly as published.
+        //
+        // Wire-based stories (anything not written in the CelebUD newsroom)
+        // stay fully readable but are not offered to Google: the owner chose
+        // (Nov 2026) to have Search judge the site on its original work.
+        // To index them again, delete the `!article.is_manual ||` below.
         robots:
-          countWords(article.content || article.description || '') < THIN_ARTICLE_WORDS
+          !article.is_manual || countWords(article.content || article.description || '') < THIN_ARTICLE_WORDS
             ? 'noindex,follow'
             : undefined,
       });
 
       return new Response(html, {
-        headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/html; charset=utf-8',
+          ...(!article.is_manual ? { 'X-Robots-Tag': 'noindex, follow' } : {}),
+        },
       });
     }
 
