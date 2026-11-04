@@ -114,12 +114,15 @@ def main():
         problems.append("No article URLs found in the sitemap to check.")
     # The AdSense crawler identifies itself differently from Googlebot.
     check_page(articles[0] if articles else "/", 250, ADSBOT, "AdSense crawler")
-    # Readers: the app must still load.
-    status, ctype, body = get("/", BROWSER)
-    if status != 200 or "id=\"root\"" not in body:
-        problems.append(f"/ (as a reader): the app did not load (HTTP {status}).")
-    else:
-        passed.append("/ (as a reader): app loads")
+    # Readers get the same finished page (with the app on top).
+    for path in ["/"] + articles[:1] + ["/about"]:
+        status, ctype, body = get(path, BROWSER)
+        if status != 200 or "id=\"root\"" not in body:
+            problems.append(f"{path} (as a reader): the app did not load (HTTP {status}).")
+        elif "id=\"ssr\"" not in body:
+            problems.append(f"{path} (as a reader): arrived as an empty app shell instead of the finished page.")
+        else:
+            check_page(path, 60 if path == "/about" else 250, BROWSER, "a reader")
 
     status, _, ads = get("/ads.txt", GOOGLEBOT)
     if status != 200 or not re.search(r"google\.com,\s*pub-\d+,\s*DIRECT", ads):

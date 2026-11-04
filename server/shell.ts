@@ -35,7 +35,7 @@ const GENERIC_HEAD = [
 ];
 
 const SSR_CSS = `<style id="ssr-css">
-html.ssr #root{display:none}
+html.ssr #root{visibility:hidden;position:absolute;top:0;left:0;width:100%;height:0;overflow:hidden}
 #ssr{font-family:Georgia,'Times New Roman',serif;color:#1f2937;background:#fff;min-height:100vh}
 #ssr .ssr-top{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid #e5e7eb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
 #ssr .ssr-top div{max-width:1100px;margin:0 auto;padding:14px 16px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}

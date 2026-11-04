@@ -187,9 +187,27 @@ function htmlResponse(body: string, status: number, robots?: string | null): Res
  * Supabase Prerender function only if the local build throws, so a bug here
  * degrades to yesterday's behaviour instead of an error page.
  */
+// Built pages are kept briefly in memory, so a busy article or the homepage
+// is not rebuilt from the database on every single visit.
+const pageCache = new Map<string, { body: string; robots: string | null; at: number }>();
+const PAGE_TTL = 60_000;
+
 async function buildPage(target: URL, ua: string): Promise<Response> {
+  const key = target.toString();
+  const hit = pageCache.get(key);
+  if (hit && Date.now() - hit.at < PAGE_TTL) {
+    return new Response(hit.body, { status: 200, headers: hit.robots ? { 'x-robots-tag': hit.robots } : {} });
+  }
   try {
-    return await renderRequest(new Request(target.toString(), { headers: { 'user-agent': ua } }));
+    const res = await renderRequest(new Request(key, { headers: { 'user-agent': ua } }));
+    if (res.status === 200) {
+      const body = await res.text();
+      const robots = res.headers.get('x-robots-tag');
+      if (pageCache.size > 300) pageCache.delete(pageCache.keys().next().value as string);
+      pageCache.set(key, { body, robots, at: Date.now() });
+      return new Response(body, { status: 200, headers: robots ? { 'x-robots-tag': robots } : {} });
+    }
+    return res;
   } catch {
     return fetch(target.toString(), { headers: { 'user-agent': ua, accept: 'text/html' }, redirect: 'manual' });
   }
@@ -215,9 +233,6 @@ async function serveFullPage(target: URL, ua: string, origin: string, cookie: st
 // Prerender (and so arrived as text/plain). Handled here now instead.
 const REWRITTEN_FOR_BOTS = /^\/(article|watch)\/[^/]+(\/[^/]+)?$/;
 
-// Pages every visitor receives fully built (stage 1 of the rebuild: articles).
-const FULL_PAGE = /^\/article\/[0-9a-f-]{36}(\/[^/]+)?$/i;
-
 export default async function middleware(request: Request) {
   try {
     const url = new URL(request.url);
@@ -239,43 +254,32 @@ export default async function middleware(request: Request) {
     if (!known) return notFoundPage(raw);
 
     const ua = request.headers.get('user-agent') || '';
-    const viaRewrite = REWRITTEN_FOR_BOTS.test(path);
+    const isBot = CRAWLER_UA.test(ua);
+    const prerenderable = REWRITTEN_FOR_BOTS.test(path) || PRERENDER_EXACT.has(path) || AUTHOR_PROFILE.test(path) || ASK_PAGE.test(path) || ELECTION_CANDIDATE.test(path) || ELECTION_GOVERNOR.test(path);
+    if (!prerenderable) return next();
 
-    // Articles: the same finished page for readers, Google and AdSense alike.
-    if (request.method === 'GET' && FULL_PAGE.test(path)) {
-      const target = new URL(PRERENDER);
-      target.searchParams.set('path', path);
+    const target = new URL(PRERENDER);
+    target.searchParams.set('path', path);
+    // Category listings are /?category=news, and ?page= drives the archive
+    // pagination; both change what the page shows, so both are passed on.
+    // Nothing else from the query string is forwarded.
+    const category = url.searchParams.get('category');
+    if (category && /^[a-z0-9-]{1,40}$/i.test(category)) target.searchParams.set('category', category);
+    const pageParam = url.searchParams.get('page');
+    if (pageParam && /^\d{1,4}$/.test(pageParam)) target.searchParams.set('page', pageParam);
+
+    // One page for everyone: readers, Google and AdSense all get the
+    // finished page; the app loads on top. (A search results view is the
+    // app's alone — the server copy would show the wrong list.)
+    if (request.method === 'GET' && !url.searchParams.has('search')) {
       const page = await serveFullPage(target, ua, url.origin, request.headers.get('cookie') || '')
         .catch((e) => `unexpected: ${(e as Error).message}`.slice(0, 200));
       if (typeof page !== 'string') return page;
       // Why the full page could not be built — visible in the response
       // headers (and the daily check), never to readers.
-      const why = { 'x-celebud-ssr': page.replace(/[^\x20-\x7e]/g, ' ') };
-      if (!CRAWLER_UA.test(ua)) return next({ headers: why });
+      if (!isBot) return next({ headers: { 'x-celebud-ssr': page.replace(/[^\x20-\x7e]/g, ' ') } });
     }
-    const prerenderable = viaRewrite || PRERENDER_EXACT.has(path) || AUTHOR_PROFILE.test(path) || ASK_PAGE.test(path) || ELECTION_CANDIDATE.test(path) || ELECTION_GOVERNOR.test(path);
-    if (!CRAWLER_UA.test(ua) || !prerenderable) return next();
-
-    // Article/watch/author pages historically went to the lowercase
-    // "prerender" deployment (vercel.json); keep using that one for them.
-    const target = new URL(viaRewrite ? PRERENDER.replace(/Prerender$/, 'prerender') : PRERENDER);
-    target.searchParams.set('path', path);
-
-    // The site expresses category listings as /?category=news rather than
-    // /category/news, and Prerender reads that same parameter to build a
-    // category-specific listing. Forwarding it means a crawler on
-    // /?category=news gets that category's articles instead of the generic
-    // homepage. Only this one parameter is passed through — anything else in
-    // the query string is ignored rather than blindly forwarded upstream.
-    const category = url.searchParams.get('category');
-    if (category) target.searchParams.set('category', category);
-
-    // ?page= drives the paginated listing chain. Without it forwarded, every
-    // page of the archive would render as page 1 and a crawler following
-    // "Next page" would loop on identical content, never reaching the older
-    // articles — the exact problem the pagination was added to fix.
-    const pageParam = url.searchParams.get('page');
-    if (pageParam && /^\d{1,4}$/.test(pageParam)) target.searchParams.set('page', pageParam);
+    if (!isBot) return next();
 
     return await servePrerendered(target, ua);
   } catch {
