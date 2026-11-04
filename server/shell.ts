@@ -8,9 +8,10 @@
 
 let shellCache: { html: string; at: number } | null = null;
 
-export async function getShell(origin: string): Promise<string> {
+export async function getShell(origin: string, cookie = ''): Promise<string> {
   if (shellCache && Date.now() - shellCache.at < 60_000) return shellCache.html;
-  const res = await fetch(`${origin}/index.html`, { headers: { 'x-celebud-shell': '1' } });
+  // The cookie only matters on password-protected preview deployments.
+  const res = await fetch(`${origin}/index.html`, { headers: { 'x-celebud-shell': '1', ...(cookie ? { cookie } : {}) } });
   if (!res.ok) throw new Error(`shell ${res.status}`);
   const html = await res.text();
   if (!html.includes('id="root"')) throw new Error('shell without root');

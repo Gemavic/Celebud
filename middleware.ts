@@ -200,11 +200,14 @@ async function buildPage(target: URL, ua: string): Promise<Response> {
  * Returns null when it cannot (not found, build error), and the caller then
  * serves the plain app exactly as before.
  */
-async function serveFullPage(target: URL, ua: string, origin: string): Promise<Response | null> {
-  const res = await buildPage(target, ua);
-  if (res.status !== 200) return null;
-  const merged = mergeIntoShell(await getShell(origin), await res.text());
-  if (!merged) return null;
+async function serveFullPage(target: URL, ua: string, origin: string, cookie: string): Promise<Response | string> {
+  let res: Response;
+  try { res = await buildPage(target, ua); } catch (e) { return `build: ${(e as Error).message}`.slice(0, 200); }
+  if (res.status !== 200) return `build status ${res.status}`;
+  let shell: string;
+  try { shell = await getShell(origin, cookie); } catch (e) { return `shell: ${(e as Error).message}`.slice(0, 200); }
+  const merged = mergeIntoShell(shell, await res.text());
+  if (!merged) return 'merge: no head/body';
   return htmlResponse(merged, 200, res.headers.get('x-robots-tag'));
 }
 
@@ -242,9 +245,13 @@ export default async function middleware(request: Request) {
     if (request.method === 'GET' && FULL_PAGE.test(path)) {
       const target = new URL(PRERENDER);
       target.searchParams.set('path', path);
-      const page = await serveFullPage(target, ua, url.origin).catch(() => null);
-      if (page) return page;
-      if (!CRAWLER_UA.test(ua)) return next();
+      const page = await serveFullPage(target, ua, url.origin, request.headers.get('cookie') || '')
+        .catch((e) => `unexpected: ${(e as Error).message}`.slice(0, 200));
+      if (typeof page !== 'string') return page;
+      // Why the full page could not be built — visible in the response
+      // headers (and the daily check), never to readers.
+      const why = { 'x-celebud-ssr': page.replace(/[^\x20-\x7e]/g, ' ') };
+      if (!CRAWLER_UA.test(ua)) return next({ headers: why });
     }
     const prerenderable = viaRewrite || PRERENDER_EXACT.has(path) || AUTHOR_PROFILE.test(path) || ASK_PAGE.test(path) || ELECTION_CANDIDATE.test(path) || ELECTION_GOVERNOR.test(path);
     if (!CRAWLER_UA.test(ua) || !prerenderable) return next();
