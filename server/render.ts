@@ -1,0 +1,1072 @@
+// supabase/functions/prerender/index.ts
+//
+// Serves fully-formed, crawlable HTML for bots and social-media link
+// scrapers (Googlebot, Bingbot, facebookexternalhit, Twitterbot,
+// LinkedInBot, Slackbot, WhatsApp, Discordbot, etc).
+//
+// WHY THIS EXISTS:
+// Real users get the normal React SPA (fast, interactive). But bots that
+// don't run JavaScript — which includes ALL social media link-preview
+// scrapers, not just some search engines — currently see an empty shell.
+// This function returns real HTML with the correct <title>, meta
+// description, Open Graph tags, and NewsArticle JSON-LD for whichever
+// article/category/home path is requested, built directly from your
+// Supabase data. It does not replace your React app; it's an alternate
+// response path used only for non-human requests (wired up in the
+// Cloudflare Worker).
+
+import { createClient } from '@supabase/supabase-js';
+// @ts-nocheck — ported verbatim from supabase/functions/prerender (Deno).
+// The site now builds its own server pages from this module (called by
+// middleware.ts), instead of fetching them from the Supabase function:
+// Supabase forces "text/plain" on HTML it serves, which is how Google ended
+// up treating every page as a plain text file. All data read here is public
+// (row-level security allows anonymous reads), so the public key is enough.
+//
+// Keep this file and supabase/functions/prerender/index.ts in step until the
+// Supabase copy is retired.
+
+const SB_URL = (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || 'https://bwtrtzvlqvykobmlfjcl.supabase.co';
+// The public (publishable) key — the same one shipped in the site's own
+// JavaScript, so it is not a secret. Env vars win if set.
+const PUBLIC_KEY = 'sb_publishable_KxyCDooCJoIPllL9GCpHag_X3nHP2u9';
+const SB_KEY = (typeof process !== 'undefined' && (process.env?.SUPABASE_ANON_KEY || process.env?.VITE_SUPABASE_ANON_KEY)) || PUBLIC_KEY;
+let _client;
+function getClient() {
+  if (!_client) _client = createClient(SB_URL, SB_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  return _client;
+}
+
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
+};
+
+const SITE_URL = 'https://celebud.com';
+const SITE_NAME = 'CelebUD';
+
+/**
+ * Renders a publication date the way a reader expects to see it.
+ *
+ * The byline previously printed article.published_at straight from the
+ * database, so live pages read "By Matthew Ayandare —
+ * 2026-09-08T14:51:09.611+00:00". Wrapped in <time datetime> the machine
+ * readable value is still available to crawlers without showing a raw
+ * timestamp to people.
+ */
+function formatBylineDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+  }).format(d);
+}
+
+/**
+ * Removes the empty paragraphs rich-text editors leave at the end of a
+ * body -- <p><br></p>, <p>&nbsp;</p> and friends. Harmless to a reader but
+ * they add meaningless nodes to the markup a crawler parses.
+ */
+function stripTrailingEmptyBlocks(html: string): string {
+  let out = html;
+  let prev: string;
+  do {
+    prev = out;
+    out = out.replace(/(?:<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>|<br\s*\/?>)\s*$/i, '').trimEnd();
+  } while (out !== prev);
+  return out;
+}
+
+// An article this short is a headline and a couple of paragraphs — a wire
+// summary, not a piece worth ranking on its own. Google calls these "thin"
+// and a site carrying enough of them reads as low-value in review. There
+// are 98 of them published here, and they were all being submitted in
+// sitemap.xml. They stay readable on the site; they just stop asking to be
+// indexed. Raise or lower this and the sitemap follows automatically —
+// generate-sitemap applies the same number.
+const THIN_ARTICLE_WORDS = 300;
+
+function countWords(html: string): number {
+  const text = (html || '').replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ');
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+// --- Static trust pages -------------------------------------------------
+//
+// /about, /contact, /editorial-standards and /privacy are plain React
+// components with no data behind them, so nothing ever routed a crawler to
+// them: they returned the empty SPA shell carrying the HOMEPAGE's title
+// tag. That matters more than an ordinary missing page, because these are
+// precisely the pages a reviewer opens to check a site is a real
+// publication — and three of them were being advertised in sitemap.xml at
+// the same time, so Google was being invited to crawl pages that rendered
+// blank.
+//
+// KEEP IN SYNC with src/pages/TrustPages.tsx and src/pages/PrivacyPolicy.tsx.
+// This must stay a faithful copy of what a reader sees. Serving a crawler
+// something different from the human page is cloaking — a considerably
+// worse problem than the one being fixed here.
+const STATIC_PAGES: Record<string, { title: string; description: string; bodyHtml: string }> = {
+  // Mirrors src/pages/TributeSubmitPage.tsx.
+  '/tributes/submit': {
+    title: `Send us a tribute | ${SITE_NAME}`,
+    description:
+      'Celebrating a birthday, an achievement or a life well lived? Send CelebUD their story and photos and our editors will write a tribute.',
+    bodyHtml: `
+<h1>Celebrate someone special on CelebUD</h1>
+<p>A birthday, an anniversary, an achievement, or a life to remember. Tell us their story in your own words and send a few photos. Our editors will write the tribute and contact you before it is published.</p>
+<p>Your contact details are only used to reach you about this tribute and are never published. See our <a href="/privacy">privacy policy</a>.</p>`,
+  },
+  '/about': {
+    title: `About CelebUD — Who We Are | ${SITE_NAME}`,
+    description:
+      'CelebUD is a digital magazine covering celebrity news, entertainment, politics, society, lifestyle, business and financial education, operated by Gemavic Media in Ontario, Canada.',
+    bodyHtml: `
+<h1>About CelebUD</h1>
+<p>Who we are and what we stand for</p>
+<p><strong>CelebUD</strong> is a digital magazine covering celebrity news, entertainment, politics, society, lifestyle, business, and financial education for readers in Africa, North America, and beyond. We publish around the clock — combining original reporting from our editorial team with curated coverage of the stories shaping our readers' world.</p>
+<p>CelebUD is operated by <strong>Gemavic Media</strong>, based in Ontario, Canada, with a reporting network across Nigeria and the diaspora. Our newsroom is led by our Editor-in-Chief and staffed by named, accountable reporters — every article on CelebUD carries a byline you can click to see who wrote or curated it.</p>
+<h2>What we cover</h2>
+<ul>
+  <li><strong>News &amp; Politics</strong> — Nigeria, Canada, and world affairs</li>
+  <li><strong>Entertainment &amp; Society</strong> — celebrity culture, film, music, and events</li>
+  <li><strong>Fin-Advisor</strong> — our dedicated financial &amp; insurance education hub with free planning calculators</li>
+  <li><strong>Lifestyle &amp; Videos</strong> — original creator content from our Content Studio</li>
+</ul>
+<p>Want to join our reporting team? <a href="/reporters/apply">Apply here</a>. For everything else, see our <a href="/contact">Contact page</a> or read our <a href="/editorial-standards">Editorial Standards</a>.</p>`,
+  },
+  '/contact': {
+    title: `Contact Us — Tips, Corrections & Partnerships | ${SITE_NAME}`,
+    description:
+      'Contact the CelebUD newsroom: editorial enquiries at info@celebud.com, SMS/WhatsApp +1 (437) 788-8011, news tips, corrections, advertising and partnerships. Based in Ontario, Canada.',
+    bodyHtml: `
+<h1>Contact Us</h1>
+<p>We read everything — questions, tips, corrections, and partnerships</p>
+<ul>
+  <li><strong>Editorial &amp; General:</strong> <a href="mailto:info@celebud.com">info@celebud.com</a></li>
+  <li><strong>SMS / WhatsApp:</strong> <a href="tel:+14377888011">+1 (437) 788-8011</a></li>
+  <li><strong>News tips &amp; corrections:</strong> <a href="mailto:info@celebud.com?subject=News%20tip%20or%20correction">Send story tips or request a correction</a></li>
+  <li><strong>Location:</strong> Ontario, Canada</li>
+</ul>
+<p><strong>Corrections:</strong> if we got something wrong, tell us. Verified corrections are made promptly and noted on the article. See our <a href="/editorial-standards">Editorial Standards</a> for how we handle accuracy.</p>
+<p><strong>Advertising &amp; partnerships:</strong> reach a fast-growing audience across Africa and North America — email us with "Advertising" in the subject line.</p>`,
+  },
+  '/editorial-standards': {
+    title: `Editorial Standards — Accuracy, Attribution & Corrections | ${SITE_NAME}`,
+    description:
+      'How CelebUD reports, curates, attributes and corrects: standards for accuracy and verification, attribution of curated stories, corrections policy, editorial independence and sponsored content labelling.',
+    bodyHtml: `
+<h1>Editorial Standards</h1>
+<p>How CelebUD reports, curates, attributes, and corrects</p>
+<p>Our credibility is our product. These standards apply to every story published on CelebUD, whether originally reported or curated from other outlets.</p>
+<h2>Accuracy &amp; verification</h2>
+<p>We verify facts before publishing. Where a story is developing, we say so plainly and update it as facts emerge. Headlines must reflect the substance of the story.</p>
+<h2>Attribution &amp; curation</h2>
+<p>Some CelebUD stories are curated from other news organizations. Curated stories always identify the original publisher, and the CelebUD staff member shown on such stories is credited as the <em>curator</em>, not the original author. Original reporting is bylined by the reporter who wrote it.</p>
+<h2>Corrections</h2>
+<p>When we publish an error, we correct the article promptly. Material corrections are noted within the article. To request a correction, use our <a href="/contact">Contact page</a>.</p>
+<h2>Independence &amp; sponsored content</h2>
+<p>Advertising never dictates editorial coverage. Sponsored or affiliate content is labeled as such wherever it appears.</p>
+<h2>Our team</h2>
+<p>Every byline links to an author profile listing that reporter's coverage. Reporters join through a vetted <a href="/reporters/apply">application process</a> reviewed by our Editor-in-Chief.</p>`,
+  },
+  '/privacy': {
+    title: `Privacy Policy | ${SITE_NAME}`,
+    description:
+      'How CelebUD collects, uses, shares and retains your information, including Google AdSense advertising cookies, analytics, your rights, and how to opt out of personalised advertising.',
+    bodyHtml: `
+<h1>Privacy Policy</h1>
+<p>Effective date: June 13, 2026</p>
+<h2>1. Information We Collect</h2>
+<p>We collect several types of information in connection with the operation of our site:</p>
+<ul>
+  <li><strong>Account information:</strong> When you register, we collect your email address and a username of your choosing.</li>
+  <li><strong>Usage data:</strong> We automatically collect information about how you interact with the site, including pages visited, articles read, time spent on pages, and referring URLs.</li>
+  <li><strong>Device information:</strong> Browser type, operating system, IP address, and device identifiers are logged as part of standard web server operation.</li>
+  <li><strong>Comments and submissions:</strong> Any content you voluntarily submit — comments, creator applications, newsletter sign-ups — is collected and stored.</li>
+  <li><strong>Cookies:</strong> We and our advertising partners use cookies and similar tracking technologies.</li>
+</ul>
+<h2>2. How We Use Your Information</h2>
+<ul>
+  <li>Provide, maintain, and improve the website and its features</li>
+  <li>Authenticate users and manage accounts</li>
+  <li>Send newsletters and editorial updates you have subscribed to</li>
+  <li>Analyze traffic and usage patterns to understand and improve our content</li>
+  <li>Display relevant advertising through Google AdSense and other ad networks</li>
+  <li>Comply with legal obligations and enforce our terms</li>
+</ul>
+<h2>3. Google AdSense and Third-Party Advertising</h2>
+<p>CelebUD uses Google AdSense to display advertisements. Google AdSense uses cookies to serve ads based on your prior visits to this website and other websites on the internet. Google's use of advertising cookies enables it and its partners to serve ads to you based on your visit to our site and/or other sites on the Internet.</p>
+<p>You may opt out of personalised advertising by visiting <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener noreferrer">Google Ads Settings</a> or <a href="https://www.aboutads.info/choices/" target="_blank" rel="noopener noreferrer">www.aboutads.info/choices</a>.</p>
+<p>Third-party vendors, including Google, use cookies to serve ads based on a user's prior visits to our website or other websites. For more information on how Google uses data when you use our site, visit <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer">Google's Privacy &amp; Terms</a>.</p>
+<h2>4. Analytics</h2>
+<p>We may use analytics services (such as Google Analytics) to collect and analyze traffic data. These services use cookies and similar technologies to collect information about your use of the site and report website trends without identifying individual visitors. You can opt out of Google Analytics by installing the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer">Google Analytics opt-out browser add-on</a>.</p>
+<h2>5. Cookies</h2>
+<p>Cookies are small text files stored on your device when you visit a website. We use cookies to keep you signed in to your account, remember your preferences, understand how you navigate the site, and deliver and measure personalised advertisements via Google AdSense.</p>
+<p>You can instruct your browser to refuse all cookies or to indicate when a cookie is being sent. However, if you do not accept cookies, some portions of our service may not function properly.</p>
+<h2>6. Sharing of Information</h2>
+<p>We do not sell your personal information. We may share information with:</p>
+<ul>
+  <li><strong>Service providers:</strong> Supabase (database and authentication), Vercel (hosting), Stripe (payments), and Google (advertising and analytics) as necessary to operate the site.</li>
+  <li><strong>Legal requirements:</strong> We may disclose information if required by law, court order, or governmental authority.</li>
+  <li><strong>Business transfers:</strong> In connection with a merger, acquisition, or sale of assets, your information may be transferred as part of the transaction.</li>
+</ul>
+<h2>7. Data Retention</h2>
+<p>We retain your information for as long as your account is active or as needed to provide the service, comply with legal obligations, resolve disputes, and enforce our agreements.</p>
+<h2>8. Children's Privacy</h2>
+<p>Our service is not directed to children under 13, and we do not knowingly collect personal information from children under 13.</p>
+<h2>9. Your Rights</h2>
+<p>Depending on where you live, you may have the right to access, correct, or delete the personal information we hold about you, and to object to or restrict certain processing. Contact us to exercise these rights.</p>
+<h2>10. External Links</h2>
+<p>Our site contains links to other websites. We are not responsible for the privacy practices or content of those third-party sites.</p>
+<h2>11. Changes to This Policy</h2>
+<p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy on this page with an updated effective date.</p>
+<h2>12. Contact Us</h2>
+<p>Questions about this policy? Email <a href="mailto:info@celebud.com">info@celebud.com</a> or use our <a href="/contact">Contact page</a>.</p>`,
+  },
+};
+
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+function articlePath(article: { id: string; slug?: string | null; title?: string | null }): string {
+  const slug = article.slug?.trim() || (article.title ? slugify(article.title) : '');
+  return slug ? `/article/${article.id}/${slug}` : `/article/${article.id}`;
+}
+
+function escapeHtml(str: string) {
+  return (str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Every prerendered page ends with this. Before it existed, a crawler that
+// landed on any page had no link out of it: the homepage listed 30 articles
+// and nothing else - no categories, no page 2, no About/Privacy. Those pages
+// existed only inside sitemap.xml, and a URL known only from a sitemap with
+// no internal link pointing at it is exactly what Google files under
+// "Discovered - currently not indexed" and then declines to crawl. Search
+// Console showed 2,063 URLs in that state against 1 indexed page.
+const SITE_FOOTER = `<footer><nav aria-label="Site"><ul>
+<li><a href="/">Home</a></li>
+<li><a href="/originals">CelebUD Originals</a></li>
+<li><a href="/fin-advisor">Fin-Advisor</a></li>
+<li><a href="/election-2027">Election 2027</a></li>
+<li><a href="/trackers">Trackers</a></li>
+<li><a href="/tributes/submit">Send us a tribute</a></li>
+<li><a href="/about">About CelebUD</a></li>
+<li><a href="/contact">Contact</a></li>
+<li><a href="/editorial-standards">Editorial Standards</a></li>
+<li><a href="/privacy">Privacy Policy</a></li>
+</ul></nav></footer>`;
+
+function baseHtml({
+  title,
+  description,
+  image,
+  url,
+  type,
+  jsonLd,
+  bodyHtml,
+  keywords,
+  extraJsonLd,
+  extraHead,
+  robots,
+}: {
+  title: string;
+  description: string;
+  image?: string;
+  url: string;
+  type: 'website' | 'article';
+  jsonLd: Record<string, unknown>;
+  bodyHtml: string;
+  keywords?: string;
+  /** Optional second JSON-LD block, e.g. BreadcrumbList. */
+  extraJsonLd?: Record<string, unknown>;
+  /** Extra <head> tags, e.g. og:video / og:audio for a media page. */
+  extraHead?: string;
+  /**
+   * Overrides the default robots directive. Emitting a second robots tag
+   * alongside the default would leave two conflicting tags on the page;
+   * Google resolves that to the most restrictive one, so it happens to
+   * work, but one unambiguous tag is what we actually mean.
+   */
+  robots?: string;
+}) {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>${escapeHtml(title)}</title>
+<meta name="description" content="${escapeHtml(description)}" />
+${keywords ? `<meta name="keywords" content="${escapeHtml(keywords)}" />` : ''}
+<link rel="canonical" href="${url}" />
+<meta name="robots" content="${robots || 'index, follow, max-image-preview:large'}" />
+
+<meta property="og:type" content="${type}" />
+<meta property="og:title" content="${escapeHtml(title)}" />
+<meta property="og:description" content="${escapeHtml(description)}" />
+<meta property="og:url" content="${url}" />
+<meta property="og:site_name" content="${SITE_NAME}" />
+${image ? `<meta property="og:image" content="${image}" />` : ''}
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="${escapeHtml(title)}" />
+<meta name="twitter:description" content="${escapeHtml(description)}" />
+${image ? `<meta name="twitter:image" content="${image}" />` : ''}
+
+${extraHead || ''}
+<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+${extraJsonLd ? `<script type="application/ld+json">${JSON.stringify(extraJsonLd)}</script>` : ''}
+</head>
+<body>
+${bodyHtml}
+${SITE_FOOTER}
+</body>
+</html>`;
+}
+
+export async function renderRequest(req: Request): Promise<Response> {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  const supabase = getClient();
+
+  const { searchParams } = new URL(req.url);
+  const path = searchParams.get('path') || '/';
+
+  try {
+    // --- /trackers: the recorded figures, so crawlers see the real data ---
+    if (path.replace(/\/+$/, '') === '/trackers') {
+      const { data: entries } = await supabase
+        .from('tracker_entries')
+        .select('tracker, observed_on, value, label, extra, source_url, note')
+        .order('observed_on', { ascending: false })
+        .limit(400);
+      const NAMES: Record<string, [string, string]> = {
+        'ngn-cad': ['Naira to Canadian dollar', 'Naira per C$1'],
+        'ngn-usd': ['Naira to US dollar', 'Naira per US$1'],
+        'express-entry': ['Express Entry draws', 'Minimum CRS score'],
+        'fuel-price': ['Petrol pump price', 'Naira per litre'],
+      };
+      const sections = Object.entries(NAMES).map(([id, [name, unit]]) => {
+        const rows = (entries || []).filter((e) => e.tracker === id).slice(0, 30);
+        const body = rows.length
+          ? `<table><thead><tr><th>Date</th><th></th><th>${unit}</th></tr></thead><tbody>${rows.map((e) =>
+              `<tr><td>${escapeHtml(e.observed_on)}</td><td>${escapeHtml(e.label || '')}</td><td>${Number(e.value).toLocaleString('en')}${e.extra != null ? ` (${Number(e.extra).toLocaleString('en')} invited)` : ''}</td></tr>`).join('')}</tbody></table>`
+          : '<p>Our editors are starting this record.</p>';
+        return `<h2>${name}</h2>${body}`;
+      }).join('');
+      const title = `Naira rates, Express Entry draws & petrol prices — CelebUD Trackers`;
+      const description = 'Naira to Canadian and US dollar, every Express Entry draw, and petrol pump prices, recorded over time with sources by CelebUD editors.';
+      const url = `${SITE_URL}/trackers`;
+      return new Response(
+        baseHtml({
+          title, description, url, type: 'website',
+          jsonLd: { '@context': 'https://schema.org', '@type': 'WebPage', name: title, description, url },
+          bodyHtml: `<main><h1>The numbers that shape life between Nigeria and Canada</h1><p>Recorded by our editors over time, every figure with its source.</p>${sections}</main>`,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } },
+      );
+    }
+
+    // --- Election 2027 hub, poll and candidate profiles. Same facts the
+    // React pages show; poll RESULTS are deliberately not rendered here (a
+    // crawler snapshot would freeze a moving number into search results).
+    const electionPath = path.replace(/\/+$/, '');
+    const govMatch = electionPath.match(/^\/election-2027\/governor\/([a-z]+)(\/poll)?$/);
+    const GOV_STATES: Record<string, string> = { lagos: 'Lagos', ogun: 'Ogun', oyo: 'Oyo' };
+    if (govMatch && GOV_STATES[govMatch[1]]) {
+      const st = GOV_STATES[govMatch[1]];
+      const { data: gc } = await supabase.from('election_candidates')
+        .select('slug, name, party_abbr, party_name, running_mate, ballot_order')
+        .eq('race', `governor-2027-${govMatch[1]}`).eq('is_active', true).order('ballot_order');
+      const list = gc || [];
+      const items = `<ol>${list.map((c) => `<li><a href="/election-2027/${c.slug}">${escapeHtml(c.name)}</a> — ${escapeHtml(c.party_name || c.party_abbr)} (${escapeHtml(c.party_abbr)})${c.running_mate ? `; deputy ${escapeHtml(c.running_mate)}` : ''}</li>`).join('')}</ol>`;
+      const isPoll = !!govMatch[2];
+      const url = `${SITE_URL}/election-2027/governor/${govMatch[1]}${isPoll ? '/poll' : ''}`;
+      const title = isPoll ? `Who should be the next Governor of ${st}? CelebUD Reader Poll` : `${st} Governorship Election 2027: All Candidates & Reader Poll | CelebUD`;
+      const description = isPoll
+        ? `If ${st} voted today, who would you choose for governor? Vote in the CelebUD reader poll and see how ${st} is leaning.`
+        : `All ${list.length} candidates for Governor of ${st} State on INEC's final list, with deputies and party, and the CelebUD reader poll. Election day: 6 February 2027.`;
+      return new Response(
+        baseHtml({ title, description, url, type: 'website', jsonLd: { '@context': 'https://schema.org', '@type': 'WebPage', name: title, description, url },
+          bodyHtml: `<main><h1>${isPoll ? `If the 2027 ${st} governorship election were held today, who would you vote for?` : `${st} governorship election 2027: the candidates`}</h1><p>Polling day: Saturday, 6 February 2027. Names as they appear on INEC's final list. CelebUD does not endorse any candidate.</p>${items}<p><a href="/election-2027/governor/${govMatch[1]}/poll">Take the ${st} reader poll</a> · <a href="/election-2027">Nigeria Decides 2027</a></p></main>` }),
+        { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } },
+      );
+    }
+    if (electionPath === '/election-2027' || electionPath === '/election-2027/poll' || /^\/election-2027\/[a-z0-9-]{3,80}$/.test(electionPath)) {
+      const { data: allCands } = await supabase
+        .from('election_candidates')
+        .select('slug, race, name, party_abbr, party_name, running_mate, bio, past_offices, promises, sources, ballot_order')
+        .eq('is_active', true).order('ballot_order');
+      const cands = (allCands || []).filter((c) => c.race === 'president-2027');
+      const list = cands || [];
+      const html200 = (title: string, description: string, url: string, bodyHtml: string, jsonType = 'WebPage') => new Response(
+        baseHtml({ title, description, url, type: 'website', jsonLd: { '@context': 'https://schema.org', '@type': jsonType, name: title, description, url }, bodyHtml }),
+        { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } },
+      );
+      const candList = `<ol>${list.map((c) => `<li><a href="/election-2027/${c.slug}">${escapeHtml(c.name)}</a> — ${escapeHtml(c.party_name || c.party_abbr)} (${escapeHtml(c.party_abbr)})${c.running_mate ? `; running mate ${escapeHtml(c.running_mate)}` : ''}</li>`).join('')}</ol>`;
+
+      if (electionPath === '/election-2027') {
+        const { data: stats } = await supabase.from('election_voter_stats').select('kind, label, value, zone').order('sort');
+        const st = stats || [];
+        const total = st.find((s) => s.kind === 'total')?.value || 0;
+        const rows = (kind: string) => st.filter((s) => s.kind === kind).map((s) => `<tr><td>${escapeHtml(s.label)}</td><td>${Number(s.value).toLocaleString('en')}</td><td>${total ? ((Number(s.value) / Number(total)) * 100).toFixed(1) : '0'}%</td></tr>`).join('');
+        const body = `<main><h1>Nigeria Decides 2027: candidates, voter numbers and reader poll</h1>
+<p>The presidential and National Assembly elections are on Saturday, 16 January 2027; governorship and State House of Assembly elections on 6 February 2027. INEC's 2027 register has ${Number(total).toLocaleString('en')} registered voters.</p>
+<h2>Registered voters by geopolitical zone</h2><table><tbody>${rows('zone')}</tbody></table>
+<h2>Registered voters by age</h2><table><tbody>${rows('age')}</tbody></table>
+<h2>Registered voters by gender</h2><table><tbody>${rows('gender')}</tbody></table>
+<h2>Largest states by registered voters</h2><table><tbody>${rows('state')}</tbody></table>
+<h2>The ${list.length} presidential candidates (INEC ballot order)</h2>${candList}
+<p><a href="/election-2027/poll">Take the CelebUD reader poll</a>. CelebUD does not endorse any candidate.</p></main>`;
+        return html200('Nigeria Decides 2027: Candidates, Voter Numbers & Reader Poll | CelebUD',
+          `All ${list.length} presidential candidates, where Nigeria's ${Number(total).toLocaleString('en')} registered voters are by zone, state and age, and the CelebUD reader poll.`,
+          `${SITE_URL}/election-2027`, body);
+      }
+      if (electionPath === '/election-2027/poll') {
+        return html200('Who gets your vote in 2027? CelebUD Reader Poll',
+          'If Nigeria voted today, who would you choose for President? Vote in the CelebUD reader poll and see how each zone and age group is leaning.',
+          `${SITE_URL}/election-2027/poll`,
+          `<main><h1>If the 2027 presidential election were held today, who would you vote for?</h1><p>A CelebUD reader poll: one vote per device, results shown by geopolitical zone and age group. It counts readers who choose to take part and is not a scientific survey.</p><h2>Candidates</h2>${candList}</main>`);
+      }
+      const slugPart = electionPath.split('/').pop();
+      const c = (allCands || []).find((x) => x.slug === slugPart);
+      if (!c) {
+        return new Response('Not found', { status: 404, headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' } });
+      }
+      const promises = (Array.isArray(c.promises) ? c.promises : []) as Array<{ text?: string; source_url?: string }>;
+      const sources = (Array.isArray(c.sources) ? c.sources : []) as Array<{ title?: string; url?: string }>;
+      const gov = String(c.race).startsWith('governor-2027-');
+      const gs = gov ? String(c.race).slice('governor-2027-'.length) : '';
+      const st = gs ? gs.charAt(0).toUpperCase() + gs.slice(1) : '';
+      const role = gov ? `2027 ${st} governorship candidate` : '2027 presidential candidate';
+      const body = `<main><article><h1>${escapeHtml(c.name)}: ${role}</h1>
+<p>${escapeHtml(c.party_name || c.party_abbr)} (${escapeHtml(c.party_abbr)}) · ${gov ? 'INEC list' : 'ballot'} number ${c.ballot_order}${c.running_mate ? ` · ${gov ? 'deputy' : 'running mate'} ${escapeHtml(c.running_mate)}` : ''} · election day ${gov ? '6 February 2027' : '16 January 2027'}</p>
+<h2>Background</h2><p>${c.bio ? escapeHtml(c.bio) : 'Profile being prepared by CelebUD editors.'}</p>
+${c.past_offices ? `<h2>Offices held</h2><ul>${c.past_offices.split(';').map((o: string) => o.trim()).filter(Boolean).map((o: string) => `<li>${escapeHtml(o)}</li>`).join('')}</ul>` : ''}
+${promises.length ? `<h2>Campaign promises</h2><ul>${promises.map((p) => `<li>${escapeHtml(p.text || '')}${p.source_url ? ` (<a href="${escapeHtml(p.source_url)}" rel="nofollow noopener">source</a>)` : ''}</li>`).join('')}</ul>` : ''}
+${sources.length ? `<h2>Sources</h2><ul>${sources.map((s) => `<li><a href="${escapeHtml(s.url || '')}" rel="nofollow noopener">${escapeHtml(s.title || 'Source')}</a></li>`).join('')}</ul>` : ''}
+<p><a href="${gov ? `/election-2027/governor/${gs}` : '/election-2027'}">All ${gov ? `${st} governorship` : 'presidential'} candidates</a> · <a href="${gov ? `/election-2027/governor/${gs}/poll` : '/election-2027/poll'}">Reader poll</a>. CelebUD does not endorse any candidate.</p></article></main>`;
+      return html200(gov ? `${c.name} (${c.party_abbr}) — ${st} Governorship Candidate 2027 | CelebUD` : `${c.name} (${c.party_abbr}) — 2027 Presidential Candidate Profile | CelebUD`,
+        `${c.name} is the ${c.party_name || c.party_abbr} candidate for ${gov ? `${st} State governor in 2027` : "Nigeria's 2027 presidential election"}${c.running_mate ? `, with ${c.running_mate} as ${gov ? 'deputy' : 'running mate'}` : ''}. Background, offices held, promises and sources.`,
+        `${SITE_URL}/election-2027/${c.slug}`, body, 'ProfilePage');
+    }
+
+    // --- /ask/:slug: a reader callout. Real page, but a one-line form is
+    // not something to rank, so it is noindex.
+    const askMatch = path.match(/^\/ask\/([a-z0-9-]+)\/?$/);
+    if (askMatch) {
+      const { data: q } = await supabase.from('reader_questions').select('question, intro').eq('slug', askMatch[1]).maybeSingle();
+      if (!q) {
+        return new Response('Not found', { status: 404, headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' } });
+      }
+      const url = `${SITE_URL}/ask/${askMatch[1]}`;
+      const description = 'Tell CelebUD in a minute — your answer may appear in our next story.';
+      return new Response(
+        baseHtml({
+          title: `${q.question} | Ask CelebUD`, description, url, type: 'website',
+          jsonLd: { '@context': 'https://schema.org', '@type': 'WebPage', name: q.question, description, url },
+          bodyHtml: `<main><h1>${escapeHtml(q.question)}</h1>${q.intro ? `<p>${escapeHtml(q.intro)}</p>` : ''}<p>${description}</p></main>`,
+          robots: 'noindex,follow',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } },
+      );
+    }
+
+    // --- Static trust pages: /about, /contact, /privacy, /editorial-standards ---
+    const staticPage = STATIC_PAGES[path.replace(/\/+$/, '') || '/'];
+    if (staticPage) {
+      const url = `${SITE_URL}${path}`;
+      return new Response(
+        baseHtml({
+          title: staticPage.title,
+          description: staticPage.description,
+          url,
+          type: 'website',
+          jsonLd: {
+            '@context': 'https://schema.org',
+            '@type': 'WebPage',
+            name: staticPage.title,
+            description: staticPage.description,
+            url,
+            publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+          },
+          bodyHtml: staticPage.bodyHtml,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } }
+      );
+    }
+
+    // --- Listing hubs: /originals and /fin-advisor ---
+    //
+    // Both are in sitemap.xml. Without a branch of their own they would
+    // fall through to the homepage listing below and return a byte-for-byte
+    // copy of the homepage under a different URL — trading an empty page
+    // for a duplicate one, which is not an improvement. Each gets the
+    // articles its React page actually shows.
+    const LISTING_HUBS: Record<
+      string,
+      { title: string; description: string; heading: string; intro: string }
+    > = {
+      '/originals': {
+        title: `CelebUD Originals — Reporting and Features by Our Newsroom | ${SITE_NAME}`,
+        description:
+          'CelebUD Originals: features, tributes, interviews and analysis written by the CelebUD newsroom rather than curated from the wires.',
+        heading: 'CelebUD Originals',
+        intro:
+          'Features, tributes, interviews and analysis written by our own newsroom — the work our reporters produce first-hand, not curated from other outlets.',
+      },
+      '/fin-advisor': {
+        title: `Fin-Advisor — Financial & Insurance Education Center | ${SITE_NAME}`,
+        description:
+          'Plain-English guides to insurance, personal finance and business for readers in Canada and Nigeria, plus free planning calculators.',
+        heading: 'Financial & Insurance Education Center',
+        intro:
+          'Plain-English guides to insurance, personal finance and business for readers in Canada, Nigeria and the diaspora — plus free planning calculators.',
+      },
+    };
+    const hub = LISTING_HUBS[path.replace(/\/+$/, '')];
+    if (hub) {
+      const isOriginals = path.startsWith('/originals');
+      let hubQuery = supabase
+        .from('media_content')
+        .select('id, slug, title, description, published_at, categories!inner(name, slug)')
+        .eq('media_type', 'article')
+        .eq('is_published', true);
+      // This hub is restricted to hand-written work, and that is not
+      // fussiness -- it is the only thing that makes the page honest.
+      //
+      // categorizeArticle() in fetch-news assigns categories with
+      // text.includes(keyword) on a broad list. Substring matching means
+      // 'bond' matches "a bond that must never be broken" and "deep
+      // maternal bonds", 'money' matches a Powerball jackpot story, and
+      // 'asset'/'currency'/'savings' behave the same way. The result:
+      // 'finance' holds 81 published articles of which only 4 were written
+      // here, and the other 77 include a Britney Spears chart record, an
+      // NYT puzzle walkthrough, a Comic-Con reveal and an advice column.
+      // 'business' is worse -- 215 articles, 4 hand-written.
+      //
+      // 'fin-advisor' is the one clean category: 16 articles, all 16
+      // hand-written, because the keyword detector has no rule that can
+      // land anything there. Adding is_manual keeps that property while
+      // still picking up the four genuine finance pieces.
+      //
+      // ~20 accurate articles beat 60 where two thirds contradict the
+      // heading. Fixing the underlying categorisation is a separate job;
+      // until then this page must not inherit the damage.
+      hubQuery = isOriginals
+        ? hubQuery.eq('is_pinned', true)
+        : hubQuery
+            .in('categories.slug', ['fin-advisor', 'finance'])
+            .eq('is_manual', true);
+
+      const { data: rows } = await hubQuery
+        .order('published_at', { ascending: false })
+        .limit(60);
+
+      const items = (rows || [])
+        .map(
+          (a: { id: string; slug?: string | null; title: string; description?: string | null }) =>
+            `<li><a href="${articlePath(a)}">${escapeHtml(a.title)}</a>${
+              a.description ? ` — ${escapeHtml(a.description)}` : ''
+            }</li>`
+        )
+        .join('\n');
+      const url = `${SITE_URL}${path}`;
+
+      return new Response(
+        baseHtml({
+          title: hub.title,
+          description: hub.description,
+          url,
+          type: 'website',
+          jsonLd: {
+            '@context': 'https://schema.org',
+            '@type': 'CollectionPage',
+            name: hub.heading,
+            description: hub.description,
+            url,
+            publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+          },
+          bodyHtml: `
+<h1>${escapeHtml(hub.heading)}</h1>
+<p>${escapeHtml(hub.intro)}</p>
+<ul>
+${items}
+</ul>`,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } }
+      );
+    }
+
+    // --- Author profile: /author/:id ---
+    // Every byline on the site links here, so these are among the most
+    // linked-to pages CelebUD has — and they were returning the empty
+    // shell. A named writer with a visible body of work is the clearest
+    // signal that a site is staffed by real, accountable people rather
+    // than assembled automatically.
+    // authors.id is a uuid: querying .eq('id', 'not-a-uuid') is a Postgres
+    // type error, not an empty result, so a junk URL would 500 instead of
+    // falling through. Check the shape before asking the database.
+    const authorMatch = path.match(
+      /^\/author\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+    );
+    if (authorMatch) {
+      const { data: author } = await supabase
+        .from('authors')
+        .select('id, name, bio, avatar_url')
+        .eq('id', authorMatch[1])
+        .maybeSingle();
+
+      if (author) {
+        const { data: byline } = await supabase
+          .from('media_content')
+          .select('id, slug, title, description, published_at')
+          .eq('author_id', author.id)
+          .eq('is_published', true)
+          .order('published_at', { ascending: false })
+          .limit(50);
+
+        const items = (byline || [])
+          .map(
+            (a: { id: string; slug?: string | null; title: string; published_at?: string }) =>
+              `<li><a href="${articlePath(a)}">${escapeHtml(a.title)}</a></li>`
+          )
+          .join('\n');
+        const url = `${SITE_URL}/author/${author.id}`;
+
+        return new Response(
+          baseHtml({
+            title: `${author.name} — Articles and Profile | ${SITE_NAME}`,
+            description:
+              author.bio ||
+              `${author.name} writes for ${SITE_NAME}. Read their latest reporting, interviews and analysis.`,
+            image: author.avatar_url || undefined,
+            url,
+            type: 'website',
+            jsonLd: {
+              '@context': 'https://schema.org',
+              '@type': 'ProfilePage',
+              mainEntity: {
+                '@type': 'Person',
+                name: author.name,
+                description: author.bio || undefined,
+                image: author.avatar_url || undefined,
+                url,
+                worksFor: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+              },
+            },
+            bodyHtml: `
+<h1>${escapeHtml(author.name)}</h1>
+${author.bio ? `<p>${escapeHtml(author.bio)}</p>` : ''}
+<h2>Articles by ${escapeHtml(author.name)}</h2>
+<ul>
+${items}
+</ul>`,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } }
+        );
+      }
+    }
+
+    // --- Creator video / audio page: /watch/:id ---
+    //
+    // Before this existed, the Content Studio share buttons had no CelebUD
+    // page to point at, so they shared the raw storage file instead. Facebook
+    // and X then showed "bwtrtzvlqvykobmlfjcl.supabase.co" as the source with
+    // a blank preview, because an .mp4/.mp3 file carries no title, no
+    // description and no image. This gives every clip a real page on
+    // celebud.com with proper preview tags.
+    const watchMatch = path.match(/^\/watch\/([^/?#]+)/);
+    if (watchMatch) {
+      const id = watchMatch[1];
+      const { data: item } = await supabase
+        .from('creator_content')
+        .select('id, title, description, content_type, media_url, thumbnail_url, external_url, created_at, status')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!item || item.status !== 'published') {
+        return new Response('Not found', { status: 404, headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' } });
+      }
+
+      const url = `${SITE_URL}/watch/${item.id}`;
+      const isAudio = item.content_type === 'audio';
+      const description =
+        (item.description || '').trim() ||
+        `${isAudio ? 'Listen' : 'Watch'} "${item.title}" on ${SITE_NAME}.`;
+      // A video with no poster gets no og:image, which is what produced the
+      // blank grey preview box. Fall back to the site logo so the card always
+      // renders as CelebUD rather than an empty rectangle.
+      const image = item.thumbnail_url || `${SITE_URL}/icon-512.png`;
+
+      // Only OUR OWN hosted files may be declared as playable media. A link
+      // to someone's X/YouTube post is a link, not a file we can stream.
+      const ownFile =
+        typeof item.media_url === 'string' &&
+        item.media_url.includes('/storage/v1/object/public/');
+
+      const mediaTags = ownFile
+        ? (isAudio
+            ? `<meta property="og:audio" content="${item.media_url}" />
+<meta property="og:audio:type" content="audio/mpeg" />`
+            : `<meta property="og:video" content="${item.media_url}" />
+<meta property="og:video:secure_url" content="${item.media_url}" />
+<meta property="og:video:type" content="video/mp4" />
+<meta property="og:video:width" content="1280" />
+<meta property="og:video:height" content="720" />
+<meta name="twitter:player" content="${url}" />`)
+        : '';
+
+      const html = baseHtml({
+        title: `${item.title} | ${SITE_NAME}`,
+        description,
+        image,
+        url,
+        type: 'website',
+        // Large image card unless we can actually stream the file.
+        extraHead: mediaTags,
+        jsonLd: {
+          '@context': 'https://schema.org',
+          '@type': isAudio ? 'AudioObject' : 'VideoObject',
+          name: item.title,
+          description,
+          thumbnailUrl: image,
+          uploadDate: item.created_at,
+          contentUrl: item.media_url || undefined,
+          embedUrl: url,
+          publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+        },
+        bodyHtml: `<h1>${escapeHtml(item.title)}</h1>
+<p>${escapeHtml(description)}</p>
+${ownFile
+  ? (isAudio
+      ? `<audio controls src="${item.media_url}"></audio>`
+      : `<video controls poster="${image}" src="${item.media_url}"></video>`)
+  : (item.external_url || item.media_url
+      ? `<p><a href="${item.external_url || item.media_url}">View the original</a></p>`
+      : '')}
+<p><a href="${SITE_URL}">More from ${SITE_NAME}</a></p>`,
+      });
+
+      return new Response(html, {
+        headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    }
+
+    // --- Article page: /article/:id ---
+    const articleMatch = path.match(/^\/article\/([^/]+)/);
+    if (articleMatch) {
+      const id = articleMatch[1];
+      const { data: article } = await supabase
+        .from('media_content')
+        .select('*, categories(name, slug), authors(name)')
+        .eq('id', id)
+        .eq('is_published', true)
+        .maybeSingle();
+
+      if (!article) {
+        return new Response('Not found', { status: 404, headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' } });
+      }
+
+      // Every prerendered article page was a dead end: the only outbound
+      // links were the category and the footer. A crawler arriving on an
+      // article found nothing pointing at any other article, which is why
+      // URL inspection reported "Referring page: None detected" even for
+      // pages sitting in the sitemap -- the sitemap was the ONLY way in.
+      //
+      // Internal links are the one form of link equity entirely within our
+      // control, and a flat archive with none of them gives Google no reason
+      // to believe any single article matters. Same category first, then
+      // recent articles to fill, so even a thin category still produces a
+      // usable trail.
+      const { data: sameCategory } = article.category_id
+        ? await supabase
+            .from('media_content')
+            .select('id, title, slug, description')
+            .eq('media_type', 'article')
+            .eq('is_published', true)
+            .eq('category_id', article.category_id)
+            .neq('id', article.id)
+            .order('published_at', { ascending: false })
+            .limit(6)
+        : { data: [] };
+
+      let related = sameCategory || [];
+      if (related.length < 6) {
+        // Deliberately no .not('id','in',...) here: PostgREST requires UUIDs
+        // in an `in` list to be quoted, and an unquoted list fails the whole
+        // query -- which silently yields no links at all. Over-fetch a small
+        // batch and de-duplicate in code instead; it cannot fail this way.
+        const exclude = new Set([article.id, ...related.map((r: { id: string }) => r.id)]);
+        const { data: filler } = await supabase
+          .from('media_content')
+          .select('id, title, slug, description')
+          .eq('media_type', 'article')
+          .eq('is_published', true)
+          .order('published_at', { ascending: false })
+          .limit(18);
+        related = [
+          ...related,
+          ...(filler || []).filter((f: { id: string }) => !exclude.has(f.id)),
+        ].slice(0, 6);
+      }
+
+      const relatedHtml = related.length
+        ? `<nav aria-label="Related articles"><h2>More from CelebUD</h2><ul>${related
+            .map(
+              (r: { id: string; title: string; slug?: string | null }) =>
+                `<li><a href="${articlePath(r)}">${escapeHtml(r.title || '')}</a></li>`,
+            )
+            .join('')}</ul></nav>`
+        : '';
+
+      const url = `${SITE_URL}${articlePath(article)}`;
+      const jsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'NewsArticle',
+        headline: article.title,
+        description: article.description,
+        image: article.thumbnail_url ? [article.thumbnail_url] : undefined,
+        datePublished: article.published_at,
+        // A deliberate editorial review (Newsroom > Living guides) is the
+        // meaningful modification date; fall back to the row's updated_at.
+        dateModified: article.content_updated_at || article.updated_at,
+        author: [{ '@type': 'Person', name: article.authors?.name || SITE_NAME }],
+        publisher: {
+          '@type': 'Organization',
+          name: SITE_NAME,
+          logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.jpg` },
+        },
+        mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+        // Section and keywords are what Google News and Top Stories use to
+        // place a story in the right topic cluster.
+        articleSection: article.categories?.name || undefined,
+        keywords: article.seo_keywords || undefined,
+      };
+
+      // Breadcrumbs give Google the "CelebUD › Politics › Headline" trail
+      // shown above search results, which lifts click-through.
+      const breadcrumb = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+          ...(article.categories
+            ? [{
+                '@type': 'ListItem',
+                position: 2,
+                name: article.categories.name,
+                item: `${SITE_URL}/?category=${article.categories.slug}`,
+              }]
+            : []),
+          {
+            '@type': 'ListItem',
+            position: article.categories ? 3 : 2,
+            name: article.title,
+            item: url,
+          },
+        ],
+      };
+
+      const bodyHtml = `
+<article>
+  <h1>${escapeHtml(article.title)}</h1>
+  <p>By ${escapeHtml(article.authors?.name || SITE_NAME)}${
+    article.published_at
+      ? ` — <time datetime="${escapeHtml(article.published_at)}">${escapeHtml(formatBylineDate(article.published_at))}</time>`
+      : ''
+  }${
+    article.content_updated_at
+      ? ` · Updated <time datetime="${escapeHtml(article.content_updated_at)}">${escapeHtml(formatBylineDate(article.content_updated_at))}</time>`
+      : ''
+  }</p>
+  ${article.thumbnail_url ? `<img src="${article.thumbnail_url}" alt="${escapeHtml(article.title)}" />` : ''}
+  <div>${stripTrailingEmptyBlocks(article.content || '') || escapeHtml(article.description || '')}</div>
+  ${article.categories ? `<p>Category: <a href="/?category=${article.categories.slug}">${escapeHtml(article.categories.name)}</a></p>` : ''}
+</article>
+${relatedHtml}`;
+
+      const html = baseHtml({
+        // Prefer the purpose-written SEO title: it is trimmed to the length
+        // search results actually display, so headlines are not cut off
+        // mid-word in Google.
+        title: `${article.seo_title || article.title} - ${SITE_NAME}`,
+        description: article.description || article.title,
+        keywords: article.seo_keywords || undefined,
+        image: article.thumbnail_url || undefined,
+        url,
+        type: 'article',
+        jsonLd,
+        extraJsonLd: breadcrumb,
+        bodyHtml,
+        // A wire summary of a couple of hundred words is not a page worth
+        // ranking on its own, and a site carrying a pile of them reads as
+        // low-value under review. "follow" is deliberate: the page keeps
+        // passing link equity to the fuller articles it points at, it just
+        // stops asking to be indexed itself. Nothing is hidden from
+        // readers — the article stays exactly as published.
+        robots:
+          countWords(article.content || article.description || '') < THIN_ARTICLE_WORDS
+            ? 'noindex,follow'
+            : undefined,
+      });
+
+      return new Response(html, {
+        headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    }
+
+    // --- Homepage / category listing: / or /?category=x ---
+    const category = searchParams.get('category');
+
+    // Pagination exists for one reason: without it a crawler could reach
+    // only the newest 30 articles. The other ~2,000 were reachable solely
+    // through sitemap.xml, with no link anywhere on the site pointing at
+    // them, which is why they sat in "Discovered - currently not indexed".
+    // Page 2..N now form a chain a crawler can walk to the end of the archive.
+    const PAGE_SIZE = 30;
+    const rawPage = parseInt(searchParams.get('page') || '1', 10);
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const from = (page - 1) * PAGE_SIZE;
+
+    let query = supabase
+      .from('media_content')
+      .select('id, slug, title, description, thumbnail_url, published_at, categories(name, slug)', { count: 'exact' })
+      .eq('is_published', true)
+      .order('published_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (category) {
+      const { data: cat } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('slug', category)
+        .maybeSingle();
+      if (cat) query = query.eq('category_id', cat.id);
+    }
+
+    const { data: articles, count } = await query;
+    const total = count || 0;
+    const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+    // Relative hrefs so the same builder serves the link and the canonical.
+    const href = (p: number) => {
+      const parts: string[] = [];
+      if (category) parts.push(`category=${encodeURIComponent(category)}`);
+      if (p > 1) parts.push(`page=${p}`);
+      return parts.length ? `/?${parts.join('&')}` : '/';
+    };
+
+    // Every category, linked from every listing page. 18 categories x the
+    // full paginated chain behind each is what actually gives a crawler a
+    // route to the whole archive rather than just the newest 30 stories.
+    const { data: cats } = await supabase
+      .from('categories')
+      .select('name, slug')
+      .order('name');
+    const categoryNav = (cats || [])
+      .map(
+        (c: { name: string; slug: string }) =>
+          `<li><a href="/?category=${encodeURIComponent(c.slug)}">${escapeHtml(c.name)}</a></li>`
+      )
+      .join('');
+
+    const pager =
+      `<nav aria-label="Pagination"><ul>` +
+      (page > 1 ? `<li><a href="${href(page - 1)}" rel="prev">Previous page</a></li>` : '') +
+      (page < lastPage ? `<li><a href="${href(page + 1)}" rel="next">Next page</a></li>` : '') +
+      `<li>Page ${page} of ${lastPage}</li>` +
+      `</ul></nav>`;
+
+    const listHtml = (articles || [])
+      .map(
+        (a) => `
+    <li>
+      <a href="${articlePath(a)}">
+        <h2>${escapeHtml(a.title)}</h2>
+        <p>${escapeHtml(a.description || '')}</p>
+      </a>
+    </li>`
+      )
+      .join('');
+
+    const html = baseHtml({
+      title: category
+        // Appending " News" unconditionally produced "News News - CelebUD"
+        // for the news category itself — a duplicated word in the one line
+        // Google shows as the clickable result title.
+        ? `${category.charAt(0).toUpperCase() + category.slice(1)}${
+            /news$/i.test(category) ? '' : ' News'
+          }${page > 1 ? ` - Page ${page}` : ''} - ${SITE_NAME}`
+        : page > 1
+          ? `Latest Stories - Page ${page} - ${SITE_NAME}`
+          : `${SITE_NAME} - Latest Celebrity News, Entertainment & Exclusive Interviews`,
+      // A category listing that repeats the site-wide description reads to a
+      // crawler as another near-duplicate page. Naming the category makes
+      // each listing's description its own.
+      description: category
+        ? `The latest ${category.toLowerCase()} stories on ${SITE_NAME} — updated daily with original reporting, interviews and analysis.`
+        : 'Stay updated with the latest celebrity news, entertainment updates, exclusive interviews, and trending stories.',
+      // Self-canonical per page: page 2 must not claim to be page 1,
+      // or Google folds the whole chain into one URL and the deeper
+      // articles lose the only link pointing at them.
+      url: `${SITE_URL}${href(page)}`,
+      type: 'website',
+      jsonLd: {
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: SITE_NAME,
+        url: SITE_URL,
+        // Lets Google show a search box for the site directly in results,
+        // and identifies the publisher so the brand can earn a knowledge panel.
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: {
+            '@type': 'EntryPoint',
+            urlTemplate: `${SITE_URL}/?search={search_term_string}`,
+          },
+          'query-input': 'required name=search_term_string',
+        },
+        publisher: {
+          '@type': 'NewsMediaOrganization',
+          name: SITE_NAME,
+          url: SITE_URL,
+          logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.jpg` },
+        },
+      },
+      bodyHtml:
+        `<main><h1>${
+          category ? escapeHtml(category.charAt(0).toUpperCase() + category.slice(1)) : 'Latest Stories'
+        }${page > 1 ? ` - Page ${page}` : ''}</h1>` +
+        `<nav aria-label="Categories"><ul>${categoryNav}</ul></nav>` +
+        `<ul>${listHtml}</ul>` +
+        pager +
+        `</main>`,
+    });
+
+    return new Response(html, {
+      headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
+    });
+  } catch (err) {
+    // Explicit text/plain so the type is declared rather than inferred.
+    return new Response(`Prerender error: ${(err as Error).message}`, {
+      status: 500,
+      headers: corsHeaders,
+    });
+  }
+}

@@ -1,3 +1,4 @@
+import { SsrHandoff } from './components/SsrHandoff';
 import { UpdateBanner } from './components/UpdateBanner';
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
@@ -52,6 +53,7 @@ function App() {
     <ErrorBoundary>
       <Router>
         <UpdateBanner />
+        <SsrHandoff />
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
             <Route path="/" element={<HomePage />} />

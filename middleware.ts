@@ -25,6 +25,8 @@
 // losing a working page would be worse. Any throw also lands on next().
 
 import { next } from '@vercel/edge';
+import { renderRequest } from './server/render';
+import { getShell, mergeIntoShell } from './server/shell';
 
 export const config = {
   // Catch-all, because "does this path exist?" cannot be expressed as a
@@ -161,30 +163,57 @@ function notFoundPage(pathname: string): Response {
 // right words but treated each page as a text file, not a web page. So
 // crawler pages are fetched here and re-served with a proper HTML type.
 async function servePrerendered(target: URL, ua: string): Promise<Response> {
-  const res = await fetch(target.toString(), {
-    headers: { 'user-agent': ua, accept: 'text/html' },
-    redirect: 'manual',
-  });
+  const res = await buildPage(target, ua);
   if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
     return new Response(null, { status: res.status, headers: { location: res.headers.get('location')! } });
   }
-  // A Prerender failure must never become what Google indexes — let the
-  // normal app shell answer instead.
+  // A build failure must never become what Google indexes — let the normal
+  // app shell answer instead.
   if (res.status >= 500) return next();
-  const body = await res.text();
+  return htmlResponse(await res.text(), res.status, res.headers.get('x-robots-tag'));
+}
+
+function htmlResponse(body: string, status: number, robots?: string | null): Response {
   const headers = new Headers({
     'content-type': 'text/html; charset=utf-8',
-    'cache-control': 'public, max-age=0, s-maxage=600, stale-while-revalidate=86400',
-    vary: 'user-agent',
+    'cache-control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=86400',
   });
-  const robots = res.headers.get('x-robots-tag');
   if (robots) headers.set('x-robots-tag', robots);
-  return new Response(body, { status: res.status, headers });
+  return new Response(body, { status, headers });
+}
+
+/**
+ * Builds the page inside the site (server/render.ts). Falls back to the old
+ * Supabase Prerender function only if the local build throws, so a bug here
+ * degrades to yesterday's behaviour instead of an error page.
+ */
+async function buildPage(target: URL, ua: string): Promise<Response> {
+  try {
+    return await renderRequest(new Request(target.toString(), { headers: { 'user-agent': ua } }));
+  } catch {
+    return fetch(target.toString(), { headers: { 'user-agent': ua, accept: 'text/html' }, redirect: 'manual' });
+  }
+}
+
+/**
+ * One page for everyone: the finished article inside the normal app shell.
+ * Returns null when it cannot (not found, build error), and the caller then
+ * serves the plain app exactly as before.
+ */
+async function serveFullPage(target: URL, ua: string, origin: string): Promise<Response | null> {
+  const res = await buildPage(target, ua);
+  if (res.status !== 200) return null;
+  const merged = mergeIntoShell(await getShell(origin), await res.text());
+  if (!merged) return null;
+  return htmlResponse(merged, 200, res.headers.get('x-robots-tag'));
 }
 
 // Paths whose crawler version vercel.json used to rewrite straight to
 // Prerender (and so arrived as text/plain). Handled here now instead.
 const REWRITTEN_FOR_BOTS = /^\/(article|watch)\/[^/]+(\/[^/]+)?$/;
+
+// Pages every visitor receives fully built (stage 1 of the rebuild: articles).
+const FULL_PAGE = /^\/article\/[0-9a-f-]{36}(\/[^/]+)?$/i;
 
 export default async function middleware(request: Request) {
   try {
@@ -208,6 +237,15 @@ export default async function middleware(request: Request) {
 
     const ua = request.headers.get('user-agent') || '';
     const viaRewrite = REWRITTEN_FOR_BOTS.test(path);
+
+    // Articles: the same finished page for readers, Google and AdSense alike.
+    if (request.method === 'GET' && FULL_PAGE.test(path)) {
+      const target = new URL(PRERENDER);
+      target.searchParams.set('path', path);
+      const page = await serveFullPage(target, ua, url.origin).catch(() => null);
+      if (page) return page;
+      if (!CRAWLER_UA.test(ua)) return next();
+    }
     const prerenderable = viaRewrite || PRERENDER_EXACT.has(path) || AUTHOR_PROFILE.test(path) || ASK_PAGE.test(path) || ELECTION_CANDIDATE.test(path) || ELECTION_GOVERNOR.test(path);
     if (!CRAWLER_UA.test(ua) || !prerenderable) return next();
 

@@ -26,6 +26,12 @@ export function ArticleDetail() {
   const navigate = useNavigate();
   const { data: article, isLoading: loading, isError, refetch } = useArticle(id || '');
   const [relatedArticles, setRelatedArticles] = useState<MediaContentWithRelations[]>([]);
+  // The server already sent this article as finished HTML. Swap to the app's
+  // version once it has the article — but if loading fails (weak network),
+  // keep showing the server copy rather than replacing it with an error.
+  useEffect(() => {
+    if (article || (!loading && !isError)) window.__ssrDone?.();
+  }, [article, loading, isError]);
   const [linkCopied, setLinkCopied] = useState(false);
 
   // Curated stories from other outlets carry a "The post ... appeared

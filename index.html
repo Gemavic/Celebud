@@ -2,6 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Server-built pages arrive with the finished article visible (#ssr)
+      // and the app hidden (html.ssr). The app calls this once its own
+      // version is on screen; until then readers already have the article.
+      window.__ssrDone = function () {
+        var y = window.scrollY;
+        var s = document.getElementById('ssr');
+        if (s && s.parentNode) s.parentNode.removeChild(s);
+        document.documentElement.classList.remove('ssr');
+        if (y) window.scrollTo(0, y);
+      };
+    </script>
     <link rel="icon" type="image/png" href="/icon-192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
