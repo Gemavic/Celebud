@@ -51,7 +51,14 @@ export function ArticleDetail() {
   const syndicationSource = useMemo(() => {
     const text = (article?.content || '') + ' ' + (article?.description || '');
     const match = text.match(/appeared first on\s+(?:<a[^>]*>)?\s*([^<.\n]{2,60})/i);
-    return match ? match[1].trim() : null;
+    if (match) return match[1].trim();
+    // Imported stories that lost the footer in rewriting are still curated:
+    // name the publisher from the feed they came from.
+    const fromFeed = (article as any)?.news_sources?.name as string | undefined;
+    if (article && article.is_manual !== true && (article.source_id || article.external_url)) {
+      return fromFeed || 'another publication';
+    }
+    return null;
   }, [article]);
 
   useEffect(() => {
@@ -422,8 +429,21 @@ export function ArticleDetail() {
 
           {syndicationSource && (
             <div className="mb-6 -mt-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
-              Originally published by <strong className="text-gray-800">{syndicationSource}</strong> — curated
-              for CelebUD readers under our <Link to="/editorial-standards" className="text-red-600 hover:text-red-700 font-medium">editorial standards</Link>.
+              Originally reported by <strong className="text-gray-800">{syndicationSource}</strong>. This is a
+              summary by the CelebUD Newsroom, curated under our <Link to="/editorial-standards" className="text-red-600 hover:text-red-700 font-medium">editorial standards</Link>.
+              {article.external_url && (
+                <>
+                  {' '}
+                  <a
+                    href={article.external_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-red-600 hover:text-red-700 font-medium"
+                  >
+                    Read the original →
+                  </a>
+                </>
+              )}
             </div>
           )}
 

@@ -1296,6 +1296,16 @@ Deno.serve(async (req: Request) => {
               assignedAuthor = defaultAuthorForSource;
             }
 
+            // Curated stories are bylined "CelebUD Newsroom", never a named
+            // reporter: a person's name on a summary of another outlet's
+            // story claims reporting they did not do, and the site's About
+            // page promises named reporters for its own work only. The
+            // routing above is kept so the Newsroom author can be swapped
+            // back out deliberately, but while a Newsroom author exists it
+            // always wins.
+            const newsroomAuthor = authors?.find((a: any) => a.name === 'CelebUD Newsroom');
+            if (newsroomAuthor) assignedAuthor = newsroomAuthor;
+
             const { bio: resolvedBio, disclaimer: resolvedDisclaimer } = resolveBioProfile(assignedAuthor?.id, finalCategorySlug);
 
             const { data: inserted, error } = await supabase.from('media_content').insert({

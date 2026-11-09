@@ -113,7 +113,7 @@ export function useArticle(id: string) {
       // spinner never hangs forever (e.g. during a Supabase cold start).
       const fetchPromise = supabase
         .from('media_content')
-        .select('*, categories(*), authors(*)')
+        .select('*, categories(*), authors(*), news_sources(name)')
         .eq('id', id)
         .eq('is_published', true)
         .maybeSingle()
