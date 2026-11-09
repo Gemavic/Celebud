@@ -43,7 +43,7 @@ Deno.serve(async (req: Request) => {
     const endIndex = startIndex + pageSize - 1;
 
     // Run all queries in parallel
-    const [categoriesRes, featuredRes, trendingRes, articlesRes, editorialRes] =
+    const [categoriesRes, featuredRes, trendingRes, articlesRes, editorialRes, originalsRes] =
       await Promise.all([
         // 1. Categories (only CelebUD categories with display_order > 0)
         supabase.from("categories").select("*").gt("display_order", 0).order("display_order"),
@@ -107,6 +107,19 @@ Deno.serve(async (req: Request) => {
           .order("priority")
           .order("created_at", { ascending: false })
           .limit(5),
+
+        // 6. CelebUD Originals: the newsroom's own hand-written work
+        // (is_manual). The homepage leads with these. Everything else on the
+        // front page is curated from other outlets, is noindexed, and is not
+        // what this site should be judged on - by readers, by Google, or by
+        // an ad network's reviewer.
+        supabase
+          .from("media_content")
+          .select("*, categories(*), authors(*)")
+          .eq("is_manual", true)
+          .eq("is_published", true)
+          .order("published_at", { ascending: false })
+          .limit(9),
       ]);
 
     const result = {
@@ -115,6 +128,7 @@ Deno.serve(async (req: Request) => {
       trending: trendingRes.data || [],
       articles: articlesRes.data || [],
       articlesCount: articlesRes.count ?? (articlesRes.data?.length || 0),
+      originals: originalsRes.data || [],
       editorial: (editorialRes.data || []).map((f: any) => ({
         ...f,
         discussion_count: 0,

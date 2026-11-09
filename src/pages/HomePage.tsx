@@ -48,6 +48,18 @@ function HomePage() {
   const trendingContent = data?.trending || [];
   const articles = data?.articles || [];
   const totalCount = data?.articlesCount || 0;
+  const originals = data?.originals || [];
+
+  // The front page (page 1, no category, no search) leads with CelebUD
+  // Originals - the newsroom's own hand-written work - instead of the newest
+  // curated stories. The curated feed is still here, further down, under
+  // "Latest Stories". Until the originals have loaded (or if none exist)
+  // the old featured picks fill the hero so the top of the page is never
+  // empty.
+  const isFrontPage = !categoryParam && !searchParam && currentPage === 1;
+  const leadWithOriginals = isFrontPage && originals.length > 0;
+  const heroContent = leadWithOriginals ? originals.slice(0, 3) : featuredContent;
+  const moreOriginals = leadWithOriginals ? originals.slice(3, 9) : [];
 
   const displayContent = useMemo(() => {
     return articles;
@@ -132,7 +144,34 @@ function HomePage() {
 
       <main id="main-content" className="pt-28" role="main">
         <WhatsAppChannelBanner />
-        <Hero featuredContent={featuredContent} />
+        <Hero
+          featuredContent={heroContent}
+          badge={leadWithOriginals ? 'CelebUD Original' : 'Featured'}
+        />
+
+        {moreOriginals.length > 0 && (
+          <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16" aria-label="CelebUD Originals">
+            <div className="flex items-end justify-between mb-6 gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900">CelebUD Originals</h2>
+                <p className="text-gray-500 text-sm mt-1">
+                  Our own reporting, guides and tributes - written here, not gathered from elsewhere
+                </p>
+              </div>
+              <Link
+                to="/originals"
+                className="text-sm font-semibold text-red-600 hover:text-red-700 whitespace-nowrap"
+              >
+                See all originals →
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {moreOriginals.map((content: any) => (
+                <MediaCard key={content.id} content={content} />
+              ))}
+            </div>
+          </section>
+        )}
 
         <ReaderToolsStrip />
 

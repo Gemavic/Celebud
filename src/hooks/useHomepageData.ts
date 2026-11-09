@@ -35,7 +35,7 @@ async function fetchDirectFromSupabase(category: string, page: number, pageSize:
   // the real cause is a dropped request on a weak mobile connection. The main
   // articles query is the one that matters; the other three are decoration.
   // allSettled lets the page render whatever arrived.
-  const [categoriesRes, featuredRes, trendingRes, articlesRes] = await Promise.allSettled([
+  const [categoriesRes, featuredRes, trendingRes, articlesRes, originalsRes] = await Promise.allSettled([
     supabase.from('categories').select('*').gt('display_order', 0).order('display_order'),
 
     supabase
@@ -79,6 +79,15 @@ async function fetchDirectFromSupabase(category: string, page: number, pageSize:
       }
       return q.range(startIndex, endIndex);
     })(),
+
+    // CelebUD Originals (hand-written, is_manual): the homepage leads with these.
+    supabase
+      .from('media_content')
+      .select('*, categories(*), authors(*)')
+      .eq('is_manual', true)
+      .eq('is_published', true)
+      .order('published_at', { ascending: false })
+      .limit(9),
   ]);
 
   const value = <T,>(r: PromiseSettledResult<T>): T | null =>
@@ -88,6 +97,7 @@ async function fetchDirectFromSupabase(category: string, page: number, pageSize:
   const featured = value(featuredRes);
   const trending = value(trendingRes);
   const articles = value(articlesRes);
+  const originals = value(originalsRes);
 
   // Only the articles query failing is a real failure. Throw so react-query
   // retries and the UI can tell "request failed" apart from "nothing here",
@@ -102,6 +112,7 @@ async function fetchDirectFromSupabase(category: string, page: number, pageSize:
     trending: trending?.data || [],
     articles: articles.data || [],
     articlesCount: articles.count ?? (articles.data?.length || 0),
+    originals: originals?.data || [],
     editorial: [],
   };
 }

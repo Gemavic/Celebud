@@ -1,10 +1,12 @@
 // src/pages/OriginalsPage.tsx
 // CelebUD Originals: the public home for the newsroom's own written work.
 //
-// Every article here is pinned (media_content.is_pinned), which means the
-// nightly trending job cannot un-feature it and no automated pass may rewrite
-// it. Articles are only ever removed from this page by an editor unpinning,
-// archiving, or deleting them by hand.
+// Only hand-written work appears here (media_content.is_manual). This page
+// used to list everything pinned (is_pinned) - 719 articles, of which 624
+// were curated rewrites of other outlets' stories, under a heading that says
+// "written in-house, not gathered from elsewhere". is_manual is the same flag
+// that decides which articles Google may index, so the page now says only
+// what is true and matches what the site tells search engines.
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -52,7 +54,7 @@ export function OriginalsPage() {
         { count: 'exact' }
       )
       .eq('media_type', 'article')
-      .eq('is_pinned', true)
+      .eq('is_manual', true)
       .eq('is_published', true);
 
     if (q) {

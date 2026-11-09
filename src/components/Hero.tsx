@@ -6,9 +6,11 @@ import { buildArticleUrl } from '../utils/articleUrl';
 
 interface HeroProps {
   featuredContent: MediaContentWithRelations[];
+  /** Label on the main story, e.g. "CelebUD Original" when the hero shows the newsroom's own work. */
+  badge?: string;
 }
 
-export function Hero({ featuredContent }: HeroProps) {
+export function Hero({ featuredContent, badge = 'Featured' }: HeroProps) {
   if (!featuredContent || featuredContent.length === 0) {
     return null;
   }
@@ -41,7 +43,7 @@ export function Hero({ featuredContent }: HeroProps) {
           <div className="absolute top-5 left-5 z-20 flex items-center gap-2">
             <span className="bg-red-600 text-white px-2.5 py-1 rounded text-[11px] font-semibold uppercase tracking-wide flex items-center gap-1">
               <TrendingUp className="w-3 h-3" />
-              <span>Featured</span>
+              <span>{badge}</span>
             </span>
             {mainFeatured.categories && (
               <span className="px-2.5 py-1 rounded text-[11px] font-semibold uppercase tracking-wide bg-white/95 text-gray-900">

@@ -550,8 +550,11 @@ ${sources.length ? `<h2>Sources</h2><ul>${sources.map((s) => `<li><a href="${esc
       // ~20 accurate articles beat 60 where two thirds contradict the
       // heading. Fixing the underlying categorisation is a separate job;
       // until then this page must not inherit the damage.
+      // /originals lists hand-written work only. It used to filter on
+      // is_pinned, which also holds ~620 curated rewrites - contradicting the
+      // page's own heading. is_manual is the same flag that decides indexing.
       hubQuery = isOriginals
-        ? hubQuery.eq('is_pinned', true)
+        ? hubQuery.eq('is_manual', true)
         : hubQuery
             .in('categories.slug', ['fin-advisor', 'finance'])
             .eq('is_manual', true);
@@ -953,6 +956,39 @@ ${relatedHtml}`;
 
     const { data: articles, count } = await query;
     const total = count || 0;
+
+    // The front page leads with CelebUD Originals - the newsroom's own
+    // hand-written work, which is all this site asks Google to index - ahead
+    // of the curated feed. Without this the only links on the homepage
+    // pointed at noindexed rewrites, which tells a crawler (and an ad
+    // network's reviewer) that the site is mostly other outlets' stories.
+    let originalsHtml = '';
+    if (!category && page === 1) {
+      const { data: originals } = await supabase
+        .from('media_content')
+        .select('id, slug, title, description, published_at')
+        .eq('is_manual', true)
+        .eq('is_published', true)
+        .order('published_at', { ascending: false })
+        .limit(12);
+      if (originals && originals.length) {
+        originalsHtml =
+          `<section aria-label="CelebUD Originals"><h2>CelebUD Originals</h2>` +
+          `<p>Our own reporting, guides and tributes, written here.</p><ul>` +
+          originals
+            .map(
+              (a) => `
+    <li>
+      <a href="${articlePath(a)}">
+        <h3>${escapeHtml(a.title)}</h3>
+        <p>${escapeHtml(a.description || '')}</p>
+      </a>
+    </li>`
+            )
+            .join('') +
+          `</ul><p><a href="/originals">See all CelebUD Originals</a></p></section>`;
+      }
+    }
     const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
     // Relative hrefs so the same builder serves the link and the canonical.
@@ -1045,6 +1081,8 @@ ${relatedHtml}`;
           category ? escapeHtml(category.charAt(0).toUpperCase() + category.slice(1)) : 'Latest Stories'
         }${page > 1 ? ` - Page ${page}` : ''}</h1>` +
         `<nav aria-label="Categories"><ul>${categoryNav}</ul></nav>` +
+        originalsHtml +
+        (originalsHtml ? `<h2>Latest Stories</h2>` : '') +
         `<ul>${listHtml}</ul>` +
         pager +
         `</main>`,
