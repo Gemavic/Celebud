@@ -7,6 +7,7 @@ import { RecategorizeArticle } from '../components/RecategorizeArticle';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { toEditableHtml } from '../utils/articleContent';
 import { checkArticleCompliance, type ComplianceViolation } from '../utils/articleCompliance';
+import { findAiTells } from '../utils/aiTells';
 import { sanitizeHtml } from '../utils/htmlSanitizer';
 import { getVideoEmbedUrl, getVideoThumbnail, isEmbeddableVideoUrl } from '../utils/videoEmbed';
 import { Search, Filter, RefreshCw, Eye, Calendar, Pencil, Trash2, X, Save, CheckCircle, Share2, Send, Copy, CheckCheck, Facebook, MessageCircle, Bell, Plus, Sparkles, AlertTriangle, Image as ImageIcon, Video, FileText, Pin, Archive } from 'lucide-react';
@@ -1454,9 +1455,10 @@ export function ArticleManagement() {
     setEditForm((f) => {
       const body = f.content || '';
       if (body.includes(heading)) return f;
-      // Before the conclusion if there is one, else before the closing
-      // disclaimer rule, else at the end.
-      const at = [/<h2>\s*Conclusion/i, /<hr\b/i]
+      // Before the Q&A block if there is one (so the reading order stays
+      // sections, then questions, then conclusion), else before the
+      // conclusion, else before the closing disclaimer rule, else at the end.
+      const at = [/<h2>[^<]*(?:questions and answers|frequently asked|FAQ)/i, /<h2>\s*Conclusion/i, /<hr\b/i]
         .map((re) => body.search(re))
         .find((i) => i >= 0);
       const content = at === undefined ? body + section : body.slice(0, at) + section + body.slice(at);
@@ -1532,6 +1534,18 @@ export function ArticleManagement() {
     if (!editingArticle && !isCreatingNew) return;
     if (editForm.content.includes('upload.pending.invalid')) {
       alert('A photo or video is still uploading into the article. Wait until it appears, then save again.');
+      return;
+    }
+    // House-style check: warn before saving wording that reads as
+    // machine-written, whatever produced it. The editor can still save.
+    const aiTells = findAiTells(editForm.content || '');
+    if (
+      aiTells.length > 0 &&
+      !window.confirm(
+        `This article contains wording that reads as AI-written:\n\n• ${aiTells.slice(0, 12).join('\n• ')}\n\n` +
+          'Press Cancel to go back and rewrite it, or OK to save anyway.'
+      )
+    ) {
       return;
     }
     setSaving(true);

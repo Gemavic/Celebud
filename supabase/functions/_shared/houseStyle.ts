@@ -23,8 +23,12 @@ export const HOUSE_STYLE = `HOUSE STYLE (follow strictly):
 - Write as an experienced newspaper journalist whose first language is English: plain, confident, natural. Short and medium sentences, varied in rhythm. Concrete nouns and strong verbs. Say a thing once, clearly.
 - Use BRITISH ENGLISH spelling and usage consistently, with -ise endings: colour, honour, favour, behaviour, labour, centre, theatre, defence, travelled, cancelled, organise, realise, recognise, analyse, programme (but "computer program"), jewellery, grey, enrol, fulfil. Never mix in American spellings. Keep official names exactly as their owners spell them (e.g. "World Health Organization").
 - Dates as "9 November 2026". Use "per cent" in running text.
-- Do NOT use these words or phrases: delve, tapestry, testament, navigate the complexities, in today's fast-paced world, in today's digital age, ever-evolving, landscape (meaning "situation"), realm, embark, unlock the potential, game-changer, elevate, seamless, leverage (as a verb), utilise, foster, bolster, myriad, plethora, meticulous, intricate, underscore, pivotal, paramount, vibrant, nestled, boasts, showcase, robust (except of physical things), holistic, synergy, "it is important to note", "it is worth noting", "in conclusion", "to sum up", "moreover", "furthermore", "additionally", "not only ... but also", "whether you are ... or ...", "let's dive in", "buckle up".
+- Do NOT use these words or phrases: delve, tapestry, testament, navigate the complexities, in today's fast-paced world, in today's digital age, ever-evolving, landscape (meaning "situation"), realm, embark, unlock the potential, game-changer, elevate, seamless, leverage (as a verb), utilise, foster, bolster, myriad, plethora, meticulous, intricate, underscore, pivotal, paramount, vibrant, nestled, boasts, showcase, robust (except of physical things), holistic, synergy, "it is important to note", "it is worth noting", "in conclusion", "to sum up", "moreover", "furthermore", "additionally", "not only ... but also", "whether you are ... or ...", "let's dive in", "buckle up", mandate (as a verb), subsequent, undertake, commence, facilitate, harness, empower, streamline, crucial, critical (except medical), navigate, landscape, "plays a key role", "the key detail lies in", "second nature", "a stark reminder", "in an era of", "in a world where", "shed light on", "when it comes to", "at the end of the day", "the reality is", "here's the thing", "in order to", "a practical step".
 - No throat-clearing openings, no rhetorical questions to open sections, no lists of three for rhythm's sake, no exclamation marks, no emojis. Use em dashes sparingly - commas and full stops first.
+- Never repeat a fact, figure, step or piece of advice that the article already gives. Every paragraph must tell the reader something new. If there is nothing new to say, say nothing.
+- Do not end a section with a call to action such as "Check your payslip today", "A practical step to take this week is...", "Pull out your permit and..." or "Before you ..., make sure...". End when the point is made.
+- Do not generalise about Nigerians, newcomers or any group ("Many newcomers assume...", "is second nature in Nigeria"). Do not open a section with "Many ...".
+- Do not overstate. Say "can", "may" or "often" unless the rule is certain, and never invent a rule, figure or deadline.
 - Write like a person who knows the subject and respects the reader's time.`;
 
 // --- deterministic clean-up ------------------------------------------------
@@ -54,6 +58,14 @@ const PHRASES: Array<[RegExp, string]> = [
   [/\b(?:myriad|plethora) of\b/gi, 'many'],
   [/\bgame-changer\b/gi, 'big change'],
   [/\blet's dive in\.?\s*/gi, ''],
+  [/\bin order to\b/gi, 'to'],
+  [/\bsubsequent to\b/gi, 'after'],
+  [/\b(?:may|might|will|would|can|could|must|to|shall) mandate that\b/gi, '__MANDATE__'],
+  [/\bat the end of the day,\s*/gi, ''],
+  [/\bit(?:'s| is) no secret that\s*/gi, ''],
+  [/\bshed(?:s|ding)? (?:some )?light on\b/gi, 'explain'],
+  [/\ba deep dive into\b/gi, 'a close look at'],
+  [/\bdive into\b/gi, 'look at'],
 ];
 
 // Verb forms that need the right tense kept.
@@ -78,6 +90,12 @@ const WORDS: Record<string, string> = {
   boasts: 'has',
   nestled: 'set',
   synergy: 'cooperation',
+  mandated: 'required', mandating: 'requiring',
+  subsequent: 'later', subsequently: 'later',
+  commence: 'start', commences: 'starts', commenced: 'started', commencing: 'starting',
+  facilitate: 'help', facilitates: 'helps', facilitated: 'helped', facilitating: 'helping',
+  harnessed: 'used', harnessing: 'using',
+  streamline: 'simplify', streamlines: 'simplifies', streamlined: 'simplified', streamlining: 'simplifying',
 };
 
 // American -> British, lower-case only (capitalised forms are usually names).
@@ -142,6 +160,9 @@ export function polishText(input: string): string {
         const verb = m.toLowerCase().split(/\s+/)[0];
         return keepCase(m, NAVIGATE[verb] || 'deal with');
       }
+      if (rep === '__MANDATE__') {
+        return m.replace(/mandate/i, (w) => keepCase(w, 'require'));
+      }
       if (rep === '__TESTAMENT__') {
         const verb = m.toLowerCase().split(/\s+/)[0];
         const past = verb === 'was' || verb === 'were' || verb === 'stood';
@@ -192,4 +213,61 @@ export function polishHtml(html: string): string {
     out += polishText(part);
   }
   return out;
+}
+
+// --- detection: what cannot be fixed by swapping a word --------------------
+//
+// Some machine-written patterns can't be repaired automatically: a stock
+// phrase whose fix depends on the sentence ("the critical detail lies in"),
+// or a call-to-action closer tacked onto the end of a section. These are
+// reported, not rewritten, so the caller can drop the text or warn the
+// editor. KEEP IN STEP with src/utils/aiTells.ts, which runs the same check
+// in the browser when an article is saved.
+
+export const AI_TELLS: Array<[RegExp, string]> = [
+  [/\ba practical (?:next )?step\b/i, 'a practical step'],
+  [/\b(?:the|a) (?:critical|crucial|key) (?:detail|point|difference) (?:lies|is found)\b/i, 'the critical detail lies in'],
+  [/\bsecond nature\b/i, 'second nature'],
+  [/\bundertak(?:e|es|en|ing)\b/i, 'undertake'],
+  [/\bnavigat(?:e|es|ed|ing)\b/i, 'navigate'],
+  [/\blandscape\b/i, 'landscape'],
+  [/\bcrucial\b/i, 'crucial'],
+  [/\bplay(?:s|ed|ing)? an? (?:crucial|pivotal|vital|key|significant) role\b/i, 'plays a key role'],
+  [/\b(?:a|serves as a) stark reminder\b/i, 'a stark reminder'],
+  [/\bin an era of\b/i, 'in an era of'],
+  [/\bin a world where\b/i, 'in a world where'],
+  [/\bwhen it comes to\b/i, 'when it comes to'],
+  [/\b(?:the reality|the truth) is\b/i, 'the reality is'],
+  [/\bhere(?:'s| is) the thing\b/i, "here's the thing"],
+  [/\bnot only\b[^.]{0,80}\bbut also\b/i, 'not only ... but also'],
+  [/\bwhether you(?:'re| are)\b[^.]{0,80}\bor\b/i, 'whether you are ... or ...'],
+  [/\btransition(?:s|ed|ing)? (?:between|from|into)\b/i, 'transition between'],
+  [/\b(?:pull|dig|take) out your\b/i, 'pull out your'],
+  [/\b(?:delve|tapestry|testament|realm|embark|foster|myriad|plethora|holistic|synergy|paramount|pivotal)\b/i, 'banned word'],
+];
+
+/** The machine-written patterns found in plain text (no HTML). */
+export function findAiTells(text: string): string[] {
+  const plain = (text || '').replace(/<[^>]+>/g, ' ');
+  return AI_TELLS.filter(([re]) => re.test(plain)).map(([, label]) => label);
+}
+
+/**
+ * Removes a final call-to-action paragraph ("Check your payslip today and
+ * ...", "A practical step to take this week ...") from a short section,
+ * as long as at least one other paragraph is left.
+ */
+export function stripClosingCallToAction(html: string): string {
+  const paras = [...(html || '').matchAll(/<p>([\s\S]*?)<\/p>/gi)];
+  if (paras.length < 2) return html;
+  const last = paras[paras.length - 1];
+  const text = last[1].replace(/<[^>]+>/g, ' ').trim();
+  const words = text.split(/\s+/).filter(Boolean).length;
+  const closer =
+    /\b(?:today|this week|right away|immediately|right now|before (?:the next|your next|you (?:accept|sign|print|book|speak)))\b/i.test(text) ||
+    /^(?:a practical|pull out|take a moment|start by|before you|check your|make sure)\b/i.test(text);
+  if (words <= 60 && closer) {
+    return (html.slice(0, last.index) + html.slice((last.index ?? 0) + last[0].length)).trim();
+  }
+  return html;
 }
