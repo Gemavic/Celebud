@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { HOUSE_STYLE, polishHtml, polishText } from '../_shared/houseStyle.ts';
 
 // "Suggest angles" for a rewritten news draft.
 //
@@ -77,6 +78,8 @@ Rules:
 - Each section: a short heading, then 2–3 paragraphs (150–250 words total), ending with one concrete takeaway or question the reader should consider.
 - Plain, warm, direct English. No hype, no clichés.
 
+${HOUSE_STYLE}
+
 Output a SINGLE JSON object, nothing else, no code fences:
 {"angles":[{"label":"2-5 word name of the perspective","heading":"section heading, e.g. What this means for Nigerians in Canada","html":"<p>…</p><p>…</p>"}]}
 The "html" may use only <p>, <strong>, <em>, <ul>, <li>. Escape double quotes inside strings.`;
@@ -122,9 +125,9 @@ The "html" may use only <p>, <strong>, <em>, <ul>, <li>. Escape double quotes in
       .filter((x) => x?.heading && x?.html)
       .slice(0, 3)
       .map((x) => ({
-        label: stripHtml(x.label || x.heading || '').slice(0, 60),
-        heading: stripHtml(x.heading || '').slice(0, 120),
-        html: sanitize(x.html || ''),
+        label: polishText(stripHtml(x.label || x.heading || '')).slice(0, 60),
+        heading: polishText(stripHtml(x.heading || '')).slice(0, 120),
+        html: polishHtml(sanitize(x.html || '')),
       }));
     if (angles.length === 0) throw new Error('No usable angles came back — please try again.');
 

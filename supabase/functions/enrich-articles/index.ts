@@ -4,6 +4,7 @@ import { buildSeoTitle, buildSeoDescription, buildSeoKeywords } from '../_shared
 import { isDurableImageHost, resolvePublishableThumbnail } from '../_shared/articleImages.ts';
 import { submitToIndexNow } from '../_shared/indexnow.ts';
 import { sanitizeDescription } from '../_shared/sourceText.ts';
+import { HOUSE_STYLE, polishHtml, polishText } from '../_shared/houseStyle.ts';
 
 // Turns thin, scraped RSS stubs into properly produced CelebUD articles.
 //
@@ -283,6 +284,8 @@ ABSOLUTE RULES:
 - Direct quotes may be reproduced only if they appear verbatim in the notes, and must be attributed to the person who said them.
 - Write in clear, professional, active-voice news English.
 
+${HOUSE_STYLE}
+
 OUTPUT: respond with ONE JSON object and nothing else — no markdown fences, no commentary. Exactly these keys:
 - "seo_title": search-friendly title, under 70 characters
 - "description": meta description / excerpt, 1-2 sentences, under 160 characters
@@ -398,11 +401,19 @@ ${sourceFacts || article.description || article.content || '(No detailed notes a
   const last = jsonStr.lastIndexOf('}');
   if (first !== -1 && last !== -1) jsonStr = jsonStr.slice(first, last + 1);
 
+  let parsed: Rewrite;
   try {
-    return JSON.parse(jsonStr) as Rewrite;
+    parsed = JSON.parse(jsonStr) as Rewrite;
   } catch {
     throw new Error('malformed JSON from model');
   }
+  // House style, enforced in code: AI-sounding words and American spellings.
+  const r = parsed as unknown as Record<string, unknown>;
+  for (const k of ['seo_title', 'description']) {
+    if (typeof r[k] === 'string') r[k] = polishText(r[k] as string);
+  }
+  if (typeof r.content === 'string') r.content = polishHtml(r.content);
+  return parsed;
 }
 
 /** Unique AI image, used for the stories readers actually see most. */

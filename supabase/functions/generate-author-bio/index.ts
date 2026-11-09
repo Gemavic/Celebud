@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { HOUSE_STYLE, polishHtml, polishText } from '../_shared/houseStyle.ts';
 
 // Generates a short, article-specific "About the Author" bio + disclaimer
 // via Google Gemini, for a human editor to review before saving (manual,
@@ -75,7 +76,9 @@ Deno.serve(async (req: Request) => {
 
 OUTPUT: respond with a SINGLE JSON object and nothing else — no markdown code fences, no commentary. Exactly these keys:
 - "bio": 2-3 sentences, third person, professional tone. Base it ONLY on the author background context given below — never invent credentials, titles, or qualifications the author wasn't described as having.
-- "disclaimer": a short 1 sentence disclaimer IF this article's topic genuinely needs one (financial/insurance/investment advice: not financial advice, consult a licensed professional; health: not medical advice; legal: not legal advice), otherwise an empty string "" — most general news/entertainment/sports articles need no disclaimer at all, don't force one.`;
+- "disclaimer": a short 1 sentence disclaimer IF this article's topic genuinely needs one (financial/insurance/investment advice: not financial advice, consult a licensed professional; health: not medical advice; legal: not legal advice), otherwise an empty string "" — most general news/entertainment/sports articles need no disclaimer at all, don't force one.
+
+${HOUSE_STYLE}`;
 
     const userPrompt = `Author: ${authorName}
 Author background/context: ${expertiseContext?.trim() || '(no specific background provided — write a general professional journalist bio)'}
@@ -153,8 +156,8 @@ Write the "About the Author" bio and disclaimer for THIS article.`;
 
     return new Response(JSON.stringify({
       success: true,
-      bio: result.bio || '',
-      disclaimer: result.disclaimer || '',
+      bio: polishText(result.bio || ''),
+      disclaimer: polishText(result.disclaimer || ''),
     }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

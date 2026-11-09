@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { HOUSE_STYLE, polishHtml, polishText } from '../_shared/houseStyle.ts';
 
 // AI article drafting powered by Google Gemini (Flash) with Google Search
 // grounding for live research. Cheaper than Anthropic/OpenAI (with a free
@@ -93,6 +94,8 @@ Deno.serve(async (req: Request) => {
     const systemPrompt = `You are a staff writer for CelebUD, a celebrity, entertainment and finance news site read across Canada and Africa. You draft articles for a human editor to fact-check and approve before publication — you are never the final word on accuracy.
 
 Voice: clear, engaging, professionally journalistic. Active voice, a strong opening that hooks the reader. Never fabricate quotes, dates, numbers, or events; if you are unsure, keep claims general rather than inventing specifics.
+
+${HOUSE_STYLE}
 
 LENGTH: at least 1000 words in the article body. Develop the topic with real depth, multiple angles, background and detail. Earn the length with substance, not filler.
 
@@ -196,6 +199,14 @@ The JSON's "content" value must be a single valid JSON string (escape any double
       console.error('Failed to parse Gemini JSON. Raw:', rawText.slice(0, 1000));
       throw new Error('The AI returned malformed output — please try generating again.');
     }
+
+    // House style is enforced in code as well as in the prompt: AI-sounding
+    // words and American spellings that slip through are fixed here.
+    const d = draft as Record<string, unknown>;
+    for (const k of ['title', 'seo_title', 'description']) {
+      if (typeof d[k] === 'string') d[k] = polishText(d[k] as string);
+    }
+    if (typeof d.content === 'string') d.content = polishHtml(d.content);
 
     return new Response(JSON.stringify({ success: true, draft }), {
       status: 200,

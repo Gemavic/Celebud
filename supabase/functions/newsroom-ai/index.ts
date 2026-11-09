@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { encodeBase64 } from 'jsr:@std/encoding@1/base64';
+import { HOUSE_STYLE, polishHtml, polishText } from '../_shared/houseStyle.ts';
 
 // AI helpers behind the Newsroom admin page (/admin/newsroom).
 //
@@ -50,7 +51,9 @@ const sanitize = (html: string) =>
       return n === 'hr' || n === 'br' ? `<${n} />` : `<${n}>`;
     });
 
-const CIVIL_RULES = `Never invent facts, numbers, quotes, names, dates or official positions. Plain, warm, direct English for CelebUD readers: Nigerians at home and the Nigerian/African diaspora, especially in Canada.`;
+const CIVIL_RULES = `Never invent facts, numbers, quotes, names, dates or official positions. Plain, warm, direct English for CelebUD readers: Nigerians at home and the Nigerian/African diaspora, especially in Canada.
+
+${HOUSE_STYLE}`;
 
 async function gemini(
   apiKey: string,
@@ -94,10 +97,10 @@ const DRAFT_SHAPE = `"title" (under 100 chars), "description" (meta description 
 
 function cleanDraft(d: Record<string, unknown>) {
   return {
-    title: stripHtml(String(d.title || '')).slice(0, 140),
-    description: stripHtml(String(d.description || '')).slice(0, 300),
+    title: polishText(stripHtml(String(d.title || ''))).slice(0, 140),
+    description: polishText(stripHtml(String(d.description || ''))).slice(0, 300),
     seo_keywords: stripHtml(String(d.seo_keywords || '')).slice(0, 300),
-    content: sanitize(String(d.content || '')),
+    content: polishHtml(sanitize(String(d.content || ''))),
   };
 }
 
@@ -244,7 +247,9 @@ Respond with ONE JSON object only, no code fences:
 {"bio": "3-5 neutral sentences: background, profession, political career (plain text)",
  "past_offices": "semicolon-separated list of offices held with years, or empty string",
  "promises": [{"text": "a specific campaign promise in their own framing, attributed", "date": "YYYY-MM-DD or empty", "source_url": "URL where it was reported"}]}
-Give at most 5 promises, each with a real source URL from your research. If none can be verified, return an empty array.`;
+Give at most 5 promises, each with a real source URL from your research. If none can be verified, return an empty array.
+
+${HOUSE_STYLE}`;
   const gov = String(c.race || '').startsWith('governor-2027-');
   const state = gov ? String(c.race).replace('governor-2027-', '').replace(/^./, (x: string) => x.toUpperCase()) : '';
   const text = `Candidate: ${c.name}${gov ? ' (name as listed by INEC, which often puts the surname first)' : ''}\nParty: ${c.party_name || c.party_abbr} (${c.party_abbr})\n${gov ? 'Deputy' : 'Running mate'}: ${c.running_mate || 'unknown'}\nElection: ${gov ? `${state} State governorship election, 6 February 2027` : 'Nigeria presidential election, 16 January 2027'}.`;
