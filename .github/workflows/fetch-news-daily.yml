@@ -22,10 +22,10 @@
 name: Fetch news daily
 
 on:
-  schedule:
+  # schedule:
     # 11:00 UTC once a day. fetch-news targets 30 quality-gated articles per
     # run, so one run a day delivers exactly the intended daily volume.
-    - cron: '0 11 * * *'
+    # - cron: '0 11 * * *'  (paused Nov 2026)
   workflow_dispatch:
 
 jobs:
