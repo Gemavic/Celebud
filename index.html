@@ -111,8 +111,14 @@
       gtag('config', 'AW-7665832939');
     </script>
 
-    <!-- Google AdSense -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4993440473524094" crossorigin="anonymous"></script>
+    <!-- Google AdSense: account ownership only. The ad script itself is NOT
+         loaded here any more. Loaded in the page head it ran on every screen -
+         curated rewrites, admin pages, loading states - which is exactly what
+         AdSense rejected the site for ("Google-served ads on screens without
+         publisher content" / "low-value content"). src/components/GoogleAd.tsx
+         now loads it only where an ad slot is rendered: the homepage and the
+         newsroom's own hand-written articles. -->
+    <meta name="google-adsense-account" content="ca-pub-4993440473524094" />
   </head>
   <body>
     <div id="root">

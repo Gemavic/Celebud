@@ -13,6 +13,29 @@ declare global {
   }
 }
 
+const ADSENSE_SRC =
+  'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4993440473524094';
+
+/**
+ * Loads the AdSense script the first time an ad slot is actually rendered.
+ *
+ * It used to sit in index.html, so it ran on every screen of the site -
+ * including the curated rewrites, admin pages and empty loading states - and
+ * any Auto ads could land there. AdSense rejected the site for exactly that:
+ * "Google-served ads on screens without publisher content". Now the script
+ * only exists on pages that render a GoogleAd, and those are restricted to
+ * the homepage and the newsroom's own hand-written articles.
+ */
+function ensureAdSenseScript(): void {
+  if (typeof document === 'undefined') return;
+  if (document.querySelector(`script[src^="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]`)) return;
+  const s = document.createElement('script');
+  s.async = true;
+  s.src = ADSENSE_SRC;
+  s.crossOrigin = 'anonymous';
+  document.head.appendChild(s);
+}
+
 /**
  * An AdSense slot that collapses when no ad is served.
  *
@@ -38,7 +61,9 @@ export function GoogleAd({ slot, format = 'auto', responsive = true, className =
 
   useEffect(() => {
     if (pushed.current) return;
+    ensureAdSenseScript();
     try {
+      // Queued until the script above finishes loading, then filled.
       (window.adsbygoogle = window.adsbygoogle || []).push({});
       pushed.current = true;
     } catch {

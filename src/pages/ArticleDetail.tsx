@@ -42,6 +42,12 @@ export function ArticleDetail() {
   // attached automatically — only a bio explicitly set on the article itself.
   const autoBioEnabled = article?.authors?.auto_bio_enabled !== false;
 
+  // Google ads only on the newsroom's own hand-written work (is_manual).
+  // Curated rewrites of other outlets' stories are what AdSense calls
+  // low-value content; showing its ads on them is why the site was refused.
+  // Those pages are also noindexed, so they stay readable but ad-free.
+  const showGoogleAds = article?.is_manual === true;
+
   const syndicationSource = useMemo(() => {
     const text = (article?.content || '') + ' ' + (article?.description || '');
     const match = text.match(/appeared first on\s+(?:<a[^>]*>)?\s*([^<.\n]{2,60})/i);
@@ -464,7 +470,7 @@ export function ArticleDetail() {
                     dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
                   />
                 )}
-                <GoogleAd slot="2687784187" format="rectangle" className="my-6" />
+                {showGoogleAds && <GoogleAd slot="2687784187" format="rectangle" className="my-6" />}
               </>
             ) : contentParagraphs.length > 0 ? (
               <div className="text-gray-700 text-base leading-relaxed space-y-5">
@@ -493,7 +499,7 @@ export function ArticleDetail() {
                         {paragraph}
                       </p>
                       {showPartner && index === 2 && contentParagraphs.length > 5 && <PartnerCard variant="article" />}
-                      {showMidArticleAd && (
+                      {showMidArticleAd && showGoogleAds && (
                         <GoogleAd slot="2687784187" format="rectangle" className="my-6" />
                       )}
                     </div>
@@ -686,7 +692,7 @@ export function ArticleDetail() {
             <AdBanner placement="article" />
           </div>
 
-          <GoogleAd slot="6950728752" format="horizontal" className="my-8" />
+          {showGoogleAds && <GoogleAd slot="6950728752" format="horizontal" className="my-8" />}
         </div>
       </article>
     </div>
