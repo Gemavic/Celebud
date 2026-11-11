@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { encodeBase64 } from 'jsr:@std/encoding@1/base64';
-import { HOUSE_STYLE, polishHtml, polishText } from '../_shared/houseStyle.ts';
+import { HOUSE_STYLE, polishText, enforceHouseStyle } from '../_shared/houseStyle.ts';
 
 // AI helpers behind the Newsroom admin page (/admin/newsroom).
 //
@@ -95,12 +95,15 @@ async function gemini(
 
 const DRAFT_SHAPE = `"title" (under 100 chars), "description" (meta description under 200 chars, no byline, no "By ..."), "seo_keywords" (5-8 comma-separated terms), "content" (HTML using only <h2>, <h3>, <p>, <strong>, <em>, <ul>, <ol>, <li>, <blockquote>; no <h1>; end with a <h2>Conclusion</h2> section)`;
 
-function cleanDraft(d: Record<string, unknown>) {
+// House style on every draft. Quotations (in quote marks or <blockquote>)
+// are someone's own words and are never changed; only CelebUD's own framing
+// sentences are polished and, where needed, rewritten.
+async function cleanDraft(d: Record<string, unknown>, key: string) {
   return {
     title: polishText(stripHtml(String(d.title || ''))).slice(0, 140),
-    description: polishText(stripHtml(String(d.description || ''))).slice(0, 300),
+    description: (await enforceHouseStyle(stripHtml(String(d.description || '')), key, MODEL)).html.slice(0, 300),
     seo_keywords: stripHtml(String(d.seo_keywords || '')).slice(0, 300),
-    content: polishHtml(sanitize(String(d.content || ''))),
+    content: (await enforceHouseStyle(sanitize(String(d.content || '')), key, MODEL)).html,
   };
 }
 
@@ -123,7 +126,7 @@ async function transcribeVoice(sb: SupabaseClient, key: string, body: Record<str
 Output one JSON object: {"transcript": "...", ${DRAFT_SHAPE}}`;
   const text = `Interviewee: ${interviewee}${role ? `\nWho they are: ${role}` : ''}${topic ? `\nTopic the editor asked about: ${topic}` : ''}`;
   const d = await gemini(key, system, [{ text }, { inline_data: { mime_type: mime, data: b64 } }], 16384);
-  return { transcript: String(d.transcript || ''), draft: cleanDraft(d) };
+  return { transcript: String(d.transcript || ''), draft: await cleanDraft(d, key) };
 }
 
 async function radarScore(sb: SupabaseClient, key: string) {
@@ -232,7 +235,7 @@ Output: {"themes":[{"theme":"...","count":0,"example_indexes":[0]}], ${DRAFT_SHA
     theme: stripHtml(String(t.theme || '')).slice(0, 200),
     count: Number(t.count) || 0,
   }));
-  return { themes, total: answers.length, draft: cleanDraft(d) };
+  return { themes, total: answers.length, draft: await cleanDraft(d, key) };
 }
 
 // Researched candidate profile for the Election 2027 hub, with sources.
@@ -298,7 +301,7 @@ Use only what the family wrote. Keep their words where they are moving; any sent
 Output: {${DRAFT_SHAPE}}`;
   const text = `Honoree: ${s.honoree_name}\nOccasion: ${s.occasion}${s.occasion_date ? ` (${s.occasion_date})` : ''}\nSubmitted by: ${s.submitter_name}${s.relationship ? `, ${s.relationship}` : ''}\n\nTHEIR STORY:\n${s.story}${s.quotes ? `\n\nWORDS FROM FAMILY AND FRIENDS:\n${s.quotes}` : ''}`;
   const d = await gemini(key, system, [{ text }], 8192);
-  const draft = cleanDraft(d);
+  const draft = await cleanDraft(d, key);
   const photos = (s.photos || []) as string[];
   if (photos.length > 1) {
     const gallery = photos.slice(1).map((u) => `<p><img src="${esc(u)}" alt="${esc(s.honoree_name)}" /></p>`).join('');

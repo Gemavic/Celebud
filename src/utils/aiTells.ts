@@ -23,7 +23,7 @@ const TELLS: RegExp[] = [
   /\bwhen it comes to\b/i,
   /\b(?:the reality|the truth) is\b/i,
   /\bhere(?:'s| is) the thing\b/i,
-  /\bnot only\b[^.]{0,80}\bbut also\b/i,
+  /\bnot only\b/i,
   /\bwhether you(?:'re| are)\b[^.]{0,80}\bor\b/i,
   /\btransition(?:s|ed|ing)? (?:between|from|into)\b/i,
   /\b(?:pull|dig|take) out your\b/i,
@@ -35,6 +35,15 @@ const TELLS: RegExp[] = [
   /\bin conclusion\b/i,
   /\bin today's (?:fast-paced|digital|modern|ever-changing)\b/i,
   /\bin order to\b/i,
+  /\b(?:is|are|was|were|isn't|aren't|wasn't|weren't)(?: not)? (?:just|merely|simply) (?:a|an|the|about)\b[^.]{0,80}[,;:—–-]\s*(?:it|they|this)(?:'s| is| are| was| were)\b/i,
+  /\bmore than just\b/i,
+  /\b(?:serves|served|stands|stood) as an? \b/i,
+  /\b(?:beacon|unwavering|multifaceted|cutting-edge|game-changing)\b/i,
+  /\bresonat(?:e|es|ed|ing)\b/i,
+  /\brevolutioni[sz](?:e|es|ed|ing)\b/i,
+  /\ba (?:wide|broad) (?:array|range|spectrum) of\b/i,
+  /\bkey takeaways?\b/i,
+  /\b(?:fast-paced|ever-changing|ever-evolving)\b/i,
 ];
 
 /**

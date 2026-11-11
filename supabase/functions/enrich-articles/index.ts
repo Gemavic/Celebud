@@ -4,7 +4,7 @@ import { buildSeoTitle, buildSeoDescription, buildSeoKeywords } from '../_shared
 import { isDurableImageHost, resolvePublishableThumbnail } from '../_shared/articleImages.ts';
 import { submitToIndexNow } from '../_shared/indexnow.ts';
 import { sanitizeDescription } from '../_shared/sourceText.ts';
-import { HOUSE_STYLE, polishHtml, polishText } from '../_shared/houseStyle.ts';
+import { HOUSE_STYLE, polishText, enforceHouseStyle } from '../_shared/houseStyle.ts';
 
 // Turns thin, scraped RSS stubs into properly produced CelebUD articles.
 //
@@ -412,7 +412,7 @@ ${sourceFacts || article.description || article.content || '(No detailed notes a
   for (const k of ['seo_title', 'description']) {
     if (typeof r[k] === 'string') r[k] = polishText(r[k] as string);
   }
-  if (typeof r.content === 'string') r.content = polishHtml(r.content);
+  if (typeof r.content === 'string') r.content = (await enforceHouseStyle(r.content, apiKey, GEMINI_MODEL)).html;
   return parsed;
 }
 

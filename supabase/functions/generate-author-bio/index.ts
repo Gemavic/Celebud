@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { HOUSE_STYLE, polishHtml, polishText } from '../_shared/houseStyle.ts';
+import { HOUSE_STYLE, polishText, enforceHouseStyle } from '../_shared/houseStyle.ts';
 
 // Generates a short, article-specific "About the Author" bio + disclaimer
 // via Google Gemini, for a human editor to review before saving (manual,
@@ -156,7 +156,7 @@ Write the "About the Author" bio and disclaimer for THIS article.`;
 
     return new Response(JSON.stringify({
       success: true,
-      bio: polishText(result.bio || ''),
+      bio: (await enforceHouseStyle(result.bio || '', apiKey, GEMINI_MODEL)).html,
       disclaimer: polishText(result.disclaimer || ''),
     }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

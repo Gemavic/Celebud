@@ -138,6 +138,20 @@ const SPELLING: Record<string, string> = {
   hospitalized: 'hospitalised', urbanization: 'urbanisation', globalization: 'globalisation',
 };
 
+
+// "Victims not only lose their savings, but also face ..." becomes
+// "Victims lose their savings and face ...". An inverted form ("Not only did
+// they ...") is left alone: it cannot be fixed by deleting words, so it is
+// caught by findAiTells() and rewritten by enforceHouseStyle() instead.
+const AUX = /^(?:did|does|do|is|are|was|were|has|have|had|can|could|will|would|should|must|might|may)\b/i;
+function fixNotOnly(input: string): string {
+  return input.replace(/\b(not only)\s+([^.;:!?]{1,160}?),?\s+but (?:also|even)\s+/gi, (m, lead: string, mid: string) => {
+    if (AUX.test(mid)) return m;
+    const first = lead[0] === 'N' ? mid.charAt(0).toUpperCase() + mid.slice(1) : mid;
+    return `${first} and `;
+  });
+}
+
 const CUT = '\u0001';
 
 const keepCase = (match: string, replacement: string) =>
@@ -148,7 +162,21 @@ const keepCase = (match: string, replacement: string) =>
 /** Clean one run of plain text (no HTML tags inside). */
 export function polishText(input: string): string {
   if (!input) return input;
-  let s = input;
+  // Words inside quotation marks are someone's own words (an interviewee, a
+  // family, an official): they are never changed. Only the text between
+  // quotes is polished.
+  if (/[“"]/.test(input)) {
+    return input
+      .split(/(“[^”]*”|"[^"]*")/g)
+      .map((seg) => (seg.startsWith('“') || seg.startsWith('"') ? seg : polishPlain(seg)))
+      .join('');
+  }
+  return polishPlain(input);
+}
+
+function polishPlain(input: string): string {
+  if (!input) return input;
+  let s = fixNotOnly(input);
 
   for (const [re, rep] of PHRASES) {
     s = s.replace(re, (m) => {
@@ -208,9 +236,15 @@ export function polishHtml(html: string): string {
   if (!html) return html;
   const parts = html.split(/(<[^>]+>)/g);
   let out = '';
+  let quoteDepth = 0; // inside <blockquote>: someone's own words, left alone
   for (const part of parts) {
-    if (part.startsWith('<')) { out += part; continue; }
-    out += polishText(part);
+    if (part.startsWith('<')) {
+      if (/^<blockquote\b/i.test(part)) quoteDepth++;
+      else if (/^<\/blockquote>/i.test(part)) quoteDepth = Math.max(0, quoteDepth - 1);
+      out += part;
+      continue;
+    }
+    out += quoteDepth > 0 ? part : polishText(part);
   }
   return out;
 }
@@ -239,11 +273,22 @@ export const AI_TELLS: Array<[RegExp, string]> = [
   [/\bwhen it comes to\b/i, 'when it comes to'],
   [/\b(?:the reality|the truth) is\b/i, 'the reality is'],
   [/\bhere(?:'s| is) the thing\b/i, "here's the thing"],
-  [/\bnot only\b[^.]{0,80}\bbut also\b/i, 'not only ... but also'],
+  [/\bnot only\b/i, 'not only ... but also'],
   [/\bwhether you(?:'re| are)\b[^.]{0,80}\bor\b/i, 'whether you are ... or ...'],
   [/\btransition(?:s|ed|ing)? (?:between|from|into)\b/i, 'transition between'],
   [/\b(?:pull|dig|take) out your\b/i, 'pull out your'],
   [/\b(?:delve|tapestry|testament|realm|embark|foster|myriad|plethora|holistic|synergy|paramount|pivotal)\b/i, 'banned word'],
+  [/\b(?:is|are|was|were|isn't|aren't|wasn't|weren't)(?: not)? (?:just|merely|simply) (?:a|an|the|about)\b[^.]{0,80}[,;:—–-]\s*(?:it|they|this)(?:'s| is| are| was| were)\b/i, "it's not just X, it's Y"],
+  [/\bmore than just\b/i, 'more than just'],
+  [/\b(?:serves|served|stands|stood) as an? \b/i, 'serves as a'],
+  [/\b(?:beacon|unwavering|multifaceted|cutting-edge|game-changing)\b/i, 'stock phrase'],
+  [/\bresonat(?:e|es|ed|ing)\b/i, 'resonate'],
+  [/\brevolutioni[sz](?:e|es|ed|ing)\b/i, 'revolutionise'],
+  [/\ba (?:wide|broad) (?:array|range|spectrum) of\b/i, 'a wide range of'],
+  [/\bkey takeaways?\b/i, 'key takeaway'],
+  [/\b(?:fast-paced|ever-changing|ever-evolving)\b/i, 'fast-paced'],
+  [/\b(?:moreover|furthermore|additionally)\b/i, 'moreover'],
+  [/\bit is (?:important|worth|crucial) (?:to note|noting)\b/i, 'it is important to note'],
 ];
 
 /** The machine-written patterns found in plain text (no HTML). */
@@ -271,3 +316,104 @@ export function stripClosingCallToAction(html: string): string {
   }
   return html;
 }
+
+// --- repair: rewrite what the word lists cannot fix ------------------------
+//
+// The prompt bans these patterns and polishText() swaps single words, but a
+// model still writes the odd "not only did X, but Y" or "serves as a beacon".
+// enforceHouseStyle() finds every sentence that still carries a pattern from
+// AI_TELLS and has the model rewrite just those sentences as a native-speaking
+// sub-editor would, keeping every fact. Two rounds at most. Whatever is still
+// left is returned in `remaining`, and the editor's save check flags it.
+
+const BANNED_FOR_REWRITE =
+  'not only ... but also; whether you are ... or; it is not just X, it is Y; more than just; serves as / stands as; beacon; ' +
+  'unwavering; multifaceted; resonate; revolutionise; cutting-edge; game-changing; a wide range/array of; key takeaway; ' +
+  'fast-paced; ever-changing; landscape; navigate; crucial; undertake; transition between; plays a key role; ' +
+  'the critical detail lies in; second nature; a stark reminder; in an era of; in a world where; when it comes to; ' +
+  'the reality is; here is the thing; moreover; furthermore; additionally; it is important to note; delve; tapestry; ' +
+  'testament; realm; embark; foster; myriad; plethora; holistic; synergy; paramount; pivotal';
+
+/** Sentences (inside text, never across tags) that carry an AI pattern. */
+function sentencesWithTells(html: string): string[] {
+  const found = new Set<string>();
+  let quoteDepth = 0;
+  for (const part of (html || '').split(/(<[^>]+>)/g)) {
+    if (!part) continue;
+    if (part.startsWith('<')) {
+      if (/^<blockquote\b/i.test(part)) quoteDepth++;
+      else if (/^<\/blockquote>/i.test(part)) quoteDepth = Math.max(0, quoteDepth - 1);
+      continue;
+    }
+    if (quoteDepth > 0) continue; // never rewrite a quotation
+    const sentences = part.match(/[^.!?]+(?:[.!?]+["'’”)\]]*|$)/g) || [];
+    for (const raw of sentences) {
+      const t = raw.trim();
+      if (/[“”"]/.test(t)) continue; // contains a quotation: leave it
+      if (t.length > 15 && t.length < 700 && findAiTells(t).length > 0) found.add(t);
+    }
+  }
+  return [...found].slice(0, 40);
+}
+
+async function rewriteSentences(sentences: string[], apiKey: string, model: string): Promise<string[] | null> {
+  const system = `You are the chief sub-editor of a British-English newspaper. Rewrite each sentence you are given so it reads as plain, natural English written by an experienced journalist whose first language is English.
+- Keep every fact, name, number, date and the meaning exactly. Add nothing and drop nothing that carries information.
+- Keep it about the same length or shorter. Keep the same tense and person. British spelling.
+- Never use any of these: ${BANNED_FOR_REWRITE}.
+Return a SINGLE JSON object, nothing else: {"rewrites":["...","..."]} with exactly one rewrite per sentence, in the same order.`;
+  const user = sentences.map((s, i) => `${i + 1}. ${s}`).join('\n');
+  try {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: 'user', parts: [{ text: user }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 4096, responseMimeType: 'application/json' },
+        }),
+      },
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const raw: string = (data?.candidates?.[0]?.content?.parts || [])
+      .map((p: { text?: string }) => p.text || '').join('').trim();
+    const a = raw.indexOf('{'); const b = raw.lastIndexOf('}');
+    const parsed = JSON.parse(a !== -1 && b !== -1 ? raw.slice(a, b + 1) : raw);
+    const out = Array.isArray(parsed?.rewrites) ? parsed.rewrites : null;
+    return out && out.length === sentences.length ? out.map((x: unknown) => String(x ?? '')) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Polish, then rewrite any sentence that still reads as machine-written.
+ * Never throws: if the rewrite call fails, the polished text is returned and
+ * `remaining` lists what is left for the editor's save check to flag.
+ */
+export async function enforceHouseStyle(
+  html: string,
+  apiKey: string,
+  model = 'gemini-flash-latest',
+): Promise<{ html: string; remaining: string[] }> {
+  let out = polishHtml(html || '');
+  for (let round = 0; round < 2; round++) {
+    const bad = sentencesWithTells(out);
+    if (bad.length === 0) break;
+    const fixed = await rewriteSentences(bad, apiKey, model);
+    if (!fixed) break;
+    bad.forEach((orig, i) => {
+      const next = polishText(fixed[i].replace(/<[^>]+>/g, '').trim());
+      // Only accept a rewrite that is clean and has not lost or gained a number.
+      const nums = (x: string) => (x.match(/\d[\d,.]*/g) || []).join('|');
+      if (next && next !== orig && findAiTells(next).length === 0 && nums(next) === nums(orig)) {
+        out = out.split(orig).join(next);
+      }
+    });
+  }
+  return { html: out, remaining: findAiTells(out) };
+}
+

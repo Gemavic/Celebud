@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { HOUSE_STYLE, polishHtml, polishText } from '../_shared/houseStyle.ts';
+import { HOUSE_STYLE, polishText, enforceHouseStyle } from '../_shared/houseStyle.ts';
 
 // AI article drafting powered by Google Gemini (Flash) with Google Search
 // grounding for live research. Cheaper than Anthropic/OpenAI (with a free
@@ -201,12 +201,18 @@ The JSON's "content" value must be a single valid JSON string (escape any double
     }
 
     // House style is enforced in code as well as in the prompt: AI-sounding
-    // words and American spellings that slip through are fixed here.
+    // words and American spellings are fixed, and any sentence that still
+    // reads as machine-written is rewritten by a second, sub-editing pass.
     const d = draft as Record<string, unknown>;
-    for (const k of ['title', 'seo_title', 'description']) {
+    for (const k of ['title', 'seo_title']) {
       if (typeof d[k] === 'string') d[k] = polishText(d[k] as string);
     }
-    if (typeof d.content === 'string') d.content = polishHtml(d.content);
+    if (typeof d.description === 'string') d.description = (await enforceHouseStyle(d.description, apiKey, GEMINI_MODEL)).html;
+    if (typeof d.content === 'string') {
+      const styled = await enforceHouseStyle(d.content, apiKey, GEMINI_MODEL);
+      d.content = styled.html;
+      if (styled.remaining.length) console.warn('house style: still flagged after rewrite:', styled.remaining.join(', '));
+    }
 
     return new Response(JSON.stringify({ success: true, draft }), {
       status: 200,
