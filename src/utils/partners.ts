@@ -41,7 +41,11 @@ const PARTNER_SECTIONS = new Set(['entertainment', 'celebrity', 'lifestyle', 'tr
 // must never carry a dating ad.
 const SOMBRE = /\b(dies|died|death|dead|killed|kills|murder|funeral|burial|mourn|tribute|rip|r\.i\.p|passes away|passed away|tragedy|tragic|accident|crash|abuse|assault|rape|kidnap|suicide|scam|scammer|fraud|fraudster|catfish|sextortion|cancer|tumour|tumor|outbreak|epidemic|pandemic|cholera|lassa|stroke|terminal|arrested|jailed|sentenced|divorce)(?:s|es|ed|ing)?\b/i;
 
+// Grief stories ("Writer Yiyun Li lost both of her sons") have no single
+// trigger word, so the common phrasings are matched as phrases.
+const LOSS = /\b(?:grief|grieving|griev(?:e|es|ed)|bereave(?:d|ment)|mourning|lost (?:both )?(?:of )?(?:her|his|their|my|our) (?:sons?|daughters?|child|children|baby|husband|wife|mother|father|parents))\b/i;
+
 export function articleAllowsPartner(categorySlug: string | null | undefined, title: string): boolean {
   if (!categorySlug || !PARTNER_SECTIONS.has(categorySlug)) return false;
-  return !SOMBRE.test(title || '');
+  return !SOMBRE.test(title || '') && !LOSS.test(title || '');
 }
