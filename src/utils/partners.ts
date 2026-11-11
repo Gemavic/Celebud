@@ -33,12 +33,13 @@ export function trackPartnerClick(placement: string) {
   } catch { /* ignore */ }
 }
 
-// Where the in-article card may appear: relationship-friendly sections only,
-// and never next to death, tragedy or crime coverage.
-const PARTNER_SECTIONS = new Set(['entertainment', 'celebrity', 'lifestyle', 'travel']);
+// Where the in-article banner may appear: lighter, people-focused sections,
+// never hard politics, security or legal coverage, and never next to death,
+// tragedy, crime or serious illness (the headline check below).
+const PARTNER_SECTIONS = new Set(['entertainment', 'celebrity', 'lifestyle', 'travel', 'society', 'news', 'health']);
 // Plurals and -er forms count too: "Romance Scams Targeting Diaspora Women"
 // must never carry a dating ad.
-const SOMBRE = /\b(dies|died|death|dead|killed|kills|murder|funeral|burial|mourn|tribute|rip|r\.i\.p|passes away|passed away|tragedy|tragic|accident|crash|abuse|assault|rape|kidnap|suicide|scam|scammer|fraud|fraudster|catfish|sextortion|arrested|jailed|sentenced|divorce)(?:s|es|ed|ing)?\b/i;
+const SOMBRE = /\b(dies|died|death|dead|killed|kills|murder|funeral|burial|mourn|tribute|rip|r\.i\.p|passes away|passed away|tragedy|tragic|accident|crash|abuse|assault|rape|kidnap|suicide|scam|scammer|fraud|fraudster|catfish|sextortion|cancer|tumour|tumor|outbreak|epidemic|pandemic|cholera|lassa|stroke|terminal|arrested|jailed|sentenced|divorce)(?:s|es|ed|ing)?\b/i;
 
 export function articleAllowsPartner(categorySlug: string | null | undefined, title: string): boolean {
   if (!categorySlug || !PARTNER_SECTIONS.has(categorySlug)) return false;
