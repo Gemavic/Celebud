@@ -193,7 +193,12 @@ Deno.serve(async (req: Request) => {
       if (page.length < PAGE) break;
     }
 
-    const currentDate = new Date().toISOString();
+    // lastmod must be the date a page's content really changed. Stamping every
+    // static page with "now" on each request taught Google to ignore our
+    // lastmod dates altogether. Pages that list articles take the newest
+    // article's date; fixed pages carry no lastmod at all.
+    const newestArticle = articles.length ? articles[0].updated_at : null;
+    const LISTS_ARTICLES = new Set(['', '/fin-advisor', '/originals']);
     const staticPages = [
       { url: '', priority: '1.0', changefreq: 'daily' },
       { url: '/fin-advisor', priority: '0.8', changefreq: 'daily' },
@@ -221,7 +226,7 @@ Deno.serve(async (req: Request) => {
     staticPages.forEach((page) => {
       sitemap += '  <url>\n';
       sitemap += `    <loc>${SITE_URL}${page.url}</loc>\n`;
-      sitemap += `    <lastmod>${currentDate}</lastmod>\n`;
+      if (LISTS_ARTICLES.has(page.url) && newestArticle) sitemap += `    <lastmod>${newestArticle}</lastmod>\n`;
       sitemap += `    <changefreq>${page.changefreq}</changefreq>\n`;
       sitemap += `    <priority>${page.priority}</priority>\n`;
       sitemap += '  </url>\n';
