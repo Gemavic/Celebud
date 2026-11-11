@@ -248,10 +248,26 @@ export default async function middleware(request: Request) {
     // Treat /about/ as /about; keep "/" itself.
     const path = raw.length > 1 && raw.endsWith('/') ? raw.slice(0, -1) : raw;
 
+    // Old or mistyped homepage addresses that someone has linked to.
+    if (path === '/homepage' || path === '/home' || path === '/index') {
+      return Response.redirect(`${url.origin}/`, 301);
+    }
+
     const known =
       KNOWN_EXACT.has(path) || KNOWN_PREFIXES.some((prefix) => path.startsWith(prefix));
 
     if (!known) return notFoundPage(raw);
+
+    // An article or video address has at most two parts after its prefix
+    // (/article/<id>/<slug>). Anything longer is a broken link -- Google
+    // found one made of three article URLs pasted together -- and the app
+    // used to bounce it around until Google gave up with "Redirect error".
+    // A plain 404 lets Google drop it.
+    if (/^\/(article|watch)\//.test(path) && !REWRITTEN_FOR_BOTS.test(path)) return notFoundPage(raw);
+
+    // Search results are the app's alone and must never be indexed: Google
+    // had indexed "/?search={search_term_string}" as a copy of the homepage.
+    if (url.searchParams.has('search')) return next({ headers: { 'x-robots-tag': 'noindex, follow' } });
 
     const ua = request.headers.get('user-agent') || '';
     const isBot = CRAWLER_UA.test(ua);

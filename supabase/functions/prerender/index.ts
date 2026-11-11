@@ -1059,16 +1059,10 @@ ${relatedHtml}`;
         '@type': 'WebSite',
         name: SITE_NAME,
         url: SITE_URL,
-        // Lets Google show a search box for the site directly in results,
-        // and identifies the publisher so the brand can earn a knowledge panel.
-        potentialAction: {
-          '@type': 'SearchAction',
-          target: {
-            '@type': 'EntryPoint',
-            urlTemplate: `${SITE_URL}/?search={search_term_string}`,
-          },
-          'query-input': 'required name=search_term_string',
-        },
+        // Identifies the publisher so the brand can earn a knowledge panel.
+        // (No SearchAction: Google retired the sitelinks search box in
+        // November 2024, and its template URL "/?search={search_term_string}"
+        // was being crawled and flagged as a duplicate of the homepage.)
         publisher: {
           '@type': 'NewsMediaOrganization',
           name: SITE_NAME,
