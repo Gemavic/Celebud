@@ -1559,6 +1559,50 @@ export function ArticleManagement() {
     }
   };
 
+  // In-text links to related CelebUD originals (newsroom-ai, action
+  // internal_links). The model only picks phrases already in the article and
+  // which existing original to link; the server checks every pick.
+  type AddedLink = { url: string; title: string; anchor: string };
+  const [linking, setLinking] = useState(false);
+  const [linksNote, setLinksNote] = useState<string | null>(null);
+  useEffect(() => { setLinksNote(null); }, [editingArticle?.id]);
+  const hasInternalLink = (html: string) =>
+    /href="(?:https?:\/\/(?:www\.)?celebud\.com)?\/article\//i.test(html || '');
+
+  const requestInternalLinks = async (html: string): Promise<{ html: string; added: AddedLink[] }> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('You must be signed in as an admin to do this.');
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/newsroom-ai`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'internal_links', html, title: editForm.title, id: editingArticle?.id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.error || `Request failed (${res.status})`);
+    return { html: data.html as string, added: (data.added || []) as AddedLink[] };
+  };
+
+  const describeLinks = (added: AddedLink[]) =>
+    added.map((l) => `“${l.anchor}” → ${l.title}`).join('\n');
+
+  const linkRelatedArticles = async () => {
+    setLinking(true);
+    setLinksNote(null);
+    try {
+      const linked = await requestInternalLinks(editForm.content || '');
+      if (linked.added.length === 0) {
+        setLinksNote('No good matches: none of your published originals fits a phrase in this article well enough to link.');
+      } else {
+        setEditForm((f) => ({ ...f, content: linked.html }));
+        setLinksNote(`Added ${linked.added.length} link${linked.added.length === 1 ? '' : 's'}: ${linked.added.map((l) => `“${l.anchor}” → ${l.title}`).join('; ')}. Check them, then Save.`);
+      }
+    } catch (err) {
+      setLinksNote(`Could not add links: ${err instanceof Error ? err.message : 'unknown error'}`);
+    } finally {
+      setLinking(false);
+    }
+  };
+
   const saveArticle = async () => {
     if (!editingArticle && !isCreatingNew) return;
     if (editForm.content.includes('upload.pending.invalid')) {
@@ -1618,11 +1662,29 @@ export function ArticleManagement() {
         setPublishBlockedBy(compliance.violations.filter((v) => v.severity === 'blocking'));
       }
 
+      // Originals get in-text links to related CelebUD originals
+      // automatically the first time they are saved without any. If the
+      // linking step fails for any reason, the article saves as written.
+      let content = editForm.content || '';
+      let autoLinked: AddedLink[] = [];
+      if (isManual && content && !hasInternalLink(content)) {
+        try {
+          const linked = await requestInternalLinks(content);
+          if (linked.added.length > 0) {
+            content = linked.html;
+            autoLinked = linked.added;
+            setEditForm((f) => ({ ...f, content }));
+          }
+        } catch (e) {
+          console.warn('Internal links skipped:', e);
+        }
+      }
+
       const payload = {
         title: editForm.title,
         slug,
         description: editForm.description || null,
-        content: editForm.content || null,
+        content: content || null,
         thumbnail_url: editForm.thumbnail_url || null,
         category_id: editForm.category_id || null,
         author_id: editForm.author_id || null,
@@ -1679,6 +1741,12 @@ export function ArticleManagement() {
       setEditingArticle(null);
       setIsCreatingNew(false);
       fetchArticles();
+      if (autoLinked.length > 0) {
+        alert(
+          `Saved. CelebUD added ${autoLinked.length} link${autoLinked.length === 1 ? '' : 's'} to related articles:\n\n${describeLinks(autoLinked)}\n\n` +
+            'Open the article again if you want to change or remove any of them.'
+        );
+      }
     } catch (err: unknown) {
       console.error('Error saving article:', err);
       const msg = err instanceof Error ? err.message
@@ -2851,6 +2919,18 @@ export function ArticleManagement() {
                   <p className="text-xs text-amber-800 mt-1.5">
                     Proposes three perspectives on what this story means for CelebUD readers. Insert one, read it over, then Save to publish.
                   </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={linkRelatedArticles}
+                      disabled={linking || !(editForm.content || '').trim()}
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-blue-900 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 transition-colors"
+                    >
+                      {linking ? 'Finding related articles…' : 'Link related CelebUD articles'}
+                    </button>
+                    <span className="text-xs text-gray-500">Done automatically on the first save of an original; use this to redo it after edits.</span>
+                  </div>
+                  {linksNote && <p className="mt-2 text-sm text-blue-800">{linksNote}</p>}
                   {anglesError && <p className="mt-2 text-sm text-red-600">{anglesError}</p>}
                   {insertedAngle && (
                     <p className="mt-2 text-sm text-green-700">

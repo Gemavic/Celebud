@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { HOUSE_STYLE, AUDIENCE, polishText, enforceHouseStyle } from '../_shared/houseStyle.ts';
+import { addInternalLinks } from '../_shared/internalLinks.ts';
 
 // AI article drafting powered by Google Gemini (Flash) with Google Search
 // grounding for live research. Cheaper than Anthropic/OpenAI (with a free
@@ -214,6 +215,14 @@ The JSON's "content" value must be a single valid JSON string (escape any double
       const styled = await enforceHouseStyle(d.content, apiKey, GEMINI_MODEL);
       d.content = styled.html;
       if (styled.remaining.length) console.warn('house style: still flagged after rewrite:', styled.remaining.join(', '));
+    }
+    // In-text links to related CelebUD originals, chosen from what is
+    // actually published. Never blocks the draft: on any failure the
+    // content comes back unchanged.
+    if (typeof d.content === 'string' && typeof d.title === 'string') {
+      const linked = await addInternalLinks(supabase, d.content, { title: d.title, apiKey, model: GEMINI_MODEL });
+      d.content = linked.html;
+      d.internal_links = linked.added;
     }
 
     return new Response(JSON.stringify({ success: true, draft }), {

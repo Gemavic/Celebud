@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { encodeBase64 } from 'jsr:@std/encoding@1/base64';
 import { HOUSE_STYLE, AUDIENCE, polishText, enforceHouseStyle, findAiTells } from '../_shared/houseStyle.ts';
+import { addInternalLinks } from '../_shared/internalLinks.ts';
 
 // AI helpers behind the Newsroom admin page (/admin/newsroom).
 //
@@ -392,6 +393,15 @@ Deno.serve(async (req) => {
       case 'candidate_profile': return json({ success: true, ...(await candidateProfile(sb, key, body)) });
       // One-click fix from the editor's save check: rewrite only the
       // sentences that read as machine-written. Quotations are never touched.
+      // In-text links from an article to related CelebUD originals. Used on
+      // an original's first save and by the editor's "Link related" button.
+      case 'internal_links': {
+        const html = String(body.html || '');
+        const title = String(body.title || '').trim();
+        if (!html.trim() || !title) return json({ error: 'The article needs a title and some text first.' }, 400);
+        const linked = await addInternalLinks(sb, html, { title, apiKey: key, model: MODEL, excludeId: body.id ? String(body.id) : undefined });
+        return json({ success: true, html: linked.html, added: linked.added });
+      }
       case 'house_style': {
         const html = String(body.html || '');
         if (!html.trim()) return json({ error: 'Nothing to check.' }, 400);
