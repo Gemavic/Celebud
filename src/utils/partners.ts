@@ -45,7 +45,15 @@ const SOMBRE = /\b(dies|died|death|dead|killed|kills|murder|funeral|burial|mourn
 // trigger word, so the common phrasings are matched as phrases.
 const LOSS = /\b(?:grief|grieving|griev(?:e|es|ed)|bereave(?:d|ment)|mourning|lost (?:both )?(?:of )?(?:her|his|their|my|our) (?:sons?|daughters?|child|children|baby|husband|wife|mother|father|parents))\b/i;
 
+const DATING_SAFETY = /\b(?:dating|date online|romance|romantic|singles?|relationships?|marriage|catfish(?:ed|ing)?)\b/i;
+const SCAM_WORDS = /\b(?:scam|scammer|fraud|fraudster|catfish)(?:s|es|ed|ing)?\b/gi;
+
 export function articleAllowsPartner(categorySlug: string | null | undefined, title: string): boolean {
   if (!categorySlug || !PARTNER_SECTIONS.has(categorySlug)) return false;
-  return !SOMBRE.test(title || '') && !LOSS.test(title || '');
+  // Dating-safety guides ("Romance Scams Aimed at Diaspora Women", "5 Red
+  // Flags on Dating Sites") are read by exactly the people a verified dating
+  // service is for, so scam and fraud words do not block the banner there.
+  // Death, violence, crime, illness and grief words still do.
+  const t = DATING_SAFETY.test(title || '') ? (title || '').replace(SCAM_WORDS, ' ') : (title || '');
+  return !SOMBRE.test(t) && !LOSS.test(t);
 }
