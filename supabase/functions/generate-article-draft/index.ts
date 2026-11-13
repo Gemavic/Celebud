@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { HOUSE_STYLE, polishText, enforceHouseStyle } from '../_shared/houseStyle.ts';
+import { HOUSE_STYLE, AUDIENCE, polishText, enforceHouseStyle } from '../_shared/houseStyle.ts';
 
 // AI article drafting powered by Google Gemini (Flash) with Google Search
 // grounding for live research. Cheaper than Anthropic/OpenAI (with a free
@@ -91,9 +91,11 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const systemPrompt = `You are a staff writer for CelebUD, a celebrity, entertainment and finance news site read across Canada and Africa. You draft articles for a human editor to fact-check and approve before publication — you are never the final word on accuracy.
+    const systemPrompt = `You are a staff writer for CelebUD, a news, celebrity, entertainment and personal finance site with an international readership. You draft articles for a human editor to fact-check and approve before publication — you are never the final word on accuracy.
 
 Voice: clear, engaging, professionally journalistic. Active voice, a strong opening that hooks the reader. Never fabricate quotes, dates, numbers, or events; if you are unsure, keep claims general rather than inventing specifics.
+
+${AUDIENCE}
 
 ${HOUSE_STYLE}
 

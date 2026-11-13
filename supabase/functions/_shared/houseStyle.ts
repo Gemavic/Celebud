@@ -31,6 +31,13 @@ export const HOUSE_STYLE = `HOUSE STYLE (follow strictly):
 - Do not overstate. Say "can", "may" or "often" unless the rule is certain, and never invent a rule, figure or deadline.
 - Write like a person who knows the subject and respects the reader's time.`;
 
+// Who CelebUD writes for. Goes into every drafting prompt beside HOUSE_STYLE.
+export const AUDIENCE = `READERSHIP (follow strictly): CelebUD is read worldwide. Its largest groups of readers are in Nigeria and the rest of Africa (Ghana, Kenya, South Africa and others), the UK, the US, Canada and the Caribbean, along with African communities living abroad.
+- Do not assume the reader lives in Nigeria or in Canada. Write for whoever the story is about and whoever it affects; where it helps, say what it means for readers in the countries most affected.
+- When rules, prices, taxes, benefits or deadlines differ by country, name the country every time ("in the UK", "in Nigeria") and give amounts in that country's currency.
+- Explain a local agency, law or acronym the first time it appears (for example "the CRA, Canada's tax agency").
+- A story about one country should still make sense to a reader anywhere: give enough context for an outsider to follow it.`;
+
 // --- deterministic clean-up ------------------------------------------------
 
 // Phrase-level fixes first (longest first), then single words.
@@ -289,11 +296,22 @@ export const AI_TELLS: Array<[RegExp, string]> = [
   [/\b(?:fast-paced|ever-changing|ever-evolving)\b/i, 'fast-paced'],
   [/\b(?:moreover|furthermore|additionally)\b/i, 'moreover'],
   [/\bit is (?:important|worth|crucial) (?:to note|noting)\b/i, 'it is important to note'],
+  // The rest mirror src/utils/aiTells.ts line for line, so every phrase the
+  // editor's save check flags is also rewritten here before a draft is shown.
+  [/\b(?:utili[sz](?:e|es|ed|ing)|leverag(?:e|es|ed|ing)|seamless(?:ly)?|meticulous(?:ly)?|intricate|bolster(?:s|ed|ing)?|underscor(?:e|es|ed|ing)|showcas(?:e|es|ed|ing)|vibrant|nestled|boasts)\b/i, 'stock word'],
+  [/\b(?:mandat(?:e|es|ed|ing)|subsequent(?:ly)?|commenc(?:e|es|ed|ing)|facilitat(?:e|es|ed|ing))\b/i, 'formal word'],
+  [/\bin conclusion\b/i, 'in conclusion'],
+  [/\bin today's (?:fast-paced|digital|modern|ever-changing)\b/i, "in today's ..."],
+  [/\bin order to\b/i, 'in order to'],
 ];
 
 /** The machine-written patterns found in plain text (no HTML). */
 export function findAiTells(text: string): string[] {
-  const plain = (text || '').replace(/<[^>]+>/g, ' ');
+  // Quotations are someone's own words, so they are never flagged.
+  const plain = (text || '')
+    .replace(/<blockquote\b[\s\S]*?<\/blockquote>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\u201c[^\u201d]*\u201d|"[^"]*"/g, ' ');
   return AI_TELLS.filter(([re]) => re.test(plain)).map(([, label]) => label);
 }
 
@@ -329,7 +347,7 @@ export function stripClosingCallToAction(html: string): string {
 const BANNED_FOR_REWRITE =
   'not only ... but also; whether you are ... or; it is not just X, it is Y; more than just; serves as / stands as; beacon; ' +
   'unwavering; multifaceted; resonate; revolutionise; cutting-edge; game-changing; a wide range/array of; key takeaway; ' +
-  'fast-paced; ever-changing; landscape; navigate; crucial; undertake; transition between; plays a key role; ' +
+  'fast-paced; ever-changing; mandate; subsequent; commence; facilitate; utilise; leverage; seamless; showcase; underscore; bolster; vibrant; in order to; in conclusion; landscape; navigate; crucial; undertake; transition between; plays a key role; ' +
   'the critical detail lies in; second nature; a stark reminder; in an era of; in a world where; when it comes to; ' +
   'the reality is; here is the thing; moreover; furthermore; additionally; it is important to note; delve; tapestry; ' +
   'testament; realm; embark; foster; myriad; plethora; holistic; synergy; paramount; pivotal';

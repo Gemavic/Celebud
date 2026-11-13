@@ -1530,23 +1530,57 @@ export function ArticleManagement() {
     }
   };
 
+  // Sends the article body to the sub-editor pass (newsroom-ai, action
+  // house_style), which rewrites only the sentences flagged as AI-written.
+  // Quotations are left exactly as they are.
+  const fixHouseStyle = async () => {
+    setSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('You must be signed in as an admin to do this.');
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/newsroom-ai`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'house_style', html: editForm.content || '' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `Request failed (${res.status})`);
+      setEditForm((f) => ({ ...f, content: data.html }));
+      const left = Array.isArray(data.remaining) ? data.remaining.length : 0;
+      alert(
+        left === 0
+          ? 'Done: the flagged sentences have been rewritten. Read them over, then press Save again.'
+          : `Rewrote what it could. ${left} phrase(s) still need a manual edit, usually inside a heading, a table or a sentence with formatting. Press Save again to see them.`
+      );
+    } catch (err) {
+      alert(`Could not rewrite automatically: ${err instanceof Error ? err.message : 'unknown error'}. Edit the flagged sentences by hand, or save anyway.`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const saveArticle = async () => {
     if (!editingArticle && !isCreatingNew) return;
     if (editForm.content.includes('upload.pending.invalid')) {
       alert('A photo or video is still uploading into the article. Wait until it appears, then save again.');
       return;
     }
-    // House-style check: warn before saving wording that reads as
-    // machine-written, whatever produced it. The editor can still save.
+    // House-style check: before saving, catch wording that reads as
+    // machine-written, whatever produced it (a drafting tool, pasted text or
+    // the editor's own typing). The editor can have those sentences
+    // rewritten in one click, or save anyway.
     const aiTells = findAiTells(editForm.content || '');
-    if (
-      aiTells.length > 0 &&
-      !window.confirm(
+    if (aiTells.length > 0) {
+      const fixNow = window.confirm(
         `This article contains wording that reads as AI-written:\n\n• ${aiTells.slice(0, 12).join('\n• ')}\n\n` +
-          'Press Cancel to go back and rewrite it, or OK to save anyway.'
-      )
-    ) {
-      return;
+          'Press OK to have just those sentences rewritten in plain English now (you can read the result before saving).\n' +
+          'Press Cancel for other options.'
+      );
+      if (fixNow) {
+        await fixHouseStyle();
+        return;
+      }
+      if (!window.confirm('Save anyway with this wording?\n\nOK = save as it is. Cancel = go back and edit.')) return;
     }
     setSaving(true);
     setPublishBlockedBy(null);

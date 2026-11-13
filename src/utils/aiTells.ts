@@ -51,11 +51,14 @@ const TELLS: RegExp[] = [
  * a few words either side so the editor can find it.
  */
 export function findAiTells(html: string): string[] {
+  // Quotations are someone's own words: never flagged.
   const text = (html || '')
+    .replace(/<blockquote\b[\s\S]*?<\/blockquote>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
-    .replace(/\s+/g, ' ');
+    .replace(/\s+/g, ' ')
+    .replace(/\u201c[^\u201d]*\u201d|"[^"]*"/g, ' ');
   const found: string[] = [];
   for (const re of TELLS) {
     const m = re.exec(text);

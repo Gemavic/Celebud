@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { encodeBase64 } from 'jsr:@std/encoding@1/base64';
-import { HOUSE_STYLE, polishText, enforceHouseStyle } from '../_shared/houseStyle.ts';
+import { HOUSE_STYLE, AUDIENCE, polishText, enforceHouseStyle, findAiTells } from '../_shared/houseStyle.ts';
 
 // AI helpers behind the Newsroom admin page (/admin/newsroom).
 //
@@ -51,7 +51,9 @@ const sanitize = (html: string) =>
       return n === 'hr' || n === 'br' ? `<${n} />` : `<${n}>`;
     });
 
-const CIVIL_RULES = `Never invent facts, numbers, quotes, names, dates or official positions. Plain, warm, direct English for CelebUD readers: Nigerians at home and the Nigerian/African diaspora, especially in Canada.
+const CIVIL_RULES = `Never invent facts, numbers, quotes, names, dates or official positions. Plain, warm, direct English for CelebUD's international readers.
+
+${AUDIENCE}
 
 ${HOUSE_STYLE}`;
 
@@ -148,8 +150,8 @@ async function radarScore(sb: SupabaseClient, key: string) {
 
   const list = rows.map((r, i) => `[${i}] ${r.title} — ${stripHtml(r.description || '').slice(0, 300)}`).join('\n');
   const system = `You are the news editor of CelebUD. ${CIVIL_RULES}
-For each incoming story, judge how much it matters to CelebUD readers specifically (their money, rights, plans, families, community, Nigerian public life). 9-10: must cover with our own angle. 6-8: worth covering if time allows. 0-5: skip (generic foreign news, celebrity gossip with no Nigerian link, sports scores).
-For each story give: "score" (0-10), "why" (one sentence on why it does or doesn't matter to our readers), "summary" (three short lines of what happened, from the text given only), "questions" (2-3 questions a CelebUD story should answer for our readers), "who_to_ask" (1-2 kinds of people the editor could ask — e.g. "a Lagos importer", "a newcomer in Calgary"; never named individuals).
+For each incoming story, judge how much it matters to CelebUD's international readers (Nigeria and the rest of Africa, the UK, the US, Canada, the Caribbean and African communities abroad): their money, rights, plans, families, communities and public life. 9-10: must cover with our own angle. 6-8: worth covering if time allows. 0-5: skip (thin items, gossip of no wider interest, bare sports scores).
+For each story give: "score" (0-10), "why" (one sentence on why it does or doesn't matter to our readers), "summary" (three short lines of what happened, from the text given only), "questions" (2-3 questions a CelebUD story should answer for our readers), "who_to_ask" (1-2 kinds of people the editor could ask — e.g. "a Lagos importer", "a London landlord", "a nurse in Houston", "a newcomer in Calgary"; never named individuals).
 Output: {"stories":[{"index":0,"score":7,"why":"...","summary":["...","...","..."],"questions":["..."],"who_to_ask":["..."]}]}`;
   const d = await gemini(key, system, [{ text: list }], 12000);
   const stories = Array.isArray(d.stories) ? d.stories as Array<Record<string, unknown>> : [];
@@ -388,6 +390,15 @@ Deno.serve(async (req) => {
       case 'group_answers': return json({ success: true, ...(await groupAnswers(sb, key, body)) });
       case 'tribute_draft': return json({ success: true, ...(await tributeDraft(sb, key, body)) });
       case 'candidate_profile': return json({ success: true, ...(await candidateProfile(sb, key, body)) });
+      // One-click fix from the editor's save check: rewrite only the
+      // sentences that read as machine-written. Quotations are never touched.
+      case 'house_style': {
+        const html = String(body.html || '');
+        if (!html.trim()) return json({ error: 'Nothing to check.' }, 400);
+        const before = findAiTells(html).length;
+        const styled = await enforceHouseStyle(html, key, MODEL);
+        return json({ success: true, html: styled.html, fixed: before - styled.remaining.length, remaining: styled.remaining });
+      }
       default: return json({ error: `Unknown action: ${body.action}` }, 400);
     }
   } catch (e) {

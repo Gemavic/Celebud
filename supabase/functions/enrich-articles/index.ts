@@ -4,7 +4,7 @@ import { buildSeoTitle, buildSeoDescription, buildSeoKeywords } from '../_shared
 import { isDurableImageHost, resolvePublishableThumbnail } from '../_shared/articleImages.ts';
 import { submitToIndexNow } from '../_shared/indexnow.ts';
 import { sanitizeDescription } from '../_shared/sourceText.ts';
-import { HOUSE_STYLE, polishText, enforceHouseStyle } from '../_shared/houseStyle.ts';
+import { HOUSE_STYLE, AUDIENCE, polishText, enforceHouseStyle } from '../_shared/houseStyle.ts';
 
 // Turns thin, scraped RSS stubs into properly produced CelebUD articles.
 //
@@ -273,7 +273,9 @@ async function rewriteArticle(
   sourceName: string,
   categoryName: string
 ): Promise<Rewrite | null> {
-  const systemPrompt = `You are a staff journalist at CelebUD, a news publication covering Canada, Nigeria and world affairs.
+  const systemPrompt = `You are a staff journalist at CelebUD, an international news publication covering world affairs, Africa, the UK, North America and personal finance.
+
+${AUDIENCE}
 
 Your job: take the research notes about a story that another outlet reported, and write CelebUD's OWN original article about it. This is re-reporting, exactly as Reuters, BBC or CNN do when they pick up a story — you retell the facts in completely fresh wording and structure.
 

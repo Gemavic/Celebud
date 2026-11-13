@@ -1,11 +1,11 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { HOUSE_STYLE, polishHtml, polishText, findAiTells, stripClosingCallToAction } from '../_shared/houseStyle.ts';
+import { HOUSE_STYLE, AUDIENCE, polishHtml, polishText, findAiTells, stripClosingCallToAction } from '../_shared/houseStyle.ts';
 
 // "Suggest angles" for a rewritten news draft.
 //
 // A rewritten wire story adds nothing Google does not already have. What
-// CelebUD can add is what the story MEANS for its own readers — Nigerians at
-// home, the diaspora in Canada, newcomers, families, small investors. This
+// CelebUD can add is what the story MEANS for its own readers — an
+// international audience across Africa, the UK, North America and beyond. This
 // function reads one draft and proposes up to three such perspectives, each
 // as a short ready-to-edit section. The editor picks one, adjusts it, and
 // saving the article is what publishes it. Nothing here publishes anything.
@@ -83,15 +83,17 @@ Deno.serve(async (req: Request) => {
       .map((m) => stripHtml(m[1]))
       .filter(Boolean);
 
-    const systemPrompt = `You are an editor at CelebUD, a news site whose readers are Nigerians at home and the Nigerian and African diaspora, especially in Canada. You are given an article. It may be a news story other outlets have reported, or a complete guide already written by CelebUD. Your job is NOT to retell or summarise it. Your job is to add what it does not yet say: what it MEANS for CelebUD's readers.
+    const systemPrompt = `You are an editor at CelebUD, a news site with an international readership (see READERSHIP below). You are given an article. It may be a news story other outlets have reported, or a complete guide already written by CelebUD. Your job is NOT to retell or summarise it. Your job is to add what it does not yet say: what it MEANS for CelebUD's readers.
 
-Propose UP TO 3 different perspectives, and only ones that add something the article does not already say. Possible lenses (pick only what fits; never force one): Nigerians in Nigeria (prices, jobs, daily life, policy); the diaspora in Canada/abroad (remittances, investing back home, travel, family); newcomers, students and immigration applicants; small business owners and traders; families and parents; personal finance; the wider African context. Each must be about readers' lives, money, rights, plans or decisions, not opinion for its own sake.
+Propose UP TO 3 different perspectives, and only ones that add something the article does not already say. Possible lenses (pick only what fits; never force one): readers in the country the story is about (prices, jobs, daily life, policy); readers in other countries it affects, such as the UK, the US, Canada, Nigeria, Ghana, Kenya, South Africa or the Caribbean; African communities abroad (remittances, investing back home, travel, family); students, workers and immigration applicants anywhere; small business owners; families and parents; personal finance. Do not default to Nigeria or Canada when the story is about somewhere else. Each must be about readers' lives, money, rights, plans or decisions, not opinion for its own sake.
 
 Rules:
 - Read the WHOLE article first. Do not restate any fact, figure, rule, step, warning or piece of advice it already contains, even in different words. If the article already covers a lens, skip that lens.
 - For each angle, state in "new_point" the one thing it tells the reader that the article does not. If you cannot name one, leave that angle out. Returning one or two angles, or none, is better than repeating the article.
 - Never invent facts, numbers, quotes, names, dates, rules or official positions. Use only facts present in the article, plus well-established general knowledge. When a specific is uncertain, write in general terms ("can", "may", "check with...").
 - Each section: a short, plain heading, then 2–3 paragraphs (120–220 words in total). Stop when the point is made.
+
+${AUDIENCE}
 
 ${HOUSE_STYLE}
 
